@@ -70,14 +70,14 @@ fs.copyFileSync(path.join(pkgRoot, 'dist', 'api', 'index.cjs'), path.join(funcDi
 fs.writeFileSync(path.join(funcDir, 'package.json'), JSON.stringify({ type: 'commonjs' }, null, 2));
 // Function externals (@libsql/client + its whole dep cluster) resolve at
 // RUNTIME from node_modules installed by the Vercel build (Linux variants).
-// nft traces them via includeFiles globs. Nothing is copied locally — local
-// testing uses the workspace node_modules naturally (see smoke-bundle.mjs).
+// includeFiles references the repo's pnpm store with an ABSOLUTE path
+// (computed at build time) — nft ships the traced subset with the function.
 fs.writeFileSync(path.join(funcDir, '.vc-config.json'), JSON.stringify({
   runtime: 'nodejs20.x',
   handler: 'index.cjs',
   maxDuration: 30,
   memory: 1024,
-  includeFiles: '../../../node_modules/.pnpm/**'
+  includeFiles: path.join(monoRoot, 'node_modules', '.pnpm') + '/**'
 }, null, 2));
 
 // config: default routing (function auto-served at /api/index). Path
