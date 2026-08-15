@@ -68,16 +68,64 @@ fs.mkdirSync(funcDir, { recursive: true });
 // .cjs forces CommonJS regardless of any "type": "module" in scope.
 fs.copyFileSync(path.join(pkgRoot, 'dist', 'api', 'index.cjs'), path.join(funcDir, 'index.cjs'));
 fs.writeFileSync(path.join(funcDir, 'package.json'), JSON.stringify({ type: 'commonjs' }, null, 2));
-// Function externals (@libsql/client + its whole dep cluster) resolve at
-// RUNTIME from node_modules installed by the Vercel build (Linux variants).
-// includeFiles references the repo's pnpm store with an ABSOLUTE path
-// (computed at build time) — nft ships the traced subset with the function.
+// Copy the full dependency cluster for external packages into the function's
+// node_modules. Walks each package's real store path and its deps recursively
+// (production deps only), dereferencing pnpm symlinks — guaranteeing the
+// runtime require succeeds regardless of nft/pnpm quirks.
+function copyDeps(names) {
+  const copied = new Set();
+  const nmRoot = path.join(monoRoot, 'node_modules');
+
+  function resolvePkg(name, fromDirs) {
+    for (const dir of fromDirs) {
+      const cand = path.join(dir, name);
+      if (fs.existsSync(path.join(cand, 'package.json'))) return cand;
+    }
+    return null;
+  }
+
+  function pkgDeps(pkgDir) {
+    const pj = JSON.parse(fs.readFileSync(path.join(pkgDir, 'package.json'), 'utf8'));
+    // Include optionalDependencies — that's where the platform-native
+    // binaries live (only the build platform's variant is installed).
+    return Object.keys({ ...pj.dependencies, ...pj.optionalDependencies });
+  }
+
+  function walk(name, searchDirs) {
+    if (copied.has(name)) return;
+    const real = resolvePkg(name, searchDirs);
+    if (!real) {
+      console.warn(`[cloud-build] WARN: cannot resolve ${name}`);
+      return;
+    }
+    const realPath = fs.realpathSync(real);
+    copied.add(name);
+    fs.cpSync(realPath, path.join(funcDir, 'node_modules', name), { recursive: true, dereference: true });
+    const deps = pkgDeps(realPath);
+    // pnpm store layout: a package's deps are SIBLINGS inside its store
+    // entry's node_modules: .pnpm/<pkg>@<ver>/node_modules/<dep>.
+    const storeNm = path.dirname(path.dirname(realPath));
+    const nextDirs = [
+      path.join(realPath, 'node_modules'),   // nested (rare)
+      path.join(storeNm, 'node_modules'),    // pnpm siblings
+      storeNm,                                // already is <entry>/node_modules
+      nmRoot
+    ];
+    for (const dep of deps) walk(dep, nextDirs);
+  }
+
+  for (const n of names) walk(n, [path.join(pkgRoot, 'node_modules'), path.join(monoRoot, 'packages', 'db', 'node_modules'), nmRoot]);
+  return copied;
+}
+
+const copiedDeps = copyDeps(['@libsql/client']);
+console.log('[cloud-build] copied runtime deps:', [...copiedDeps].join(', '));
+
 fs.writeFileSync(path.join(funcDir, '.vc-config.json'), JSON.stringify({
   runtime: 'nodejs20.x',
   handler: 'index.cjs',
   maxDuration: 30,
-  memory: 1024,
-  includeFiles: path.join(monoRoot, 'node_modules', '.pnpm') + '/**'
+  memory: 1024
 }, null, 2));
 
 // config: default routing (function auto-served at /api/index). Path
