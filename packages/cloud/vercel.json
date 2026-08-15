@@ -2,18 +2,5 @@
   "version": 2.5,
   "framework": null,
   "buildCommand": "pnpm run vercel-build",
-  "installCommand": "pnpm install",
-  "outputDirectory": "public",
-  "functions": {
-    "api/index.js": {
-      "maxDuration": 30
-    }
-  },
-  "rewrites": [
-    { "source": "/", "destination": "/api/index" },
-    { "source": "/api/(.*)", "destination": "/api/index" },
-    { "source": "/display", "destination": "/api/index" },
-    { "source": "/admin", "destination": "/api/index" },
-    { "source": "/sw.js", "destination": "/api/index" }
-  ]
+  "installCommand": "pnpm install"
 }
