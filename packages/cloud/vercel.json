@@ -1,5 +1,9 @@
 {
-  "version": 2,
+  "version": 2.5,
+  "framework": null,
+  "buildCommand": "pnpm run vercel-build",
+  "outputDirectory": "dist",
+  "installCommand": "pnpm install",
   "rewrites": [
     { "source": "/", "destination": "/api/index" },
     { "source": "/api/(.*)", "destination": "/api/index" },
