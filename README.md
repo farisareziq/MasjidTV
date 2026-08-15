@@ -66,8 +66,10 @@ node scripts/deploy-cloud.mjs
 
 Env wajib: `TURSO_URL`, `TURSO_AUTH_TOKEN`, `JWT_SECRET`,
 `LICENSE_PUBLIC_KEY`, `VERCEL_BLOB_READ_WRITE_TOKEN` (lihat
-`packages/cloud/.env.example`). Superuser lalai: `admin / 00000000`
-(wajib tukar PIN).
+`packages/cloud/.env.example`). Superuser `admin` menggunakan PIN bootstrap
+**rawak** yang dicetak pada log boot pertama (juga disimpan dalam fail
+`MASJIDTV_SUPERUSER_PIN.txt` dalam direktori sementara) — tukar serta-merta
+selepas login pertama.
 
 ## Lesen
 
