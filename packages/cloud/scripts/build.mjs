@@ -21,9 +21,14 @@ fs.mkdirSync(stubDir, { recursive: true });
 fs.writeFileSync(path.join(stubDir, 'better-sqlite3.js'),
   'export default function unavailable() { throw new Error("better-sqlite3 is not available in the cloud bundle"); }\n');
 
-// 1. Typecheck (source-mapped workspace deps, no emit).
+// 1. Build workspace deps (shared, db) — the cloud typecheck resolves them
+// through node_modules workspace links to their dist output.
 const tsc = path.join(monoRoot, 'node_modules', 'typescript', 'bin', 'tsc');
-execFileSync(process.execPath, [tsc, '-p', path.join(pkgRoot, 'tsconfig.build.json'), '--noEmit'], {
+execFileSync(process.execPath, [tsc, '-p', path.join(monoRoot, 'packages', 'shared', 'tsconfig.json')], { stdio: 'inherit' });
+execFileSync(process.execPath, [tsc, '-p', path.join(monoRoot, 'packages', 'db', 'tsconfig.json')], { stdio: 'inherit' });
+
+// 2. Typecheck the cloud app (plain node_modules resolution).
+execFileSync(process.execPath, [tsc, '-p', path.join(pkgRoot, 'tsconfig.json'), '--noEmit'], {
   stdio: 'inherit'
 });
 
