@@ -5,7 +5,7 @@ let handlerPromise = null;
 
 export default async function handler(req, res) {
   try {
-    handlerPromise ??= import('../dist/api/index.js').then((m) => m.default);
+    handlerPromise ??= import('../dist/api/index.cjs').then((m) => m.default);
     const handler = await handlerPromise;
     return await handler(req, res);
   } catch (err) {

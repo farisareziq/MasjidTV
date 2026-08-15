@@ -1,22 +1,25 @@
-// Smoke-test the bundled cloud function locally: spin it up as an HTTP
-// listener via the Fastify app and hit /api/health + zones.
-import { createRequire } from 'node:module';
+// Smoke-test the bundled cloud function locally. The bundle's externals
+// (@libsql/client) resolve from the workspace node_modules by placing the
+// function bundle in packages/cloud/dist (resolution walks up to the
+// workspace root). On Vercel the runtime resolves them via includeFiles.
 import { createServer } from 'node:http';
+import { createRequire } from 'node:module';
 import path from 'node:path';
-import { fileURLToPath, pathToFileURL } from 'node:url';
+import { fileURLToPath } from 'node:url';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const bundlePath = path.join(__dirname, '..', 'dist', 'api', 'index.js');
+const bundlePath = path.join(__dirname, '..', 'dist', 'api', 'index.cjs');
 
-process.env.NODE_ENV = 'production'; // exercise the fail-fast checks (TURSO_URL is set)
+process.env.NODE_ENV = 'production';
 
-const { default: handler } = await import(pathToFileURL(bundlePath).href);
+const require = createRequire(import.meta.url);
+const handler = require(bundlePath).default;
 
 const server = createServer((req, res) => handler(req, res));
-await new Promise((resolve) => server.listen(8899, '127.0.0.1', resolve));
+await new Promise((resolve) => server.listen(8887, '127.0.0.1', resolve));
 
 async function get(p) {
-  const r = await fetch(`http://127.0.0.1:8899${p}`);
+  const r = await fetch(`http://127.0.0.1:8887${p}`);
   const body = await r.json();
   return { status: r.status, body };
 }

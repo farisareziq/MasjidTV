@@ -32,6 +32,10 @@ const stubDir = path.join(pkgRoot, '.build-stubs');
 fs.mkdirSync(stubDir, { recursive: true });
 fs.writeFileSync(path.join(stubDir, 'better-sqlite3.js'),
   'export default function unavailable() { throw new Error("better-sqlite3 is not available in the cloud bundle"); }\n');
+// @vercel/blob lazily requires @neon-rs/load only for Neon Postgres flows we
+// never use — stub it so bundling doesn't leave a dangling require.
+fs.writeFileSync(path.join(stubDir, 'neon-rs-load.js'),
+  'module.exports = function load() { throw new Error("@neon-rs/load is not available in the cloud bundle"); };\n');
 
 await build({
   entryPoints: [path.join(pkgRoot, 'src', 'api', 'index.ts')],
@@ -39,18 +43,18 @@ await build({
   platform: 'node',
   target: 'node20',
   format: 'cjs',
-  outfile: path.join(pkgRoot, 'dist', 'api', 'index.js'),
+  outfile: path.join(pkgRoot, 'dist', 'api', 'index.cjs'),
   alias: {
     '@masjidtv/shared': path.join(monoRoot, 'packages', 'shared', 'src', 'index.ts'),
     '@masjidtv/db': path.join(monoRoot, 'packages', 'db', 'src', 'index.ts'),
-    'better-sqlite3': path.join(stubDir, 'better-sqlite3.js')
+    'better-sqlite3': path.join(stubDir, 'better-sqlite3.js'),
+    '@neon-rs/load': path.join(stubDir, 'neon-rs-load.js')
   },
-  // Only the libsql native driver stack stays external — everything else
-  // (fastify, jwt, bcrypt, drizzle...) is bundled. The @libsql/* pure-JS
-  // packages are bundled too; they dynamically require the platform binary
-  // package (e.g. @libsql/linux-x64-gnu) which resolves from node_modules
-  // at runtime via includeFiles below.
-  external: ['@libsql/linux-x64-gnu', '@libsql/win32-x64-msvc', '@libsql/darwin-x64', '@libsql/darwin-arm64', 'libsql']
+  // @libsql/client stays EXTERNAL — its JS+native dependency cluster is
+  // copied wholesale into the function dir below (bundling it produced a
+  // broken hrana-only client; the real package resolves the correct
+  // http/ws protocol against libsql:// URLs).
+  external: ['@libsql/client']
 });
 
 // 3. Assemble Build Output API layout.
@@ -63,15 +67,19 @@ fs.writeFileSync(path.join(outRoot, 'static', 'index.html'), '<!doctype html><ti
 // function
 const funcDir = path.join(outRoot, 'functions', 'api', 'index.func');
 fs.mkdirSync(funcDir, { recursive: true });
-fs.copyFileSync(path.join(pkgRoot, 'dist', 'api', 'index.js'), path.join(funcDir, 'index.js'));
+// .cjs forces CommonJS regardless of any "type": "module" in scope.
+fs.copyFileSync(path.join(pkgRoot, 'dist', 'api', 'index.cjs'), path.join(funcDir, 'index.cjs'));
+fs.writeFileSync(path.join(funcDir, 'package.json'), JSON.stringify({ type: 'commonjs' }, null, 2));
+// Function externals (@libsql/client + its whole dep cluster) resolve at
+// RUNTIME from node_modules installed by the Vercel build (Linux variants).
+// nft traces them via includeFiles globs. Nothing is copied locally — local
+// testing uses the workspace node_modules naturally (see smoke-bundle.mjs).
 fs.writeFileSync(path.join(funcDir, 'vc-config.json'), JSON.stringify({
   runtime: 'nodejs20.x',
-  handler: 'index.js',
+  handler: 'index.cjs',
   maxDuration: 30,
   memory: 1024,
-  // Ship the libsql platform binaries with the function (the bundle's
-  // dynamic require of @libsql/<platform> resolves against these).
-  includeFiles: 'node_modules/@libsql/** node_modules/libsql/**'
+  includeFiles: '../../../node_modules/.pnpm/**'
 }, null, 2));
 
 // routes: everything -> function
