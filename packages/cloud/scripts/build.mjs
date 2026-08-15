@@ -72,7 +72,7 @@ fs.writeFileSync(path.join(funcDir, 'package.json'), JSON.stringify({ type: 'com
 // RUNTIME from node_modules installed by the Vercel build (Linux variants).
 // nft traces them via includeFiles globs. Nothing is copied locally — local
 // testing uses the workspace node_modules naturally (see smoke-bundle.mjs).
-fs.writeFileSync(path.join(funcDir, 'vc-config.json'), JSON.stringify({
+fs.writeFileSync(path.join(funcDir, '.vc-config.json'), JSON.stringify({
   runtime: 'nodejs20.x',
   handler: 'index.cjs',
   maxDuration: 30,
