@@ -1,0 +1,29 @@
+# Vercel CLI deploys scan the whole repo — exclude everything the cloud
+# build does not need. Kept: root manifests (.npmrc, package.json,
+# pnpm-lock.yaml, pnpm-workspace.yaml, tsconfig.base.json) + the three
+# workspace packages cloud depends on (sources only, built by vercel-build).
+release/
+dist/
+coverage/
+.github/
+.vite/
+logs/
+data/
+cloud-data/
+node_modules/
+apps/
+scripts/
+tools/
+packages/frontend/
+packages/server/
+packages/cloud/node_modules/
+packages/cloud/dist/
+packages/cloud/.vercel/
+packages/cloud/.env*
+packages/shared/node_modules/
+packages/shared/dist/
+packages/db/node_modules/
+packages/db/dist/
+packages/db/data/
+*.log
+*.zip

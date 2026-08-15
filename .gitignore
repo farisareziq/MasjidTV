@@ -13,3 +13,6 @@ logs/
 packages/frontend/public/hls.min.js
 data/
 cloud-data/
+
+.vercel
+.env*
