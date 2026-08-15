@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#0B1C33"/>
+      <stop offset="1" stop-color="#143E62"/>
+    </linearGradient>
+    <linearGradient id="gold" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#F4D894"/>
+      <stop offset="1" stop-color="#D9A441"/>
+    </linearGradient>
+  </defs>
+  <rect width="120" height="120" rx="26" fill="url(#bg)"/>
+  <circle cx="60" cy="60" r="56" fill="none" stroke="url(#gold)" stroke-width="3" opacity="0.45"/>
+  <path fill-rule="evenodd" fill="#F4D894"
+    d="M60 20 a12 12 0 1 0 0 24 a12 12 0 1 0 0 -24 M67 22 a9 9 0 1 0 0 18 a9 9 0 1 0 0 -18 Z"/>
+  <rect x="19" y="50" width="7" height="34" rx="3" fill="url(#gold)"/>
+  <path fill="url(#gold)" d="M22.5 43 m-4 0 a4 4 0 1 0 8 0 a4 4 0 1 0 -8 0 Z"/>
+  <rect x="94" y="50" width="7" height="34" rx="3" fill="url(#gold)"/>
+  <path fill="url(#gold)" d="M97.5 43 m-4 0 a4 4 0 1 0 8 0 a4 4 0 1 0 -8 0 Z"/>
+  <path fill="url(#gold)" d="M34 84 Q34 42 60 42 Q86 42 86 84 Z"/>
+  <rect x="30" y="82" width="60" height="7" rx="3.5" fill="url(#gold)"/>
+  <path fill="#0A1A2F" d="M52 89 v-12 a8 8 0 0 1 16 0 v12 Z"/>
+  <path stroke="#62D9C6" stroke-width="3" fill="none" stroke-linecap="round" d="M42 72 Q60 60 78 72"/>
+</svg>

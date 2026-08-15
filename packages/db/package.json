@@ -1,0 +1,31 @@
+{
+  "name": "@masjidtv/db",
+  "version": "1.0.0",
+  "type": "module",
+  "description": "Drizzle schema + migrations + client factory (better-sqlite3 local, libsql cloud)",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "generate": "drizzle-kit generate",
+    "migrate": "drizzle-kit migrate"
+  },
+  "dependencies": {
+    "@libsql/client": "^0.17.4",
+    "better-sqlite3": "^11.7.0",
+    "drizzle-orm": "0.38.4"
+  },
+  "devDependencies": {
+    "@types/better-sqlite3": "^7.6.12",
+    "drizzle-kit": "^0.30.0",
+    "node-gyp": "^13.0.1",
+    "typescript": "^5.7.2"
+  }
+}

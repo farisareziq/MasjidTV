@@ -1,0 +1,11 @@
+# Normalize line endings: LF in repo, working copy may vary.
+* text=auto eol=lf
+
+# Windows scripts keep CRLF
+*.ps1 text eol=crlf
+*.bat text eol=crlf
+
+# Binaries
+*.png binary
+*.woff2 binary
+*.node binary

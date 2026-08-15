@@ -1,0 +1,92 @@
+<!doctype html>
+<html lang="ms" data-theme="dark">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>MasjidTV — Waktu Solat</title>
+  <link rel="icon" type="image/png" href="/assets/favicon.png">
+  <link rel="stylesheet" href="/css/display.css">
+</head>
+<body>
+  <main class="screen">
+    <header class="hdr">
+      <div class="hdr-top">
+        <div class="brand">
+          <img class="brand-mark" id="brandMark" src="/assets/logo.png" alt="">
+          <div class="brand-text">
+            <h1 id="mosqueName">Masjid Al-Hidayah</h1>
+            <p id="mosqueMeta"></p>
+            <p id="screenLabel" class="screen-label" hidden></p>
+          </div>
+        </div>
+
+        <div class="clock-block">
+          <div class="clock" id="clock">--:--:--</div>
+          <div class="date-row">
+            <span id="gregorianDate">—</span>
+            <span class="date-sep" aria-hidden="true">•</span>
+            <span id="hijriDate">—</span>
+            <span id="soundChip" class="sound-chip" hidden>🔊</span>
+            <span id="weatherChip" class="weather-chip" hidden></span>
+          </div>
+        </div>
+      </div>
+
+      <div class="prayer-strip" id="prayerStrip">
+        <div class="strip-times" id="stripTimes"></div>
+        <div class="source-line" id="sourceLine"></div>
+      </div>
+    </header>
+
+    <section class="main">
+      <article class="panel slide-panel" id="slidePanel">
+        <div class="slide" id="slide"></div>
+        <div class="slide-dots" id="slideDots"></div>
+      </article>
+
+      <aside class="side-stack">
+        <article class="panel side-card" id="dutyPanel" hidden>
+          <div class="panel-head">
+            <h2 id="dutyTitle">Bertugas Hari Ini</h2>
+          </div>
+          <div class="side-body" id="dutyBody"></div>
+        </article>
+
+        <article class="panel side-card" id="kutipanPanel" hidden>
+          <div class="panel-head">
+            <h2 id="kutipanTitle">Kutipan</h2>
+          </div>
+          <div class="side-body" id="kutipanBody"></div>
+        </article>
+
+        <article class="panel side-card" id="eventPanel" hidden>
+          <div class="panel-head">
+            <h2 id="eventTitle">Hari Kebesaran</h2>
+          </div>
+          <div class="side-body" id="eventBody"></div>
+        </article>
+      </aside>
+    </section>
+
+    <footer class="ticker-bar" id="tickerBar" hidden>
+      <span class="ticker-label" id="tickerLabel">MAKLUMAT</span>
+      <div class="ticker-viewport">
+        <div class="ticker-track" id="tickerTrack"></div>
+      </div>
+    </footer>
+  </main>
+  <div id="prayerOverlay" class="prayer-overlay" hidden>
+    <div class="overlay-inner">
+      <div class="ov-kicker" id="ovKicker"></div>
+      <div class="ov-arabic" id="ovArabic"></div>
+      <div class="ov-name" id="ovName"></div>
+      <div class="ov-sub" id="ovSub"></div>
+      <div class="ov-countdown" id="ovCountdown"></div>
+    </div>
+    <div class="ov-black-clock" id="ovBlackClock" hidden></div>
+  </div>
+  <div id="debugChip" class="debug-chip" hidden></div>
+  <script src="/vendor/hls.min.js"></script>
+  <script src="/js/display.js"></script>
+</body>
+</html>

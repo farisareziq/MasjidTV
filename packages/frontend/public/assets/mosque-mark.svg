@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120">
+  <defs>
+    <linearGradient id="gold" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#eed08b"/>
+      <stop offset="1" stop-color="#c99c3d"/>
+    </linearGradient>
+  </defs>
+  <circle cx="60" cy="60" r="57" fill="#0d1b2e" stroke="url(#gold)" stroke-width="4"/>
+  <path fill-rule="evenodd" fill="url(#gold)"
+    d="M60 18 a42 42 0 1 0 0 84 a42 42 0 1 0 0 -84 M76 24 a30 30 0 1 0 0 60 a30 30 0 1 0 0 -60 Z"/>
+</svg>

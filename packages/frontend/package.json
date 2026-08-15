@@ -1,0 +1,10 @@
+{
+  "name": "@masjidtv/frontend",
+  "version": "1.0.0",
+  "type": "module",
+  "description": "MasjidTV display + admin frontend (baseline ported from TVMasjid reference)",
+  "scripts": {
+    "build": "node -e \"console.log('frontend assets are served directly from public/')\"",
+    "typecheck": "node -e \"console.log('no typecheck (static assets)')\""
+  }
+}

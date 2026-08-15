@@ -1,0 +1,26 @@
+{
+  "name": "@masjidtv/shared",
+  "version": "1.0.0",
+  "type": "module",
+  "description": "Shared domain core: types, prayer engine, JAKIM client, zones, hijri, events, verses",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "adhan": "^4.4.4"
+  },
+  "devDependencies": {
+    "typescript": "^5.7.2",
+    "vitest": "^3.0.0"
+  }
+}

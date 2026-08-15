@@ -1,0 +1,30 @@
+{
+  "name": "@masjidtv/cloud",
+  "version": "1.0.0",
+  "type": "module",
+  "description": "MasjidTV cloud multi-tenant Fastify app (Vercel + Turso + Blob)",
+  "main": "./dist/index.js",
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "vercel-build": "pnpm --filter @masjidtv/shared build && pnpm --filter @masjidtv/db build && tsc -p tsconfig.json",
+    "dev": "node --import tsx src/dev.ts"
+  },
+  "dependencies": {
+    "@libsql/client": "^0.17.4",
+    "@masjidtv/db": "workspace:*",
+    "@masjidtv/shared": "workspace:*",
+    "@vercel/blob": "^2.7.0",
+    "bcryptjs": "^3.0.3",
+    "dotenv": "^17.4.2",
+    "drizzle-orm": "0.38.4",
+    "fastify": "^5.2.0",
+    "jsonwebtoken": "^9.0.3"
+  },
+  "devDependencies": {
+    "@types/bcryptjs": "^2.4.6",
+    "@types/jsonwebtoken": "^9.0.7",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.2"
+  }
+}
