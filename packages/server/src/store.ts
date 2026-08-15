@@ -3,8 +3,7 @@
 
 import crypto from 'node:crypto';
 import bcrypt from 'bcryptjs';
-import { createLocalClient, applySchema, type LocalClient, settings, announcements } from '@masjidtv/db';
-import { eq } from 'drizzle-orm';
+import { createLocalClient, applySchema, settings, announcements, eq, type LocalClient } from '@masjidtv/db';
 import { DEFAULT_SETTINGS, applyPatch, type Settings, type Announcement } from '@masjidtv/shared';
 import fs from 'node:fs';
 import path from 'node:path';

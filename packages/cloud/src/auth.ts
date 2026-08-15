@@ -2,9 +2,7 @@
 
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
-import type { CloudDatabase } from '@masjidtv/db';
-import { loginAttempts } from '@masjidtv/db';
-import { eq } from 'drizzle-orm';
+import { loginAttempts, eq, type CloudDatabase } from '@masjidtv/db';
 
 const isProd = process.env.NODE_ENV === 'production';
 const JWT_SECRET: string = process.env.JWT_SECRET || (isProd ? '' : 'dev-secret-ganti-sebelum-produksi');

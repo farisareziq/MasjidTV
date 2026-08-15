@@ -24,16 +24,16 @@ describe('db client (better-sqlite3)', () => {
     expect(names).not.toContain('tv_devices');
   });
 
-  it('persists settings via drizzle', () => {
-    client.db.insert(settings).values({ id: 1, data: JSON.stringify({ name: 'test' }), updatedAt: Date.now() }).run();
-    const rows = client.db.select().from(settings).where(eq(settings.id, 1)).all();
+  it('persists settings via drizzle', async () => {
+    await client.db.insert(settings).values({ id: 1, data: JSON.stringify({ name: 'test' }), updatedAt: Date.now() }).run();
+    const rows = await client.db.select().from(settings).where(eq(settings.id, 1)).all();
     expect(rows).toHaveLength(1);
     expect(JSON.parse(rows[0].data)).toEqual({ name: 'test' });
   });
 
-  it('persists announcements via drizzle', () => {
-    client.db.insert(announcements).values({ id: 'a1', data: JSON.stringify({ title: 'Hello' }), createdAt: Date.now() }).run();
-    const rows = client.db.select().from(announcements).all();
+  it('persists announcements via drizzle', async () => {
+    await client.db.insert(announcements).values({ id: 'a1', data: JSON.stringify({ title: 'Hello' }), createdAt: Date.now() }).run();
+    const rows = await client.db.select().from(announcements).all();
     expect(rows).toHaveLength(1);
   });
 });

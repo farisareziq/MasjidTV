@@ -6,12 +6,10 @@ import crypto from 'node:crypto';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import type { CloudDatabase } from '@masjidtv/db';
 import {
   tenants, users, superusers, cloudAnnouncements, cloudMedia,
-  pairingSessions, tvDevices
+  pairingSessions, tvDevices, eq, and, type CloudDatabase
 } from '@masjidtv/db';
-import { eq, and } from 'drizzle-orm';
 import { DEFAULT_SETTINGS, applyPatch, type Settings, type Announcement } from '@masjidtv/shared';
 import { hashPassword } from './auth.js';
 
