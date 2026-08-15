@@ -27,6 +27,14 @@ const tsc = path.join(monoRoot, 'node_modules', 'typescript', 'bin', 'tsc');
 execFileSync(process.execPath, [tsc, '-p', path.join(monoRoot, 'packages', 'shared', 'tsconfig.json')], { stdio: 'inherit' });
 execFileSync(process.execPath, [tsc, '-p', path.join(monoRoot, 'packages', 'db', 'tsconfig.json')], { stdio: 'inherit' });
 
+// Debug: prove which schema the cloud tsc will resolve.
+const dbResolved = fs.realpathSync(path.join(pkgRoot, 'node_modules', '@masjidtv', 'db'));
+const schemaSrc = fs.readFileSync(path.join(dbResolved, 'dist', 'schema.d.ts'), 'utf8');
+console.log('[cloud-build] resolved @masjidtv/db at:', dbResolved);
+console.log('[cloud-build] schema.d.ts has lastSeen:', schemaSrc.includes('lastSeen'));
+console.log('[cloud-build] schema.d.ts has mustChangePin:', schemaSrc.includes('mustChangePin'));
+console.log('[cloud-build] store.ts line 65:', fs.readFileSync(path.join(pkgRoot, 'src', 'store.ts'), 'utf8').split('\n')[64].trim().slice(0, 80));
+
 // 2. Typecheck the cloud app (plain node_modules resolution).
 execFileSync(process.execPath, [tsc, '-p', path.join(pkgRoot, 'tsconfig.json'), '--noEmit'], {
   stdio: 'inherit'
