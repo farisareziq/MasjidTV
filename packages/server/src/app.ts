@@ -58,7 +58,7 @@ export interface AppOptions {
 }
 
 export async function buildApp(opts: AppOptions): Promise<FastifyInstance> {
-  const store = new Store({ dataDir: opts.dataDir });
+  const store = await Store.open({ dataDir: opts.dataDir });
   const announcements = new AnnouncementService(store);
   const streams = new StreamManager(
     opts.dataDir,

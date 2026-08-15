@@ -25,7 +25,7 @@ async function main() {
     dbUrl = 'file:///' + path.join(found, 'dist', 'index.js').replace(/\\/g, '/');
   }
   const { createLocalClient } = await import(dbUrl);
-  const client = createLocalClient(dbPath);
+  const client = await createLocalClient(dbPath);
   const row = client.raw.prepare('SELECT data FROM settings WHERE id = 1').get();
   client.close();
   if (row) {

@@ -1,10 +1,14 @@
-import { describe, it, expect, afterAll } from 'vitest';
+import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { createMemoryClient, applySchema } from '../src/client.js';
 import { settings, announcements } from '../src/schema.js';
 import { eq } from 'drizzle-orm';
 
 describe('db client (better-sqlite3)', () => {
-  const client = createMemoryClient();
+  let client: Awaited<ReturnType<typeof createMemoryClient>>;
+
+  beforeAll(async () => {
+    client = await createMemoryClient();
+  });
 
   afterAll(() => client.close());
 

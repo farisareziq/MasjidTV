@@ -20,13 +20,18 @@ export class Store {
   readonly client: LocalClient;
   private settingsDoc: Settings;
 
-  constructor(opts: StoreOptions) {
-    this.dataDir = opts.dataDir;
-    fs.mkdirSync(this.dataDir, { recursive: true });
-    const dbPath = path.join(this.dataDir, 'masjidtv.db');
-    this.client = createLocalClient(dbPath);
-    applySchema(this.client);
+  private constructor(dataDir: string, client: LocalClient) {
+    this.dataDir = dataDir;
+    this.client = client;
     this.settingsDoc = this.loadSettings();
+  }
+
+  // Async factory: createLocalClient lazily imports better-sqlite3.
+  static async open(opts: StoreOptions): Promise<Store> {
+    fs.mkdirSync(opts.dataDir, { recursive: true });
+    const client = await createLocalClient(path.join(opts.dataDir, 'masjidtv.db'));
+    applySchema(client);
+    return new Store(opts.dataDir, client);
   }
 
   // --- settings -------------------------------------------------------------

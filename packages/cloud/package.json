@@ -7,7 +7,7 @@
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "vercel-build": "node -e \"const p=require('node:path');const fs=require('node:fs');const pj=JSON.parse(fs.readFileSync(p.join('node_modules','drizzle-orm','package.json'),'utf8'));console.log('drizzle:',pj.version);console.log('cwd:',process.cwd())\" && pnpm --filter @masjidtv/shared build && pnpm --filter @masjidtv/db build && tsc -p tsconfig.json",
+    "vercel-build": "node scripts/build.mjs",
     "dev": "node --import tsx src/dev.ts"
   },
   "dependencies": {
@@ -24,6 +24,7 @@
   "devDependencies": {
     "@types/bcryptjs": "^2.4.6",
     "@types/jsonwebtoken": "^9.0.7",
+    "esbuild": "^0.28.2",
     "tsx": "^4.19.2",
     "typescript": "^5.7.2"
   }

@@ -80,7 +80,7 @@ try {
 
   // Resolve display key from DB.
   const { createLocalClient } = await import(pathToFileURL(path.join(root, 'packages/db/dist/index.js')).href);
-  const dbClient = createLocalClient(path.join(DATA_DIR, 'masjidtv.db'));
+  const dbClient = await createLocalClient(path.join(DATA_DIR, 'masjidtv.db'));
   const settingsRow = dbClient.raw.prepare('SELECT data FROM settings WHERE id = 1').get();
   dbClient.close();
   const settingsDoc = JSON.parse(settingsRow.data);
