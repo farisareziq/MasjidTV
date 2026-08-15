@@ -60,9 +60,7 @@ await build({
 // 3. Assemble Build Output API layout.
 fs.rmSync(outRoot, { recursive: true, force: true });
 
-// static placeholder
-fs.mkdirSync(path.join(outRoot, 'static'), { recursive: true });
-fs.writeFileSync(path.join(outRoot, 'static', 'index.html'), '<!doctype html><title>MasjidTV</title>');
+// (No static dir — see config note below.)
 
 // function
 const funcDir = path.join(outRoot, 'functions', 'api', 'index.func');
@@ -82,7 +80,9 @@ fs.writeFileSync(path.join(funcDir, 'vc-config.json'), JSON.stringify({
   includeFiles: '../../../node_modules/.pnpm/**'
 }, null, 2));
 
-// routes: everything -> function
+// config: route everything to the function. No static dir at all — static
+// files take priority over routes in Build Output v3, and a placeholder
+// index.html would shadow the catch-all.
 fs.writeFileSync(path.join(outRoot, 'config.json'), JSON.stringify({
   version: 3,
   routes: [
