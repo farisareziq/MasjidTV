@@ -80,14 +80,11 @@ fs.writeFileSync(path.join(funcDir, 'vc-config.json'), JSON.stringify({
   includeFiles: '../../../node_modules/.pnpm/**'
 }, null, 2));
 
-// config: route everything to the function. No static dir at all — static
-// files take priority over routes in Build Output v3, and a placeholder
-// index.html would shadow the catch-all.
+// config: default routing (function auto-served at /api/index). Path
+// rewrites (/api/*, /, /display...) come from vercel.json which Vercel
+// merges into the build output config.
 fs.writeFileSync(path.join(outRoot, 'config.json'), JSON.stringify({
-  version: 3,
-  routes: [
-    { "src": "/.*", "dest": "/api/index" }
-  ]
+  version: 3
 }, null, 2));
 
 console.log('[cloud-build] build output assembled at', outRoot);

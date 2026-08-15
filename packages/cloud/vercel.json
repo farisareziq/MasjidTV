@@ -2,5 +2,18 @@
   "version": 2.5,
   "framework": null,
   "buildCommand": "pnpm run vercel-build",
-  "installCommand": "pnpm install"
+  "installCommand": "pnpm install",
+  "rewrites": [
+    { "source": "/", "destination": "/api/index" },
+    { "source": "/api/(.*)", "destination": "/api/index" },
+    { "source": "/display", "destination": "/api/index" },
+    { "source": "/admin", "destination": "/api/index" },
+    { "source": "/sw.js", "destination": "/api/index" },
+    { "source": "/css/(.*)", "destination": "/api/index" },
+    { "source": "/js/(.*)", "destination": "/api/index" },
+    { "source": "/vendor/(.*)", "destination": "/api/index" },
+    { "source": "/assets/(.*)", "destination": "/api/index" },
+    { "source": "/icons/(.*)", "destination": "/api/index" },
+    { "source": "/manifest.webmanifest", "destination": "/api/index" }
+  ]
 }
