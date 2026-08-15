@@ -7,7 +7,7 @@
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "vercel-build": "pnpm --filter @masjidtv/shared build && pnpm --filter @masjidtv/db build && tsc -p tsconfig.json",
+    "vercel-build": "node -e \"console.log('drizzle:', require('drizzle-orm/package.json').version); console.log('cwd:', process.cwd())\" && pnpm --filter @masjidtv/shared build && pnpm --filter @masjidtv/db build && tsc -p tsconfig.json",
     "dev": "node --import tsx src/dev.ts"
   },
   "dependencies": {
