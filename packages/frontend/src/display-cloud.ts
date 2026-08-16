@@ -39,6 +39,7 @@ interface DisplayState {
   slidesData: SlideData | null;
   slideIndex: number;
   slideTimer: ReturnType<typeof setTimeout> | null;
+  videoGuardTimer: ReturnType<typeof setTimeout> | null;
   hls: { destroy(): void } | null;
   audioCache: Map<string, HTMLAudioElement>;
   playedAdhan: Set<string>;
@@ -181,6 +182,7 @@ const state: DisplayState = {
   slidesData: null,
   slideIndex: 0,
   slideTimer: null,
+  videoGuardTimer: null,
   hls: null,
   audioCache: new Map(),
   playedAdhan: new Set(),
@@ -876,6 +878,17 @@ function scheduleNextSlide(slide: Slide): void {
   }, slideDuration(slide));
 }
 
+// Jaring keselamatan untuk slaid video: jika acara 'ended' tidak tercetus
+// (video tersekat/rangkaian putus), tukar slaid selepas tempoh munasabah —
+// paparan tidak boleh tersekat pada satu slaid selama-lamanya.
+function scheduleVideoGuard(slide: Slide): void {
+  clearTimeout(state.videoGuardTimer);
+  state.videoGuardTimer = setTimeout(() => {
+    const nextIndex = (state.slideIndex + 1) % state.slides.length;
+    showSlide(nextIndex, false);
+  }, Math.max(slideDuration(slide) * 3, 60000));
+}
+
 function showSlide(index: number, instant: boolean): void {
   const slide = state.slides[index];
   // Indeks tidak sah (senarai berubah di antara tick) — jangan crash.
@@ -909,6 +922,7 @@ function showSlide(index: number, instant: boolean): void {
 
   initSlideMedia(slide);
   scheduleNextSlide(slide);
+  scheduleVideoGuard(slide);
   syncNativeStream(slide);
 }
 
@@ -1275,7 +1289,10 @@ async function sync(): Promise<void> {
       renderHeader();
       renderPrayerStrip();
       renderSource();
-      renderSlides(slides); // stream/pengumuman mungkin berubah melalui tetapan
+      // renderSlides dijalankan di bawah jika slidesChanged; jika tetapan
+      // sahaja berubah (strim/pengumuman melalui tetapan) tapi payload slaid
+      // kekal sama, kemas kini slaid sekali di sini — elak render dua kali.
+      if (!slidesChanged) renderSlides(slides);
     } else if (todayChanged) {
       renderPrayerStrip();
       renderSource();

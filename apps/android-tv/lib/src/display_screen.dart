@@ -2,7 +2,6 @@
 // RTSP/ONVIF/RTMP stream playback (ExoPlayer via media_kit).
 
 import 'dart:async';
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:media_kit/media_kit.dart';
 import 'package:webview_flutter/webview_flutter.dart';
@@ -23,7 +22,6 @@ class _DisplayScreenState extends State<DisplayScreen> {
   final _bridge = MasjidBridge();
   bool _offline = false;
   bool _pageLoaded = false;
-  bool _streamActive = false;
   Timer? _networkWaitTimer;
   StreamSubscription<BridgeState>? _bridgeSub;
 
@@ -38,7 +36,6 @@ class _DisplayScreenState extends State<DisplayScreen> {
         _goPairing();
         return;
       }
-      setState(() => _streamActive = s.url != null);
     });
     _controller = WebViewController()
       ..setJavaScriptMode(JavaScriptMode.unrestricted)

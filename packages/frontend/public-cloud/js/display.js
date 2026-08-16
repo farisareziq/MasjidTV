@@ -187,6 +187,7 @@ const state = {
   slidesData: null,
   slideIndex: 0,
   slideTimer: null,
+  videoGuardTimer: null,
   hls: null,
   audioCache: /* @__PURE__ */ new Map(),
   playedAdhan: /* @__PURE__ */ new Set(),
@@ -810,6 +811,13 @@ function scheduleNextSlide(slide) {
     showSlide(nextIndex, false);
   }, slideDuration(slide));
 }
+function scheduleVideoGuard(slide) {
+  clearTimeout(state.videoGuardTimer);
+  state.videoGuardTimer = setTimeout(() => {
+    const nextIndex = (state.slideIndex + 1) % state.slides.length;
+    showSlide(nextIndex, false);
+  }, Math.max(slideDuration(slide) * 3, 6e4));
+}
 function showSlide(index, instant) {
   const slide = state.slides[index];
   if (!slide) return;
@@ -840,6 +848,7 @@ function showSlide(index, instant) {
   });
   initSlideMedia(slide);
   scheduleNextSlide(slide);
+  scheduleVideoGuard(slide);
   syncNativeStream(slide);
 }
 function slideHtml(slide) {
@@ -1163,7 +1172,7 @@ async function sync() {
       renderHeader();
       renderPrayerStrip();
       renderSource();
-      renderSlides(slides);
+      if (!slidesChanged) renderSlides(slides);
     } else if (todayChanged) {
       renderPrayerStrip();
       renderSource();
