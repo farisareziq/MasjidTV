@@ -9,6 +9,7 @@
 
 import 'dart:async';
 import 'dart:convert';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:media_kit/media_kit.dart';
 import 'package:media_kit_video/media_kit_video.dart';
@@ -18,13 +19,15 @@ class BridgeState {
   final String? url;
   final Rect? slot;
   final bool muted;
-  const BridgeState({this.url, this.slot, this.muted = false});
+  final bool sessionExpired;
+  const BridgeState({this.url, this.slot, this.muted = false, this.sessionExpired = false});
 }
 
 class MasjidBridge {
   String? _currentUrl;
   Rect? _slot;
   bool _muted = false;
+  bool _sessionExpired = false;
   final _controller = StreamController<BridgeState>.broadcast();
 
   Player? _player;
@@ -32,7 +35,7 @@ class MasjidBridge {
 
   /// Subscribe to play/stop/slot/mute changes (drive media_kit player from here).
   Stream<BridgeState> get states => _controller.stream;
-  BridgeState get current => BridgeState(url: _currentUrl, slot: _slot, muted: _muted);
+  BridgeState get current => BridgeState(url: _currentUrl, slot: _slot, muted: _muted, sessionExpired: _sessionExpired);
 
   /// Lazily create the native player (call MediaKit.ensureInitialized first).
   VideoController ensurePlayer() {
@@ -43,6 +46,7 @@ class MasjidBridge {
 
   Future<void> handle(String message) async {
     // Message is JSON like {"method":"playStream","args":["url","name","id"]}
+    debugPrint('[bridge] msg: ${message.length > 120 ? message.substring(0, 120) : message}');
     try {
       final decoded = jsonDecode(message);
       if (decoded is! Map<String, dynamic>) return;
@@ -63,6 +67,9 @@ class MasjidBridge {
         case 'playStream':
           if (args.isNotEmpty) {
             _currentUrl = args[0];
+            // Pemain dimulakan secara malas: elak kos permulaan libmpv
+            // pada TV spesifikasi rendah sehingga strim benar-benar perlu.
+            ensurePlayer();
             await _player?.open(Media(_currentUrl!));
             if (_player != null) {
               await _player!.setVolume(_muted ? 0 : 100);
@@ -83,8 +90,10 @@ class MasjidBridge {
           }
           break;
         case 'onSessionExpired':
+          debugPrint('[bridge] onSessionExpired — session invalid');
           await _player?.stop();
           _currentUrl = null;
+          _sessionExpired = true;
           _emit();
           break;
       }

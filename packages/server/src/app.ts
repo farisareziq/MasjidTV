@@ -184,7 +184,7 @@ export async function buildApp(opts: AppOptions): Promise<FastifyInstance> {
   // Cloud sync mode (proxy + cache) — takes precedence when enabled. In this
   // mode the local display/admin routes below are NOT registered (Fastify
   // rejects duplicate method+url, unlike Express first-wins).
-  applyCloudSync(app, opts.dataDir);
+  applyCloudSync(app, opts.dataDir, requireDisplayKey);
 
   // --- Public (display) endpoints ------------------------------------------
 

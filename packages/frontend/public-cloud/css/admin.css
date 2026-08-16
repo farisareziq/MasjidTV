@@ -210,7 +210,9 @@ label {
   flex-direction: column;
   gap: 6px;
   margin-top: 22px;
-  flex: 1;
+  flex: 1 1 auto;
+  overflow-y: auto;
+  min-height: 0;
 }
 
 .nav-btn {
@@ -241,6 +243,7 @@ label {
   gap: 10px;
   border-top: 1px solid rgba(255, 255, 255, 0.10);
   padding-top: 16px;
+  flex-shrink: 0;
 }
 
 .side-version {

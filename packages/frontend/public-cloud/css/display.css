@@ -846,12 +846,18 @@ body.banner-mode .slide-dots {
   min-width: 0;
   overflow: hidden;
   mask-image: linear-gradient(90deg, transparent, #000 2%, #000 98%, transparent);
+  /* Pencirian tanpa 'size' — 'strict' akan runtuhkan tinggi viewport. */
+  contain: content;
 }
 
 .ticker-track {
   display: inline-flex;
   white-space: nowrap;
   will-change: transform;
+  /* Angkat ke lapisan GPU sendiri — tanpa ini animasi transform berlaku
+     pada utas utama dan tersekat-sekat pada TV spesifikasi rendah. */
+  transform: translateZ(0);
+  backface-visibility: hidden;
 }
 
 .ticker-item {

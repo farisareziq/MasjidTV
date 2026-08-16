@@ -61,7 +61,11 @@ async function cloudFetch(p: string): Promise<{ ok: boolean; status: number; jso
   return { ok: true, status: 200, json: await res.json() };
 }
 
-export function applyCloudSync(app: FastifyInstance, dataDir: string): void {
+export function applyCloudSync(
+  app: FastifyInstance,
+  dataDir: string,
+  requireDisplayKey?: (req: import('fastify').FastifyRequest, reply: FastifyReply, done: (err?: Error) => void) => void
+): void {
   if (!cloudSyncEnabled()) return;
   const cacheDir = path.join(dataDir, 'cloud-cache');
   fs.mkdirSync(cacheDir, { recursive: true });
@@ -99,9 +103,14 @@ export function applyCloudSync(app: FastifyInstance, dataDir: string): void {
     }
   };
 
-  app.get('/api/settings', async (_req, reply) => syncEndpoint(reply, '/api/settings', true));
-  app.get('/api/slides', async (_req, reply) => syncEndpoint(reply, '/api/slides', true));
-  app.get('/api/today', async (_req, reply) => syncEndpoint(reply, '/api/today', false));
+  // Endpoint proksi cloud turut memerlukan kunci paparan tempatan — tanpa ini
+  // sesiapa di LAN boleh membaca tetapan (termasuk URL strim) tanpa kunci.
+  // Guna preHandler yang sama dengan endpoint tempatan bila disediakan.
+  const opts = requireDisplayKey ? { preHandler: requireDisplayKey } : {};
+
+  app.get('/api/settings', opts, async (_req, reply) => syncEndpoint(reply, '/api/settings', true));
+  app.get('/api/slides', opts, async (_req, reply) => syncEndpoint(reply, '/api/slides', true));
+  app.get('/api/today', opts, async (_req, reply) => syncEndpoint(reply, '/api/today', false));
 
   app.get('/admin', async (_req, reply) => reply.redirect(`${CLOUD_URL}/admin`));
   // Paparan tempatan kekal boleh dilalui (kiosk/watchdog membuka /display):

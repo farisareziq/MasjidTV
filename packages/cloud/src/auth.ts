@@ -33,7 +33,9 @@ export function signToken({ userId, tenantId, role, version = 0 }: {
 
 export function verifyToken(token: string): TokenPayload | null {
   try {
-    return jwt.verify(token, JWT_SECRET) as unknown as TokenPayload;
+    // Pin algorithm HS256 — elak serangan kekeliruan 'alg' pada token yang
+    // ditandatangani secara asing.
+    return jwt.verify(token, JWT_SECRET, { algorithms: ['HS256'] }) as unknown as TokenPayload;
   } catch {
     return null;
   }

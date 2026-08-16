@@ -25,21 +25,33 @@ export function sortAnnouncements(items: Announcement[]): Announcement[] {
 }
 
 // Active window: start at 00:00 local, end at 23:59:59 local (inclusive).
+// Kalis ranap: tarikh rosak (data lama sebelum sanitasi) dianggap "tiada
+// tetingkap" — jangan biarkan satu baris rosak meruntuhkan /api/slides.
 export function isAnnouncementActive(item: Announcement, now: Date, timezone: string): boolean {
   if (!item.active) return false;
   if (item.start) {
     const start = zonedDateTime(item.start, '00:00', timezone).getTime();
+    if (Number.isNaN(start)) return false; // tarikh tidak sah — tidak aktif
     if (start > now.getTime()) return false;
   }
   if (item.end) {
     const end = zonedDateTime(item.end, '23:59:59', timezone).getTime();
+    if (Number.isNaN(end)) return false;
     if (end < now.getTime()) return false;
   }
   return true;
 }
 
 function dateOrNull(v: unknown): string | null {
-  return typeof v === 'string' && v ? v : null;
+  // Hantar format YYYY-MM-DD sahaja DAN tarikh kalendar sebenar — elak
+  // rentetan sewenang-wenangnya (disimpan-XSS) & tarikh tidak sah (cth
+  // 2026-13-99) yang merosakkan pengiraan tetingkap aktif.
+  if (typeof v !== 'string' || !v) return null;
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(v)) return null;
+  const [y, m, d] = v.split('-').map(Number);
+  const dt = new Date(Date.UTC(y, m - 1, d));
+  if (dt.getUTCFullYear() !== y || dt.getUTCMonth() !== m - 1 || dt.getUTCDate() !== d) return null;
+  return v;
 }
 
 export function sanitizeAnnouncementCreate(input: Record<string, unknown>): Announcement {

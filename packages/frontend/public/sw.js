@@ -2,7 +2,7 @@
 // HTML /display TIDAK dikendalikan SW: kawalan navigasi oleh SW sebelum ini
 // menyebabkan pelbagai kegagalan (redirect ditelan, CSP menyekat fetch,
 // cache lapuk). Halaman sentiasa dimuatkan terus dari rangkaian.
-const CACHE = 'tvmasjid-v5';
+const CACHE = 'masjidtv-v6';
 
 self.addEventListener('install', (e) => self.skipWaiting());
 

@@ -1674,7 +1674,7 @@ async function syncAdminData() {
 }
 setInterval(syncAdminData, 1e4);
 function escapeHtml(str) {
-  return String(str ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+  return String(str ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#39;");
 }
 if (state.token) {
   loadApp().then(() => resetIdleTimer()).catch(() => showLogin());

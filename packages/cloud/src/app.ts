@@ -52,6 +52,13 @@ export async function createCloudApp(): Promise<FastifyInstance> {
   const app = Fastify({ logger: false, bodyLimit: 1024 * 1024, trustProxy: true });
   const startedAt = Date.now();
 
+  // Pembersihan berkala: sesi pemadanan tamat tempoh + kaunter rate-limit
+  // matang. Interval tidak akan menghalang proses serverless keluar.
+  const purgeTimer = setInterval(() => {
+    store.purgeExpired().catch(() => {});
+  }, 60 * 60 * 1000);
+  purgeTimer.unref?.();
+
   app.addHook('onClose', async () => {
     await db.close();
   });
@@ -66,6 +73,14 @@ export async function createCloudApp(): Promise<FastifyInstance> {
     return reply.status(status).send(code ? { error: message, code } : { error: message });
   }
 
+  // Base URL untuk pautan paparan/admin: keutamaan env (elak host-header
+  // injection), jatuh kembali kepada host permintaan yang sah.
+  function baseDisplayUrl(req: FastifyRequest): string {
+    const configured = process.env.MASJIDTV_PUBLIC_URL;
+    if (configured) return configured.replace(/\/+$/, '');
+    return `${req.protocol}://${req.headers.host}`;
+  }
+
   // --- tenant resolution -------------------------------------------------
 
   async function tenantFromRequest(req: FastifyRequest): Promise<TenantRow | null> {
@@ -77,8 +92,14 @@ export async function createCloudApp(): Promise<FastifyInstance> {
     const token = String(req.headers.authorization || '').replace(/^Bearer /, '');
     const payload = verifyToken(token);
     if (payload && payload.role === 'admin' && payload.tid) {
-      const t = await store.getTenant(payload.tid);
-      if (t) return t;
+      // Sahkan pengguna masih aktif & versi token semasa — elak token lama
+      // (pengguna dilumpuhkan / kata laluan ditukar) terus membaca data.
+      const user = await store.getUserById(payload.uid);
+      if (user && user.tenantId === payload.tid && user.active === 1
+        && Number(user.tokenVersion || 0) === Number(payload.v || 0)) {
+        const t = await store.getTenant(payload.tid);
+        if (t) return t;
+      }
     }
     const devToken = req.headers['x-device-token'];
     if (devToken) {
@@ -313,11 +334,17 @@ export async function createCloudApp(): Promise<FastifyInstance> {
   });
 
   app.post('/api/auth/superuser/pin', async (req, reply) => {
+    const ip = ipOf(req);
+    const rlKey = `su-pin:${ip}`;
+    const rl = await checkRateLimit(db.db, rlKey);
+    if (rl.locked) return jsonError(reply, 429, 'Terlalu banyak percubaan. Cuba lagi selepas 15 minit.');
+    await recordFailure(db.db, rlKey, 20, 15 * 60 * 1000);
     const token = String(req.headers.authorization || '').replace(/^Bearer /, '');
     const payload = verifyToken(token);
     if (!payload || payload.role !== 'superuser') return jsonError(reply, 401, 'Sesi superuser tidak sah');
     const su = await store.getSuperuser('admin');
     if (!su || su.id !== payload.uid) return jsonError(reply, 401, 'Sesi superuser tidak sah');
+    if (Number(su.tokenVersion || 0) !== Number(payload.v || 0)) return jsonError(reply, 401, 'Sesi superuser tidak sah');
     const { pin } = (req.body || {}) as { pin?: string };
     if (String(pin || '').length < 8) return jsonError(reply, 400, 'PIN mesti sekurang-kurangnya 8 aksara');
     await store.setSuperuserPin(su.id, await hashPassword(String(pin)));
@@ -402,8 +429,8 @@ export async function createCloudApp(): Promise<FastifyInstance> {
       version: '1.0.0',
       uptime: (Date.now() - startedAt) / 1000,
       startedAt: new Date(startedAt).toISOString(),
-      screenUrl: `${req.protocol}://${req.headers.host}/display?key=${tenant.apiKey}`,
-      adminUrl: `${req.protocol}://${req.headers.host}/admin`,
+      screenUrl: `${baseDisplayUrl(req)}/display?key=${tenant.apiKey}`,
+      adminUrl: `${baseDisplayUrl(req)}/admin`,
       counts: { announcements: all.length, activeAnnouncements: activeCount },
       mosque: settings.mosque.name,
       language: settings.display.language,
@@ -539,7 +566,7 @@ export async function createCloudApp(): Promise<FastifyInstance> {
     try {
       const signedToken = await issueSignedToken({
         token: blobToken, pathname, operations: ['put'],
-        allowedContentTypes: [contentType!], maximumSizeInBytes: 500 * 1024 * 1024
+        allowedContentTypes: [contentType!], maximumSizeInBytes: 50 * 1024 * 1024
       });
       const { presignedUrl } = await presignUrl(signedToken, {
         operation: 'put', pathname, access: 'public', allowedContentTypes: [contentType!], addRandomSuffix: false
@@ -752,9 +779,12 @@ export async function createCloudApp(): Promise<FastifyInstance> {
 
   app.post('/api/pair/start', async (req, reply) => {
     const ip = ipOf(req);
-    const rl = await checkRateLimit(db.db, `pair-start:${ip}`);
+    // Kunci v2: had lebih longgar (permintaan sah = 1 kembara setiap pelancaran
+    // aplikasi TV) + tempoh kunci pendek. Tetapan lama terlalu ketat — TV yang
+    // dimulakan semula berulang kali (pemasangan/sideload) mengunci dirinya.
+    const rl = await checkRateLimit(db.db, `pair-start-v2:${ip}`);
     if (rl.locked) return jsonError(reply, 429, 'Terlalu banyak percubaan — cuba lagi kemudian');
-    await recordFailure(db.db, `pair-start:${ip}`, 20, 15 * 60 * 1000);
+    await recordFailure(db.db, `pair-start-v2:${ip}`, 120, 5 * 60 * 1000);
     const { deviceId } = (req.body || {}) as { deviceId?: string };
     if (!deviceId || typeof deviceId !== 'string' || deviceId.length > 100) return jsonError(reply, 400, 'deviceId diperlukan');
     let code = '';
@@ -770,14 +800,18 @@ export async function createCloudApp(): Promise<FastifyInstance> {
     if (!code || !device) return jsonError(reply, 400, 'Parameter tidak lengkap');
     const codeUpper = String(code).toUpperCase();
     const ip = ipOf(req);
-    const ipKey = `pair-status-ip:${ip}`;
-    const codeKey = `pair-status-code:${codeUpper}`;
-    const [ipRl, codeRl] = await Promise.all([checkRateLimit(db.db, ipKey), checkRateLimit(db.db, codeKey)]);
-    if (ipRl.locked || codeRl.locked) return jsonError(reply, 429, 'Terlalu banyak percubaan — cuba lagi kemudian');
-    await recordFailure(db.db, ipKey, 1200, 15 * 60 * 1000);
-    await recordFailure(db.db, codeKey, 400, 15 * 60 * 1000);
+    // Kunci hanya dienforced terhadap brute-force: poll TV sah (kod wujud)
+    // tidak dikira sebagai kegagalan — jika tidak TV yang menunggu lama akan
+    // mengunci dirinya sendiri (20 poll/min × 15 min = 300, dekat had 400).
+    const ipKey = `pair-status-v2:${ip}`;
+    const ipRl = await checkRateLimit(db.db, ipKey);
+    if (ipRl.locked) return jsonError(reply, 429, 'Terlalu banyak percubaan — cuba lagi kemudian');
     const s = await store.getPairingSession(codeUpper);
-    if (!s) return reply.send({ status: 'not_found' });
+    if (!s) {
+      // Kod tidak wujud = tanda brute-force — barulah kira.
+      await recordFailure(db.db, ipKey, 400, 15 * 60 * 1000);
+      return reply.send({ status: 'not_found' });
+    }
     if (Date.now() > Number(s.expiresAt)) return reply.send({ status: 'expired' });
     if (s.status !== 'paired' || !s.tenantId) return reply.send({ status: 'pending' });
     const dev = await store.getDeviceByPair(String(device), s.tenantId);
@@ -795,14 +829,13 @@ export async function createCloudApp(): Promise<FastifyInstance> {
     if (!s) return jsonError(reply, 404, 'Kod tidak dijumpai');
     if (Date.now() > Number(s.expiresAt)) return jsonError(reply, 400, 'Kod telah tamat tempoh');
     if (s.status === 'paired') return jsonError(reply, 400, 'Kod sudah digunakan');
+    // Tuntut sesi dahulu (CAS) — baru cipta/kemas kini peranti. Susunan ini
+    // mengelakkan lumba yang memadam peranti sedia ada bila admin lain
+    // menuntut kod yang sama serentak.
+    const claimed = await store.pairSession(s.code, tenant.id);
+    if (!claimed) return jsonError(reply, 409, 'Kod sudah digunakan');
     const token = crypto.randomBytes(24).toString('hex');
     await store.createDevice(tenant.id, s.deviceId, String(name || '').slice(0, 60), token);
-    // CAS: hanya satu admin boleh menuntut sesi — yang kalah perlu maklum.
-    const claimed = await store.pairSession(s.code, tenant.id);
-    if (!claimed) {
-      await store.deleteDeviceByToken(tenant.id, token);
-      return jsonError(reply, 409, 'Kod sudah digunakan');
-    }
     reply.send({ ok: true, token });
   });
 

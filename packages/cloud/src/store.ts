@@ -8,7 +8,7 @@ import os from 'node:os';
 import path from 'node:path';
 import {
   tenants, users, superusers, cloudAnnouncements, cloudMedia,
-  pairingSessions, tvDevices, eq, and, sql, type CloudDatabase
+  pairingSessions, tvDevices, loginAttempts, eq, and, lt, sql, type CloudDatabase
 } from '@masjidtv/db';
 import { DEFAULT_SETTINGS, applyPatch, type Settings, type Announcement } from '@masjidtv/shared';
 import { hashPassword } from './auth.js';
@@ -287,5 +287,17 @@ export class CloudStore {
     await this.db.delete(users).where(eq(users.tenantId, id)).run();
     await this.db.delete(cloudAnnouncements).where(eq(cloudAnnouncements.tenantId, id)).run();
     await this.db.delete(cloudMedia).where(eq(cloudMedia.tenantId, id)).run();
+    await this.db.delete(tvDevices).where(eq(tvDevices.tenantId, id)).run();
+    await this.db.delete(pairingSessions).where(eq(pairingSessions.tenantId, id)).run();
+  }
+
+  // Pembersihan berkala: buang sesi pemadanan tamat tempoh dan kaunter
+  // rate-limit yang telah matang — elak jadual membesar tanpa had (Turso).
+  async purgeExpired(): Promise<void> {
+    const t = now();
+    await this.db.delete(pairingSessions).where(lt(pairingSessions.expiresAt, t - 3600_000)).run();
+    await this.db.delete(loginAttempts).where(
+      and(lt(loginAttempts.lockedUntil, t - 3600_000), lt(loginAttempts.count, 5))
+    ).run();
   }
 }

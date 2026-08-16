@@ -2,11 +2,13 @@
 // RTSP/ONVIF/RTMP stream playback (ExoPlayer via media_kit).
 
 import 'dart:async';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:media_kit/media_kit.dart';
 import 'package:webview_flutter/webview_flutter.dart';
 import 'prefs.dart';
 import 'bridge.dart';
+import 'pairing_screen.dart';
 
 class DisplayScreen extends StatefulWidget {
   final Prefs prefs;
@@ -20,6 +22,7 @@ class _DisplayScreenState extends State<DisplayScreen> {
   late final WebViewController _controller;
   final _bridge = MasjidBridge();
   bool _offline = false;
+  bool _pageLoaded = false;
   bool _streamActive = false;
   Timer? _networkWaitTimer;
   StreamSubscription<BridgeState>? _bridgeSub;
@@ -28,8 +31,13 @@ class _DisplayScreenState extends State<DisplayScreen> {
   void initState() {
     super.initState();
     MediaKit.ensureInitialized();
-    _bridge.ensurePlayer();
+    debugPrint('[display] initState url=${widget.prefs.displayUrl}');
     _bridgeSub = _bridge.states.listen((s) {
+      if (s.sessionExpired) {
+        debugPrint('[display] session expired — returning to pairing');
+        _goPairing();
+        return;
+      }
       setState(() => _streamActive = s.url != null);
     });
     _controller = WebViewController()
@@ -40,15 +48,31 @@ class _DisplayScreenState extends State<DisplayScreen> {
         onMessageReceived: (msg) => _bridge.handle(msg.message),
       )
       ..setNavigationDelegate(NavigationDelegate(
-        onPageFinished: (_) => setState(() => _offline = false),
-        onWebResourceError: (_) => setState(() => _offline = true),
+        onPageFinished: (url) {
+          debugPrint('[webview] page finished: $url');
+          setState(() {
+            _offline = false;
+            _pageLoaded = true;
+          });
+        },
+        onWebResourceError: (e) {
+          // Abaikan ralat sub-sumber (favicon, gambar, fetch dibatalkan) —
+          // halaman utama masih boleh berfungsi. Hanya kegagalan frame
+          // utama yang bermakna sambungan terganggu.
+          if (e.isForMainFrame != true) return;
+          debugPrint('[webview] main-frame error: ${e.description} (${e.errorCode})');
+          setState(() => _offline = true);
+        },
       ))
       ..enableZoom(false)
       ..loadRequest(Uri.parse(widget.prefs.displayUrl));
 
-    // Network-wait fallback: retry load after 90s if not yet loaded.
+    // Network-wait fallback: retry only if the main page never finished
+    // loading (e.g. Wi-Fi still connecting at boot). Never reload a page
+    // that is already up — that would interrupt the running display.
     _networkWaitTimer = Timer(const Duration(seconds: 90), () {
-      if (_offline) {
+      if (!_pageLoaded) {
+        debugPrint('[display] page never loaded — retrying');
         _controller.loadRequest(Uri.parse(widget.prefs.displayUrl));
       }
     });
@@ -60,6 +84,15 @@ class _DisplayScreenState extends State<DisplayScreen> {
     _bridgeSub?.cancel();
     _bridge.dispose();
     super.dispose();
+  }
+
+  Future<void> _goPairing() async {
+    // Token ditolak server — buang dan minta pautan semula.
+    await widget.prefs.clearToken();
+    if (!mounted) return;
+    Navigator.of(context).pushReplacement(
+      MaterialPageRoute(builder: (_) => const PairingScreen()),
+    );
   }
 
   @override

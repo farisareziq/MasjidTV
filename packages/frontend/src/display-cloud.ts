@@ -957,7 +957,7 @@ function mediaHtml(src: string, kind: 'video' | 'image', slide: Slide): string {
 
 function streamHtml(stream: PublicStream): string {
   if (stream.kind === 'youtube' && stream.youtubeId) {
-    const embedOrigin = encodeURIComponent(location.origin || 'https://tvmasjid-eight.vercel.app');
+    const embedOrigin = encodeURIComponent(location.origin || 'https://masjidtv.vercel.app');
     // youtubeId datang daripada rekod stream — hadkan aksara ID YouTube
     // sahaja (elak pecah keluar atribut src melalui " atau <).
     const ytId = escapeHtml(String(stream.youtubeId).replace(/[^A-Za-z0-9_-]/g, '').slice(0, 11));
@@ -1305,7 +1305,8 @@ function escapeHtml(str: string): string {
     .replace(/&/g, '&amp;')
     .replace(/</g, '&lt;')
     .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;');
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
 }
 
 setInterval(tickClock, 1000);

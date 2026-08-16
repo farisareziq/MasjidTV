@@ -88,10 +88,14 @@ export function formatTime(date: Date, timeZone: string): string {
 
 // Bina Date yang waktu dindingnya dalam `timeZone` = HH:MM[:SS] pada tarikh
 // sivil itu. Saat dipelihara jika diberikan (cth "23:59:59").
+// Kalis ranap: komponen tidak sah (data lama/rosak) memulangkan Invalid Date
+// (NaN) — pemanggil mesti semak Number.isNaN().
 export function zonedDateTime(dateKey: string, hhmm: string, timeZone: string): Date {
   const [y, m, d] = dateKey.split('-').map(Number);
   const [h, mi, sec] = String(hhmm).split(':').map(Number);
+  if (![y, m, d, h, mi].every(Number.isFinite)) return new Date(NaN);
   const asSystem = new Date(y, m - 1, d, h, mi, sec || 0, 0);
+  if (Number.isNaN(asSystem.getTime())) return new Date(NaN);
   const sysOffset = -asSystem.getTimezoneOffset();
   const tgtOffset = tzOffsetMinutes(asSystem.getTime(), timeZone);
   return new Date(asSystem.getTime() - (tgtOffset - sysOffset) * 60000);

@@ -20,16 +20,21 @@ export function parseYouTubeId(url: string): string | null {
 
 export function publicStream(s: Stream): Record<string, unknown> {
   const base = { id: s.id, name: s.name, type: s.type, enabled: s.enabled, duration: s.duration };
+  // Buang userinfo (rtsp://user:pass@host) daripada URL yang didedahkan —
+  // kredensial kamera tidak boleh bocor ke paparan umum. App Android TV
+  // menggunakan url ini untuk ExoPlayer; kredensial dihantar hanya melalui
+  // saluran tetapan admin, bukan paparan.
+  const safeUrl = String(s.url || '').replace(/\/\/[^/@:]+:[^/@]+@/, '//');
   if (isRelayType(s.type)) {
     // url diperlukan oleh app Android TV (ExoPlayer native RTSP/RTMP);
     // paparan bukan-Android guna hlsUrl relay tempatan.
-    return { ...base, kind: 'relay', url: s.url, hlsUrl: `/relay/${s.id}/index.m3u8` };
+    return { ...base, kind: 'relay', url: safeUrl, hlsUrl: `/relay/${s.id}/index.m3u8` };
   }
-  if (s.type === 'hls') return { ...base, kind: 'hls', url: s.url };
+  if (s.type === 'hls') return { ...base, kind: 'hls', url: safeUrl };
   if (s.type === 'youtube') {
     return { ...base, kind: 'youtube', youtubeId: parseYouTubeId(s.url), url: s.url };
   }
-  return { ...base, kind: 'embed', url: s.url };
+  return { ...base, kind: 'embed', url: safeUrl };
 }
 
 // Public (display) settings projection. The local server includes

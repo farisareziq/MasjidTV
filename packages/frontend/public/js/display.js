@@ -863,7 +863,7 @@ function mediaHtml(src, kind, slide) {
 }
 function streamHtml(stream) {
   if (stream.kind === "youtube" && stream.youtubeId) {
-    const embedOrigin = encodeURIComponent(location.origin || "https://tvmasjid-eight.vercel.app");
+    const embedOrigin = encodeURIComponent(location.origin || "https://masjidtv.vercel.app");
     const ytId = escapeHtml(String(stream.youtubeId).replace(/[^A-Za-z0-9_-]/g, "").slice(0, 11));
     return `
       <span class="stream-badge"><span class="dot"></span>${escapeHtml(t("live"))} \u2022 ${escapeHtml(stream.name)}</span>
@@ -1164,7 +1164,7 @@ window.addEventListener("error", (e) => {
   console.error("[display] uncaught:", e.message);
 });
 function escapeHtml(str) {
-  return String(str ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+  return String(str ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#39;");
 }
 setInterval(tickClock, 1e3);
 setInterval(tickAudio, 1e3);

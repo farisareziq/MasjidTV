@@ -26,7 +26,7 @@ class Prefs {
   static Future<Prefs> load() async {
     final sp = await SharedPreferences.getInstance();
     return Prefs(
-      cloudUrl: sp.getString(_cloudUrl) ?? 'https://tvmasjid.vercel.app',
+      cloudUrl: sp.getString(_cloudUrl) ?? 'https://masjidtv.vercel.app',
       tenantKey: sp.getString(_tenantKey) ?? '',
       deviceToken: sp.getString(_deviceToken) ?? '',
       tenantName: sp.getString(_tenantName) ?? '',
@@ -37,6 +37,12 @@ class Prefs {
     final sp = await SharedPreferences.getInstance();
     await sp.setString(_deviceToken, token);
     await sp.setString(_tenantName, tenantName);
+  }
+
+  Future<void> clearToken() async {
+    final sp = await SharedPreferences.getInstance();
+    await sp.remove(_deviceToken);
+    await sp.remove(_tenantName);
   }
 
   Future<void> saveManual(String url, String key) async {
