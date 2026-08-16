@@ -4,7 +4,10 @@ import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import { loginAttempts, eq, type CloudDatabase } from '@masjidtv/db';
 
-const isProd = process.env.NODE_ENV === 'production';
+// Predikat produksi MESTI sepadan dengan app.ts — di Vercel, NODE_ENV
+// sentiasa 'production', tetapi jangan benarkan rahsia dev jika hanya
+// salah satu ditetapkan (cth. vercel dev dengan VERCEL=1).
+const isProd = process.env.NODE_ENV === 'production' || !!process.env.VERCEL;
 const JWT_SECRET: string = process.env.JWT_SECRET || (isProd ? '' : 'dev-secret-ganti-sebelum-produksi');
 if (!JWT_SECRET) {
   throw new Error('JWT_SECRET diperlukan — tetapkan pemboleh ubah persekitaran JWT_SECRET sebelum deploy produksi');
@@ -62,7 +65,12 @@ export async function recordFailure(
   lockMs = LOCK_MS
 ): Promise<{ count: number; locked: boolean; until: number }> {
   const rows = await db.select().from(loginAttempts).where(eq(loginAttempts.key, key)).all();
-  const count = Number(rows[0]?.count || 0) + 1;
+  const prev = rows[0];
+  const prevUntil = Number(prev?.lockedUntil || 0);
+  // Selepas kunci tamat tempoh, mula kiraan baharu — jika tidak, satu
+  // kegagalan sahaja cukup untuk mengunci semula selama-lamanya.
+  const expired = prevUntil > 0 && prevUntil <= now();
+  const count = (expired ? 0 : Number(prev?.count || 0)) + 1;
   const lockedUntil = count >= maxAttempts ? now() + lockMs : 0;
   await db.insert(loginAttempts)
     .values({ key, count, lockedUntil })

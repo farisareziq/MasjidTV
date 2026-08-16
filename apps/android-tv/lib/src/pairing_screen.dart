@@ -20,6 +20,10 @@ class _PairingScreenState extends State<PairingScreen> {
   String _code = '';
   String _status = 'Starting…';
   Timer? _poll;
+  // deviceId stabil per sesi — dihantar ke /api/pair/start dan digunakan
+  // semula pada /api/pair/status supaya cloud memadankan peranti yang sama.
+  late final String _deviceId =
+      'flutter-${DateTime.now().millisecondsSinceEpoch}';
 
   @override
   void initState() {
@@ -32,7 +36,7 @@ class _PairingScreenState extends State<PairingScreen> {
       final res = await http.post(
         Uri.parse('${widget.prefs.cloudUrl}/api/pair/start'),
         headers: {'content-type': 'application/json'},
-        body: jsonEncode({'deviceId': 'flutter-${DateTime.now().millisecondsSinceEpoch}'}),
+        body: jsonEncode({'deviceId': _deviceId}),
       );
       final data = jsonDecode(res.body);
       setState(() {
@@ -48,7 +52,7 @@ class _PairingScreenState extends State<PairingScreen> {
   Future<void> _check() async {
     try {
       final res = await http.get(
-        Uri.parse('${widget.prefs.cloudUrl}/api/pair/status?code=$_code&device=flutter'),
+        Uri.parse('${widget.prefs.cloudUrl}/api/pair/status?code=$_code&device=$_deviceId'),
       );
       final data = jsonDecode(res.body);
       if (data['status'] == 'paired') {

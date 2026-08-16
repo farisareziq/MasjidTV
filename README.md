@@ -21,7 +21,8 @@ MasjidTV/global/
 │   │   ├── scripts/      # install/start/uninstall-kiosk.ps1 + watchdog
 │   │   └── src/updater   # Self-updater (GitHub Releases, checksum, atomic swap)
 │   ├── cloud/            # Cloud multi-tenant Fastify (Vercel + Turso + Blob)
-│   └── frontend/         # Paparan + admin (vanilla, baseline daripada rujukan)
+│   └── frontend/         # Paparan + admin — sumber TypeScript (src/*.ts),
+│                         #   dikompile esbuild ke public*/js (pariti penuh)
 ├── apps/android-tv/      # App Android TV (Flutter): WebView + ExoPlayer + pairing
 ├── scripts/              # dry-run E2E, build-dist, deploy-cloud, turso-backup
 ├── tools/                # license-gen.mjs (alat lesen OFFLINE — kunci peribadi luar repo)
@@ -121,8 +122,13 @@ terang, warna custom + preset, latar foto + kelegapan, cuaca Open-Meteo,
 pelbagai skrin LAN, safe margin, mod ujian, kiosk + watchdog, cloud multi-
 tenant + lesen + percubaan 14 hari + pairing TV, cache offline SW.
 
-Nota: frontend guna baseline rujukan (HTML/CSS/JS) dipindahkan verbatim untuk
-pariti gelagat penuh; terjemahan TypeScript penuh adalah kerja susulan.
+Nota: sumber frontend kini TypeScript sepenuhnya (`packages/frontend/src/*.ts`)
+dengan jenis daripada `@masjidtv/shared`; output dikompile esbuild ke
+`public*/js` (kelakuan runtime serupa dengan baseline — disemak melalui audit
+pariti token + smoke DOM `pnpm --filter @masjidtv/frontend run smoke`).
+Deviasi disengajakan daripada baseline: (1) adapter AndroidBridge dua mod
+(kaedah terus + postMessage Flutter), (2) pembetulan `data-users` superuser
+(baseline menulis `t.id` → "undefined", toggle Users sentiasa ralat).
 App Android TV: scaffolding Flutter lengkap (kontrak bridge/API sepadan);
 integrasi ExoPlayer/UVC/auto-start perlu disahkan pada peranti sebenar.
 

@@ -1,0 +1,636 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>TVMasjid — Admin</title>
+  <link rel="icon" type="image/png" href="/assets/favicon.png">
+  <meta name="theme-color" content="#0a1a2f">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black">
+  <link rel="manifest" href="/manifest.webmanifest">
+  <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png">
+  <link rel="stylesheet" href="/css/admin.css">
+</head>
+<body>
+
+  <div id="loginView" class="login-view">
+    <form id="loginForm" class="login-card">
+  <img class="login-mark" src="/assets/logo.png" alt="">
+      <h1>TVMasjid Admin</h1>
+      <p class="login-sub" data-i18n="loginSub">Manage the mosque signage system</p>
+      <input type="text" id="loginUsername" data-i18n-placeholder="loginUsername" placeholder="Username" autocomplete="username" autofocus required>
+      <input type="password" id="loginPassword" data-i18n-placeholder="loginPassword" placeholder="Password / PIN" autocomplete="current-password" required>
+      <p id="loginError" class="error" hidden></p>
+      <button type="submit" class="btn primary block" data-i18n="signIn">Sign in</button>
+    </form>
+  </div>
+
+  <div id="pinChangeView" class="login-view" hidden>
+    <form id="pinChangeForm" class="login-card">
+  <img class="login-mark" src="/assets/logo.png" alt="">
+      <h1>TVMasjid Admin</h1>
+      <p class="login-sub" data-i18n="pinChangeSub">Set your superuser PIN before continuing</p>
+      <input type="password" id="pinNew" data-i18n-placeholder="newPin" placeholder="New PIN" autocomplete="new-password" required>
+      <input type="password" id="pinConfirm" data-i18n-placeholder="confirmPin" placeholder="Confirm PIN" autocomplete="new-password" required>
+      <p id="pinError" class="error" hidden></p>
+      <button type="submit" class="btn primary block" data-i18n="changePin">Change PIN</button>
+    </form>
+  </div>
+
+  <div id="appView" class="app" hidden>
+    <aside class="sidebar">
+      <div class="side-brand">
+        <img src="/assets/logo.png" alt="">
+        <div class="side-brand-text">
+          <strong>TVMasjid</strong>
+          <span id="sideMosque">Admin</span>
+        </div>
+      </div>
+      <nav class="side-nav">
+        <button class="nav-btn active" data-view="overview" data-i18n="overview">Overview</button>
+        <button class="nav-btn" data-view="announcements" data-i18n="announcements">Announcements</button>
+        <button class="nav-btn" data-view="profil" data-i18n="navProfil">Profil Masjid</button>
+        <button class="nav-btn" data-view="prayer" data-i18n="navPrayer">Waktu Solat</button>
+        <button class="nav-btn" data-view="display" data-i18n="navDisplay">Paparan</button>
+        <button class="nav-btn" data-view="content" data-i18n="navContent">Kandungan &amp; Media</button>
+        <button class="nav-btn" data-view="masjid" id="masjidNavBtn" hidden data-i18n="masjid">Masjid</button>
+        <button class="nav-btn" id="tvNavBtn" data-view="tv" data-i18n="tv">TV &amp; Paparan</button>
+        
+      </nav>
+      <div class="side-foot">
+        <label class="lang-label" for="adminLang" data-i18n="language">Language</label>
+        <select id="adminLang" class="lang-select">
+          <option value="en">English</option>
+          <option value="ms">Bahasa Melayu</option>
+        </select>
+        <span id="sideVersion" class="side-version"></span>
+        <button id="logoutBtn" class="btn ghost block" data-i18n="signOut">Sign out</button>
+      </div>
+    </aside>
+
+    <main class="content">
+
+      <section id="view-overview" class="view active">
+        <header class="view-head">
+          <h2 data-i18n="overview">Overview</h2>
+          <p data-i18n="overviewSub">Live status of the signage system.</p>
+        </header>
+
+        <div class="card-grid">
+          <div class="card">
+            <h3 data-i18n="server">Server</h3>
+            <p class="stat" id="ovServer">—</p>
+            <p class="sub" id="ovUptime">—</p>
+          </div>
+          <div class="card">
+            <h3 data-i18n="nextPrayer">Next prayer</h3>
+            <p class="stat" id="ovNextPrayer">—</p>
+            <p class="sub" id="ovCountdown">—</p>
+          </div>
+          <div class="card">
+            <h3 data-i18n="announcementsTitle">Announcements</h3>
+            <p class="stat" id="ovAnnouncements">—</p>
+            <p class="sub" id="ovActive">—</p>
+          </div>
+          <div class="card">
+            <h3 data-i18n="nextIslamicEvent">Next Islamic event</h3>
+            <p class="stat" id="ovEvent">—</p>
+            <p class="sub" id="ovEventDays">—</p>
+          </div>
+          <div class="card" id="licenseCard" hidden>
+            <h3 data-i18n="license">License</h3>
+            <p class="stat" id="ovLicense">—</p>
+            <p class="sub" id="ovLicenseSub">—</p>
+            <p class="url-line"><code id="ovApiKey" style="font-size:11px"></code></p>
+            <div id="licenseReg" hidden>
+              <div class="form-grid">
+                <label class="span-2"><span data-i18n="licenseCodeLabel">License code</span>
+                  <input type="text" id="licCodeInput" placeholder="TVM-…">
+                </label>
+              </div>
+              <button id="licRegisterBtn" class="btn primary" data-i18n="registerLicense">Register license</button>
+            </div>
+          </div>
+          <div class="card">
+            <h3 data-i18n="signageScreen">Signage screen</h3>
+            <p class="url-line"><code id="ovScreenUrl">—</code></p>
+            <div class="btn-row">
+              <button id="openDisplayBtn" class="btn primary sm" data-i18n="openDisplay">Open display</button>
+              <button id="copyUrlBtn" class="btn ghost sm" data-i18n="copyUrl">Copy URL</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="card">
+          <h3 data-i18n="notes">Notes</h3>
+          <ul class="notes">
+            <li id="note1">Point any screen on the network to <strong id="ovScreenUrlNote">—</strong> and open it fullscreen (Edge kiosk handles this automatically on the mini PC).</li>
+            <li id="passwordNote" hidden>⚠️ The default admin password file still exists at <code>server/data/ADMIN_PASSWORD.txt</code>. Change the password in Settings and the file is removed.</li>
+            <li data-i18n="noteJakim">Prayer times and hijri date come from the official JAKIM e-Solat API (selected zone), with automatic offline calculation fallback.</li>
+            <li id="eventsSyncNote" hidden data-i18n="noteEvents">📅 Islamic events auto-synced from JAKIM takwim.</li>
+            <li id="audioNote" hidden data-i18n="noteAudio">🔊 Adhan/Iqamah audio is configured — the screen will call at prayer times.</li>
+            <li id="streamNote" hidden>📡 <span id="streamNoteCount">—</span> live stream(s) configured. RTSP/RTMP/ONVIF need ffmpeg on the mini PC.</li>
+          </ul>
+        </div>
+      </section>
+
+      <section id="view-announcements" class="view">
+        <header class="view-head">
+          <h2 data-i18n="announcements">Announcements</h2>
+          <p data-i18n="announcementsSub">Shown in the slideshow and ticker on every screen.</p>
+        </header>
+
+        <div class="toolbar">
+          <button id="newAnnouncementBtn" class="btn primary" data-i18n="newAnnouncement">+ New announcement</button>
+          <button id="refreshAnnouncementsBtn" class="btn ghost" data-i18n="refresh">Refresh</button>
+        </div>
+
+        <div id="announcementForm" class="card form-card" hidden>
+          <h3 id="announcementFormTitle">New announcement</h3>
+          <div class="form-grid">
+            <label><span data-i18n="title">Title</span>
+              <input type="text" id="anTitle" maxlength="200" placeholder="e.g. Kuliah Maghrib">
+            </label>
+            <label><span data-i18n="category">Category</span>
+              <select id="anCategory">
+                <option value="announcement" data-i18n="catAnnouncement">Announcement</option>
+                <option value="event" data-i18n="catEvent">Event</option>
+                <option value="general" data-i18n="catGeneral">General</option>
+                <option value="welcome" data-i18n="catWelcome">Welcome</option>
+                <option value="tabung" data-i18n="catTabung">Tabung / Collection</option>
+                <option value="quran" data-i18n="catQuran">Quran — daily verse</option>
+              </select>
+            </label>
+            <label class="span-2"><span data-i18n="message">Message</span>
+              <textarea id="anMessage" rows="3" maxlength="2000" placeholder="Details shown on screen…"></textarea>
+            </label>
+            <div id="anQuranBox" class="form-grid span-2 quran-box" hidden>
+              <label class="checkbox-label span-2"><input type="checkbox" id="anQuranDaily" checked> <span data-i18n="quranDaily">Daily Quran verse (auto-rotates every day)</span></label>
+              <label class="span-2"><span data-i18n="quranArabic">Arabic text (optional — override daily pick)</span>
+                <textarea id="anArabic" rows="2" maxlength="2000" dir="rtl"></textarea>
+              </label>
+              <label><span data-i18n="quranTranslationMs">Translation — Malay</span>
+                <input type="text" id="anTranslationMs" maxlength="2000">
+              </label>
+              <label><span data-i18n="quranTranslationEn">Translation — English</span>
+                <input type="text" id="anTranslationEn" maxlength="2000">
+              </label>
+              <label class="span-2"><span data-i18n="quranRef">Reference (e.g. Al-Baqarah 2:45)</span>
+                <input type="text" id="anRef" maxlength="200">
+              </label>
+            </div>
+            <label><span data-i18n="startDate">Start date (optional)</span>
+              <input type="date" id="anStart">
+            </label>
+            <label><span data-i18n="endDate">End date (optional)</span>
+              <input type="date" id="anEnd">
+            </label>
+            <label><span data-i18n="priority">Priority (0–10)</span>
+              <input type="number" id="anPriority" min="0" max="10" value="0">
+            </label>
+            <label class="checkbox-label"><input type="checkbox" id="anActive" checked> <span data-i18n="active">Active</span></label>
+            <label class="span-2"><span data-i18n="mediaOptional">Media — image or video (optional)</span>
+              <input type="file" id="anImage" accept="image/png,image/jpeg,image/webp,image/gif,video/mp4,video/webm,video/ogg">
+              <input type="hidden" id="anImageUrl">
+              <img id="anImagePreview" class="img-preview" hidden alt="preview">
+              <input type="hidden" id="anVideoUrl">
+              <video id="anVideoPreview" class="img-preview" hidden controls></video>
+              <button type="button" id="anImageClear" class="btn ghost sm" hidden data-i18n="removeImage">Remove image</button>
+              <button type="button" id="anVideoClear" class="btn ghost sm" hidden data-i18n="removeVideo">Remove video</button>
+            </label>
+          </div>
+          <div class="btn-row">
+            <button id="anSave" class="btn primary" data-i18n="save">Save</button>
+            <button id="anCancel" class="btn ghost" data-i18n="cancel">Cancel</button>
+          </div>
+        </div>
+
+        <div id="announcementList" class="announcement-list"></div>
+      </section>
+
+      <section id="view-masjid" class="view">
+        <header class="view-head">
+          <h2 data-i18n="masjid">Masjid</h2>
+          <p data-i18n="masjidSub">Register mosque accounts and manage licenses.</p>
+        </header>
+
+        <div class="card">
+          <h3 data-i18n="registerMasjid">Register mosque</h3>
+          <div class="form-grid">
+            <label><span data-i18n="mosqueNameLabel">Mosque name</span>
+              <input type="text" id="suTenantName" maxlength="120" placeholder="Masjid Al-Hidayah">
+            </label>
+            <label><span data-i18n="usernameLabel">Admin username</span>
+              <input type="text" id="suTenantUsername" maxlength="60" placeholder="admin@masjid">
+            </label>
+            <label><span data-i18n="passwordLabel">Admin password</span>
+              <input type="password" id="suTenantPassword" autocomplete="new-password">
+            </label>
+          </div>
+          <button id="suCreateTenant" class="btn primary" data-i18n="registerBtn">Register</button>
+        </div>
+
+        <div id="tenantList" class="announcement-list"></div>
+      </section>
+
+      <section id="view-tv" class="view">
+        <header class="view-head">
+          <h2 data-i18n="tv">TV &amp; Paparan</h2>
+          <p data-i18n="tvSub">Pautkan peranti Android TV menggunakan kod yang dipaparkan pada skrin TV.</p>
+        </header>
+
+        <div class="card">
+          <h3 data-i18n="tvPairTitle">Pair TV baharu</h3>
+          <div class="form-grid">
+            <label><span data-i18n="tvPairCode">Kod pada skrin TV</span>
+              <input type="text" id="tvPairCode" maxlength="6" placeholder="ABCDEF" style="text-transform:uppercase">
+            </label>
+          </div>
+          <button id="tvPairBtn" class="btn primary" data-i18n="tvPairBtn">Pair TV</button>
+        </div>
+
+        <div class="card">
+          <h3 data-i18n="tvDevices">Peranti terpaut</h3>
+          <div id="tvDeviceList" class="announcement-list"></div>
+        </div>
+      </section>
+
+            <section id="view-profil" class="view">
+        <header class="view-head">
+          <h2 data-i18n="navProfil">Mosque Profile</h2>
+          <p data-i18n="navProfilSub">Mosque details, location, weather and account.</p>
+        </header>
+
+        <div class="card">
+          <h3 data-i18n="mosque">Mosque</h3>
+          <div class="form-grid">
+            <label class="span-2"><span data-i18n="name">Name</span>
+              <input type="text" id="stMosqueName" maxlength="120">
+            </label>
+            <label class="span-2"><span data-i18n="tagline">Tagline</span>
+              <input type="text" id="stTagline" maxlength="120">
+            </label>
+            <label class="span-2"><span data-i18n="address">Address</span>
+              <input type="text" id="stAddress" maxlength="200">
+            </label>
+            <label class="span-2"><span data-i18n="logoOptional">Logo (optional)</span>
+              <input type="file" id="stLogoFile" accept="image/png,image/jpeg,image/webp,image/gif">
+              <input type="hidden" id="stLogoUrl">
+              <img id="stLogoPreview" class="img-preview" hidden alt="logo preview">
+              <button type="button" id="stLogoClear" class="btn ghost sm" hidden data-i18n="removeLogo">Remove logo</button>
+            </label>
+          </div>
+          <button class="btn primary" data-save="mosque" data-i18n="saveMosque">Save mosque</button>
+        </div>
+
+        <div class="card">
+          <h3 data-i18n="location">Location</h3>
+          <p class="sub" data-i18n="locationSub">Used for prayer-time calculation and weather. Latitude/longitude in decimal degrees.</p>
+          <div class="form-grid">
+            <label><span data-i18n="latitude">Latitude</span>
+              <input type="number" id="stLat" step="0.000001" min="-90" max="90">
+            </label>
+            <label><span data-i18n="longitude">Longitude</span>
+              <input type="number" id="stLng" step="0.000001" min="-180" max="180">
+            </label>
+            <label class="span-2"><span data-i18n="placeName">Place name</span>
+              <input type="text" id="stPlace" maxlength="120">
+            </label>
+          </div>
+          <button class="btn primary" data-save="location" data-i18n="saveLocation">Save location</button>
+        </div>
+
+        <div class="card">
+          <h3 data-i18n="weatherTitle">Weather</h3>
+          <div class="form-grid">
+            <label class="checkbox-label"><input type="checkbox" id="stWeatherEnabled"> <span data-i18n="weatherEnabled">Weather enabled</span></label>
+            <label><span data-i18n="unit">Unit</span>
+              <select id="stWeatherUnit">
+                <option value="c" data-i18n="celsius">Celsius</option>
+                <option value="f" data-i18n="fahrenheit">Fahrenheit</option>
+              </select>
+            </label>
+          </div>
+          <button class="btn primary" data-save="weather" data-i18n="saveWeather">Save weather</button>
+        </div>
+
+        <div class="card">
+          <h3 data-i18n="hijriTitle">Hijri date</h3>
+          <div class="form-grid">
+            <label><span data-i18n="hijriOffset">Day offset (−2 to +2)</span>
+              <input type="number" id="stHijriOffset" min="-2" max="2" value="0">
+            </label>
+          </div>
+          <button class="btn primary" data-save="hijri" data-i18n="saveHijri">Save Hijri offset</button>
+        </div>
+
+        <div class="card">
+          <h3 data-i18n="passwordTitle">Change admin password</h3>
+          <div class="form-grid">
+            <label><span data-i18n="currentPassword">Current password</span>
+              <input type="password" id="pwCurrent" autocomplete="current-password">
+            </label>
+            <label><span data-i18n="newPassword">New password (min 6 chars)</span>
+              <input type="password" id="pwNew" autocomplete="new-password">
+            </label>
+            <label><span data-i18n="confirmPassword">Confirm new password</span>
+              <input type="password" id="pwConfirm" autocomplete="new-password">
+            </label>
+          </div>
+          <button id="pwSaveBtn" class="btn primary" data-i18n="changePassword">Change password</button>
+        </div>
+
+      </section>
+      <section id="view-prayer" class="view">
+        <header class="view-head">
+          <h2 data-i18n="navPrayer">Prayer Times</h2>
+          <p data-i18n="navPrayerSub">Prayer schedule, azan/iqamah and audio.</p>
+        </header>
+
+        <div class="card">
+          <h3 data-i18n="prayerTimes">Prayer times</h3>
+          <div class="form-grid">
+            <label class="span-2"><span data-i18n="jakimZone">JAKIM zone (official prayer times)</span>
+              <select id="stZone"></select>
+            </label>
+            <label><span data-i18n="timeSource">Time source</span>
+              <select id="stSource">
+                <option value="jakim" data-i18n="sourceJakim">JAKIM API (e-Solat) — with local fallback</option>
+                <option value="local" data-i18n="sourceLocal">Local calculation only</option>
+              </select>
+            </label>
+            <label><span data-i18n="fallbackMethod">Fallback calculation method</span>
+              <select id="stMethod"></select>
+            </label>
+            <label class="span-2"><span data-i18n="timezone">Timezone (IANA)</span>
+              <input type="text" id="stTimezone" placeholder="Asia/Kuala_Lumpur">
+            </label>
+            <label class="checkbox-label"><input type="checkbox" id="stShowImsak"> <span data-i18n="showImsak">Show Imsak</span></label>
+            <label><span data-i18n="imsakOffset">Imsak offset (min before Fajr)</span>
+              <input type="number" id="stImsakOffset" min="1" max="60">
+            </label>
+            <label class="checkbox-label"><input type="checkbox" id="stShowSunrise"> <span data-i18n="showSunrise">Show Syuruk/Sunrise</span></label>
+            <label><span data-i18n="azanLead">Azan countdown starts (min before adhan)</span>
+              <input type="number" id="stAzanLead" min="1" max="60">
+            </label>
+            <label><span data-i18n="iqamahOffset">Iqamah after adhan (minutes)</span>
+              <input type="number" id="stIqamahOffset" min="1" max="60">
+            </label>
+            <label><span data-i18n="jemaahDur">Solat Jemaah screen (minutes)</span>
+              <input type="number" id="stJemaahDur" min="1" max="120">
+            </label>
+            <label><span data-i18n="afterIqamah">After iqamah display</span>
+              <select id="stAfterIqamah">
+                <option value="jemaah" data-i18n="afterIqamahJemaah">Solat Jemaah screen</option>
+                <option value="black" data-i18n="afterIqamahBlack">Black screen with clock (top-right)</option>
+              </select>
+            </label>
+          </div>
+          <h4 data-i18n="adjustments">Adjustments (minutes)</h4>
+          <div class="form-grid six">
+            <label><span data-i18n="fajr">Fajr</span> <input type="number" id="stAdjFajr" min="-120" max="120" value="0"></label>
+            <label><span data-i18n="sunrise">Sunrise</span> <input type="number" id="stAdjSunrise" min="-120" max="120" value="0"></label>
+            <label><span data-i18n="dhuhr">Dhuhr</span> <input type="number" id="stAdjDhuhr" min="-120" max="120" value="0"></label>
+            <label><span data-i18n="asr">Asr</span> <input type="number" id="stAdjAsr" min="-120" max="120" value="0"></label>
+            <label><span data-i18n="maghrib">Maghrib</span> <input type="number" id="stAdjMaghrib" min="-120" max="120" value="0"></label>
+            <label><span data-i18n="isha">Isha</span> <input type="number" id="stAdjIsha" min="-120" max="120" value="0"></label>
+          </div>
+          <h4 data-i18n="iqamahFixed">Iqamah fixed times (HH:MM, optional — leave empty to use the offset above)</h4>
+          <div class="form-grid five">
+            <label><span data-i18n="fajr">Fajr</span> <input type="time" id="stIqFajr"></label>
+            <label><span data-i18n="dhuhr">Dhuhr</span> <input type="time" id="stIqDhuhr"></label>
+            <label><span data-i18n="asr">Asr</span> <input type="time" id="stIqAsr"></label>
+            <label><span data-i18n="maghrib">Maghrib</span> <input type="time" id="stIqMaghrib"></label>
+            <label><span data-i18n="isha">Isha</span> <input type="time" id="stIqIsha"></label>
+          </div>
+          <button class="btn primary" data-save="prayer" data-i18n="savePrayer">Save prayer settings</button>
+        </div>
+
+        <div class="card">
+          <h3 data-i18n="audioTitle">Audio — Azan &amp; Iqamah</h3>
+          <p class="sub" data-i18n="audioSub">The screen plays the adhan at the start of each prayer and the iqamah call at the configured iqamah time. Upload your own audio files or paste a URL.</p>
+          <div class="form-grid">
+            <label class="checkbox-label"><input type="checkbox" id="stAudioEnabled"> <span data-i18n="audioEnabled">Audio enabled</span></label>
+            <label><span data-i18n="adhanAudio">Azan audio</span>
+              <input type="text" id="stAdhanUrl" placeholder="/uploads/azan.mp3 or https://…">
+              <input type="file" id="stAdhanFile" accept="audio/mpeg,audio/wav,audio/ogg,audio/mp4,audio/x-m4a">
+            </label>
+            <label><span data-i18n="iqamahAudio">Iqamah audio</span>
+              <input type="text" id="stIqamahUrl" placeholder="/uploads/iqamah.mp3 or https://…">
+              <input type="file" id="stIqamahFile" accept="audio/mpeg,audio/wav,audio/ogg,audio/mp4,audio/x-m4a">
+            </label>
+          </div>
+          <button class="btn primary" data-save="audio" data-i18n="saveAudio">Save audio settings</button>
+        </div>
+
+      </section>
+      <section id="view-display" class="view">
+        <header class="view-head">
+          <h2 data-i18n="navDisplay">Display</h2>
+          <p data-i18n="navDisplaySub">Screen layout, colours and test mode.</p>
+        </header>
+
+        <div class="card">
+          <h3 data-i18n="displayTitle">Display</h3>
+          <div class="form-grid">
+            <label><span data-i18n="languageLabel">Language</span>
+              <select id="stLanguage">
+                <option value="ms">Bahasa Melayu</option>
+                <option value="en">English</option>
+              </select>
+            </label>
+            <label><span data-i18n="colourPreset">Colour preset</span>
+              <select id="stColorPreset">
+                <option value="" data-i18n="presetCustom">— Custom —</option>
+                <option value="navy" data-i18n="presetNavy">Navy &amp; Gold (default)</option>
+                <option value="emerald" data-i18n="presetEmerald">Emerald &amp; Gold</option>
+                <option value="royal" data-i18n="presetRoyal">Royal Blue &amp; Gold</option>
+                <option value="maroon" data-i18n="presetMaroon">Maroon &amp; Gold</option>
+                <option value="cream" data-i18n="presetCream">Black &amp; Cream</option>
+                <option value="light" data-i18n="presetLight">Light</option>
+              </select>
+            </label>
+            <label><span data-i18n="headingFont">Heading font</span>
+              <select id="stHeadingFont">
+                <option value="sans" data-i18n="fontSans">Sans (default)</option>
+                <option value="serif" data-i18n="fontSerif">Serif — Royal</option>
+                <option value="classic" data-i18n="fontClassic">Classic — Formal</option>
+              </select>
+            </label>
+            <label><span data-i18n="clockFormat">Clock format</span>
+              <select id="stClockFormat">
+                <option value="24h" data-i18n="clock24">24-hour</option>
+                <option value="12h" data-i18n="clock12">12-hour</option>
+              </select>
+            </label>
+            <label class="checkbox-label"><input type="checkbox" id="stShowSeconds" checked> <span data-i18n="showSeconds">Show seconds</span></label>
+            <label><span data-i18n="slideshowInterval">Slideshow interval (seconds)</span>
+              <input type="number" id="stSlideInterval" min="5" max="300">
+            </label>
+            <label><span data-i18n="fridayKhutbahUntil">Khutbah &amp; Solat Jumaat sehingga (HH:mm)</span>
+              <input type="time" id="stFridayUntil" value="13:55">
+            </label>
+            <label><span data-i18n="tickerSpeed">Ticker speed</span>
+              <select id="stTickerSpeed">
+                <option value="slow" data-i18n="tickerSlow">Slow</option>
+                <option value="normal" data-i18n="tickerNormal">Normal</option>
+                <option value="fast" data-i18n="tickerFast">Fast</option>
+              </select>
+            </label>
+            <label><span data-i18n="safeMargin">Safe margin (% of screen, for TV overscan)</span>
+              <input type="number" id="stSafeMargin" min="0" max="8" step="0.5" value="2">
+            </label>
+            <label><span data-i18n="mediaFit">Media fit mode</span>
+              <select id="stMediaFit">
+                <option value="stretch" data-i18n="mediaFitStretch">Stretch — full, no bars &amp; no crop</option>
+                <option value="fit" data-i18n="mediaFitFit">Fit — original ratio, black bars</option>
+                <option value="crop" data-i18n="mediaFitCrop">Crop — full, edges trimmed</option>
+              </select>
+            </label>
+            <label class="checkbox-label"><input type="checkbox" id="stShowTicker"> <span data-i18n="showTicker">Show ticker</span></label>
+            <label class="span-2"><span data-i18n="tickerCustom">Ticker custom text (optional — replaces system announcements, one message per line)</span>
+              <textarea id="stTickerCustom" rows="2" maxlength="1000" placeholder="e.g. Selamat datang ke masjid&#10;Kuliah Maghrib malam ini 8:00 malam"></textarea>
+            </label>
+            <label class="checkbox-label"><input type="checkbox" id="stShowWeather"> <span data-i18n="showWeather">Show weather</span></label>
+          </div>
+          <h4 data-i18n="bannerStatic">Static banner</h4>
+          <p class="sub" data-i18n="bannerHint">Full-screen static banner for events. The azan/iqamah countdown still runs as usual on top of it.</p>
+          <div class="form-grid">
+            <label class="checkbox-label"><input type="checkbox" id="stBannerEnabled"> <span data-i18n="bannerEnabled">Show static banner (full screen)</span></label>
+            <label class="span-2"><span data-i18n="bannerTitle">Banner title</span>
+              <input type="text" id="stBannerTitle" maxlength="120" placeholder="e.g. MAJLIS TADARUS AL-QURAN">
+            </label>
+            <label class="span-2"><span data-i18n="bannerMessage">Banner message</span>
+              <textarea id="stBannerMessage" rows="2" maxlength="300" placeholder="e.g. 8:00 malam — Dewan Utama Masjid"></textarea>
+            </label>
+            <label class="span-2"><span data-i18n="bannerImage">Banner background image (optional)</span>
+              <input type="file" id="stBannerFile" accept="image/png,image/jpeg,image/webp,image/gif">
+              <input type="text" id="stBannerImage" placeholder="/uploads/banner.jpg or https://…">
+              <button type="button" id="stBannerClear" class="btn ghost sm" hidden data-i18n="removePhoto">Remove photo</button>
+            </label>
+          </div>
+          <h4 data-i18n="coloursBg">Colours &amp; background</h4>
+          <div class="form-grid">
+            <label><span data-i18n="bgTop">Background (top)</span>
+              <input type="color" id="stBgTop" value="#06101f">
+            </label>
+            <label><span data-i18n="bgBottom">Background (bottom)</span>
+              <input type="color" id="stBgBottom" value="#0a1a2f">
+            </label>
+            <label><span data-i18n="textColour">Text</span>
+              <input type="color" id="stText" value="#f3f6fb">
+            </label>
+            <label><span data-i18n="mutedText">Muted text</span>
+              <input type="color" id="stMuted" value="#8fa4bd">
+            </label>
+            <label><span data-i18n="accentGold">Accent (gold)</span>
+              <input type="color" id="stGold" value="#e0bc6a">
+            </label>
+            <label><span data-i18n="accentTeal">Accent 2 (teal)</span>
+              <input type="color" id="stTeal" value="#62d9c6">
+            </label>
+            <label class="span-2"><span data-i18n="bgPhoto">Background photo (optional)</span>
+              <input type="file" id="stBgFile" accept="image/png,image/jpeg,image/webp,image/gif">
+              <input type="text" id="stBgImage" placeholder="/uploads/background.jpg or https://…">
+              <button type="button" id="stBgClear" class="btn ghost sm" hidden data-i18n="removePhoto">Remove photo</button>
+            </label>
+            <label><span data-i18n="photoOpacity">Photo opacity</span>
+              <input type="range" id="stBgOpacity" min="0" max="100" value="0">
+            </label>
+            <span id="stBgOpacityVal" class="sub" style="padding-top:8px">0%</span>
+          </div>
+          <button class="btn primary" data-save="display" data-i18n="saveDisplay">Save display settings</button>
+        </div>
+
+        <div class="card">
+          <h3 data-i18n="testModeTitle">Test mode — azan &amp; iqamah countdown</h3>
+          <p class="sub" data-i18n="testModeSub">Simulate the clock and date to preview the full-screen azan/iqamah flow. The display follows the simulated time; audio is muted during simulation.</p>
+          <div class="form-grid">
+            <label class="checkbox-label"><input type="checkbox" id="stTestEnabled"> <span data-i18n="testEnabled">Enable test mode</span></label>
+            <label><span data-i18n="testDate">Simulated date</span>
+              <input type="date" id="stTestDate">
+            </label>
+            <label><span data-i18n="testTime">Simulated time</span>
+              <input type="time" id="stTestTime">
+            </label>
+            <label><span data-i18n="testPrayer">Quick set — prayer</span>
+              <select id="stTestPrayer">
+                <option value="fajr" data-i18n="prayerFajr">Subuh</option>
+                <option value="dhuhr" data-i18n="prayerDhuhr">Zohor</option>
+                <option value="asr" data-i18n="prayerAsr">Asar</option>
+                <option value="maghrib" data-i18n="prayerMaghrib">Maghrib</option>
+                <option value="isha" data-i18n="prayerIsha">Isyak</option>
+              </select>
+            </label>
+            <span class="sub" id="stTestRef" style="padding-top:8px"></span>
+          </div>
+          <div class="btn-row">
+            <button type="button" id="stTestMinus5" class="btn ghost sm" data-i18n="testMinus5">T − 5 min</button>
+            <button type="button" id="stTestAzan" class="btn ghost sm" data-i18n="testAzan">Adhan time</button>
+            <button type="button" id="stTestIqamah" class="btn ghost sm" data-i18n="testIqamah">Iqamah time</button>
+            <button id="stTestSave" class="btn primary sm" data-i18n="saveTestMode">Save test mode</button>
+          </div>
+        </div>
+
+      </section>
+      <section id="view-content" class="view">
+        <header class="view-head">
+          <h2 data-i18n="navContent">Content & Media</h2>
+          <p data-i18n="navContentSub">Live streams, Islamic events and duty roster.</p>
+        </header>
+
+        <div class="card">
+          <h3 data-i18n="liveStreams">Live streams (IP camera / ONVIF / RTSP / RTMP / HLS / WebRTC / YouTube)</h3>
+          <p class="sub" id="ffmpegStatus" data-i18n="checkingFfmpeg">Checking ffmpeg…</p>
+          <p class="sub" data-i18n="streamsSub">RTSP, RTMP and ONVIF streams are converted to HLS by ffmpeg on this machine and shown in the slideshow. YouTube accepts a normal or live video URL. WebRTC uses a custom embed URL (e.g. your WebRTC gateway page).</p>
+          <div class="form-grid">
+            <label class="span-2"><span data-i18n="ffmpegPath">ffmpeg path (for RTSP/RTMP/ONVIF)</span>
+              <input type="text" id="stFfmpegPath" placeholder="ffmpeg">
+            </label>
+          </div>
+          <button class="btn ghost sm" data-save="ffmpeg" data-i18n="saveFfmpeg">Save ffmpeg path</button>
+          <div id="streamList" class="stream-list"></div>
+          <div class="btn-row">
+            <button id="addStreamBtn" class="btn primary sm" data-i18n="addStream">+ Add stream</button>
+            <button id="saveStreamsBtn" class="btn ghost sm" data-i18n="saveStreams">Save streams</button>
+          </div>
+        </div>
+
+        <div class="card">
+          <h3 data-i18n="eventsTitle">Islamic events (countdown)</h3>
+          <p class="sub" data-i18n="eventsSub">Auto-sync dari takwim rasmi JAKIM (e-Solat) — tarikh hari kebesaran dikemas kini mengikut zon yang dipilih.</p>
+          <div class="form-grid">
+            <label class="checkbox-label"><input type="checkbox" id="stEventsAuto"> <span data-i18n="eventsAuto">Auto-sync dari JAKIM</span></label>
+            <div>
+              <p class="sub" id="eventsSyncStatus">—</p>
+            </div>
+          </div>
+          <div class="btn-row">
+            <button id="syncEventsBtn" class="btn primary sm" data-i18n="syncNow">Sync sekarang</button>
+          </div>
+          <div id="eventList" class="event-list"></div>
+          <div class="btn-row">
+            <button id="addEventBtn" class="btn primary sm" data-i18n="addEvent">+ Add event</button>
+            <button id="saveEventsBtn" class="btn ghost sm" data-i18n="saveEvents">Save events</button>
+          </div>
+        </div>
+
+        <div class="card">
+          <h3 data-i18n="dutyTitle">Imam &amp; Bilal bertugas</h3>
+          <p class="sub" data-i18n="rosterSub">Today's duty is shown on the screen.</p>
+          <div id="rosterGrid" class="roster-grid"></div>
+          <button class="btn primary" data-save="roster" data-i18n="saveRoster">Save roster</button>
+        </div>
+
+      </section>
+
+
+    </main>
+  </div>
+
+  <div id="toast" class="toast" hidden></div>
+  <script src="/js/admin.js"></script>
+</body>
+</html>

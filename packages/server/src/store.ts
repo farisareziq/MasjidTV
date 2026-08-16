@@ -41,8 +41,20 @@ export class Store {
       try {
         const existing = JSON.parse(rows[0].data);
         return this.migrate(existing);
-      } catch {
-        // fall through to defaults
+      } catch (err) {
+        // JANGAN reset secara senyap — itu memadam semua tetapan + kata laluan.
+        // Sandarkan data rosak untuk pemulihan, kekalkan fail kata laluan.
+        console.error('[store] tetapan rosak (JSON tidak sah) — mengekalkan nilai lalai');
+        console.error('[store] punca:', err instanceof Error ? err.message : err);
+        try {
+          fs.writeFileSync(
+            path.join(this.dataDir, `settings-corrupt-${Date.now()}.json`),
+            String(rows[0].data),
+            'utf8'
+          );
+        } catch {
+          /* sandaran gagal — teruskan dengan lalai */
+        }
       }
     }
     const s = this.createInitialSettings();
@@ -155,7 +167,17 @@ export class Store {
 
   listAnnouncements(): Announcement[] {
     const rows = this.client.db.select().from(announcements).orderBy(announcements.createdAt).all();
-    return rows.map((r) => JSON.parse(r.data) as Announcement);
+    // Baris rosak (JSON tidak sah) tidak boleh merosakkan seluruh API —
+    // langkau dengan log supaya boleh dibaiki/dipadam manual.
+    const out: Announcement[] = [];
+    for (const r of rows) {
+      try {
+        out.push(JSON.parse(r.data) as Announcement);
+      } catch (err) {
+        console.error(`[store] pengumuman rosak dilangkau (id=${r.id}):`, err instanceof Error ? err.message : err);
+      }
+    }
+    return out;
   }
 
   saveAnnouncement(item: Announcement): void {

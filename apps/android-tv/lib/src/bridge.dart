@@ -11,10 +11,23 @@ import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/material.dart';
 
+/// State stream emitted to any listening player widget (ExoPlayer/media_kit).
+class BridgeState {
+  final String? url;
+  final Rect? slot;
+  final bool muted;
+  const BridgeState({this.url, this.slot, this.muted = false});
+}
+
 class MasjidBridge {
   String? _currentUrl;
   Rect? _slot;
   bool _muted = false;
+  final _controller = StreamController<BridgeState>.broadcast();
+
+  /// Subscribe to play/stop/slot/mute changes (drive media_kit player from here).
+  Stream<BridgeState> get states => _controller.stream;
+  BridgeState get current => BridgeState(url: _currentUrl, slot: _slot, muted: _muted);
 
   Future<void> handle(String message) async {
     // Message is JSON like {"method":"playStream","args":["url","name","id"]}
@@ -32,25 +45,36 @@ class MasjidBridge {
               double.parse(args[2]),
               double.parse(args[3]),
             );
+            _emit();
           }
           break;
         case 'playStream':
-          if (args.isNotEmpty) _currentUrl = args[0];
+          if (args.isNotEmpty) {
+            _currentUrl = args[0];
+            _emit();
+          }
           break;
         case 'stopStream':
           _currentUrl = null;
+          _emit();
           break;
         case 'setStreamMuted':
-          if (args.isNotEmpty) _muted = args[0] == 'true';
+          if (args.isNotEmpty) {
+            _muted = args[0] == 'true';
+            _emit();
+          }
           break;
         case 'onSessionExpired':
           _currentUrl = null;
+          _emit();
           break;
       }
     } catch (_) {
       // Ignore malformed bridge messages.
     }
   }
+
+  void _emit() => _controller.add(current);
 
   Widget streamSurface() {
     return Positioned(
@@ -64,5 +88,6 @@ class MasjidBridge {
 
   void dispose() {
     _currentUrl = null;
+    _controller.close();
   }
 }

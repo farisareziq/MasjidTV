@@ -86,11 +86,12 @@ export function formatTime(date: Date, timeZone: string): string {
   return `${p.hour}:${p.minute}`;
 }
 
-// Bina Date yang waktu dindingnya dalam `timeZone` = HH:MM pada tarikh sivil itu.
+// Bina Date yang waktu dindingnya dalam `timeZone` = HH:MM[:SS] pada tarikh
+// sivil itu. Saat dipelihara jika diberikan (cth "23:59:59").
 export function zonedDateTime(dateKey: string, hhmm: string, timeZone: string): Date {
   const [y, m, d] = dateKey.split('-').map(Number);
-  const [h, mi] = hhmm.split(':').map(Number);
-  const asSystem = new Date(y, m - 1, d, h, mi, 0, 0);
+  const [h, mi, sec] = String(hhmm).split(':').map(Number);
+  const asSystem = new Date(y, m - 1, d, h, mi, sec || 0, 0);
   const sysOffset = -asSystem.getTimezoneOffset();
   const tgtOffset = tzOffsetMinutes(asSystem.getTime(), timeZone);
   return new Date(asSystem.getTime() - (tgtOffset - sysOffset) * 60000);
@@ -99,9 +100,10 @@ export function zonedDateTime(dateKey: string, hhmm: string, timeZone: string): 
 function computeLocal(dateKey: string, settings: Settings): { times: Record<string, Date>; timeZone: string } {
   const tz = settings.prayer.timezone || 'Asia/Kuala_Lumpur';
   const [y, m, d] = dateKey.split('-').map(Number);
-  // Guna tarikh UTC supaya komponen tarikh sivil konsisten tanpa mengira
-  // timezone server (Vercel = UTC). Waktu akhir dibina semula dalam tz masjid.
-  const date = new Date(Date.UTC(y, m - 1, d));
+  // adhan membaca komponen tarikh daripada getter TEMPATAN (bukan UTC) untuk
+  // memilih hari pengiraan — bina tengah hari tempatan (elak tepi tengah
+  // malam) supaya hari sivil konsisten tanpa mengira timezone server.
+  const date = new Date(y, m - 1, d, 12, 0, 0);
   const coords = new adhan.Coordinates(+settings.location.latitude, +settings.location.longitude);
   const t = new adhan.PrayerTimes(coords, date, makeParams(settings.prayer.method));
   const adj = settings.prayer.adjustments || {};
@@ -152,7 +154,7 @@ async function getDayJakim(dateKey: string, settings: Settings): Promise<JakimDa
   const put = (key: string, hhmm: string | null) => {
     if (hhmm) times[key] = zonedDateTime(dateKey, hhmm, tz);
   };
-  put('imsak', entry.times.imsak);
+  if (settings.prayer.showImsak) put('imsak', entry.times.imsak);
   put('fajr', entry.times.fajr);
   put('sunrise', entry.times.syuruk);
   put('dhuhr', entry.times.dhuhr);

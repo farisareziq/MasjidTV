@@ -21,7 +21,9 @@ export function parseYouTubeId(url: string): string | null {
 export function publicStream(s: Stream): Record<string, unknown> {
   const base = { id: s.id, name: s.name, type: s.type, enabled: s.enabled, duration: s.duration };
   if (isRelayType(s.type)) {
-    return { ...base, kind: 'relay', hlsUrl: `/relay/${s.id}/index.m3u8` };
+    // url diperlukan oleh app Android TV (ExoPlayer native RTSP/RTMP);
+    // paparan bukan-Android guna hlsUrl relay tempatan.
+    return { ...base, kind: 'relay', url: s.url, hlsUrl: `/relay/${s.id}/index.m3u8` };
   }
   if (s.type === 'hls') return { ...base, kind: 'hls', url: s.url };
   if (s.type === 'youtube') {
@@ -33,6 +35,8 @@ export function publicStream(s: Stream): Record<string, unknown> {
 // Public (display) settings projection. The local server includes
 // `eventsSync` (reference server behavior); the cloud omits it (reference
 // cloud behavior) — controlled by includeEventsSync.
+// NOTA KESELAMATAN: `media` (laluan ffmpeg internal) dan URL mentah stream
+// (kredensial RTSP) TIDAK didedahkan — hanya projetksi publicStream().
 export function publicSettings(s: Settings, opts: { includeEventsSync?: boolean } = {}): Record<string, unknown> {
   const out: Record<string, unknown> = {
     mosque: s.mosque,
@@ -53,11 +57,10 @@ export function publicSettings(s: Settings, opts: { includeEventsSync?: boolean 
     display: s.display,
     weather: s.weather,
     audio: s.audio,
-    media: s.media,
     hijriOffset: s.hijriOffset,
     events: s.events,
     roster: s.roster,
-    streams: s.streams
+    streams: (s.streams || []).map(publicStream)
   };
   if (opts.includeEventsSync) out.eventsSync = s.eventsSync;
   return out;

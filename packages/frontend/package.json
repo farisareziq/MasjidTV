@@ -2,9 +2,15 @@
   "name": "@masjidtv/frontend",
   "version": "1.0.0",
   "type": "module",
-  "description": "MasjidTV display + admin frontend (baseline ported from TVMasjid reference)",
+  "description": "MasjidTV display + admin frontend (TypeScript sources compiled to public*/js by esbuild)",
   "scripts": {
-    "build": "node -e \"console.log('frontend assets are served directly from public/')\"",
-    "typecheck": "node -e \"console.log('no typecheck (static assets)')\""
+    "build": "node build.mjs",
+    "typecheck": "tsc -p tsconfig.json",
+    "smoke": "node smoke-dom.cjs"
+  },
+  "devDependencies": {
+    "@masjidtv/shared": "workspace:*",
+    "esbuild": "^0.28.2",
+    "typescript": "^5.7.2"
   }
 }

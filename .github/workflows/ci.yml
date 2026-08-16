@@ -23,8 +23,13 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      # Bina pakej asas dahulu — type/test server & cloud menyelesaikan
+      # @masjidtv/{shared,db} melalui dist/ (lihat package exports).
+      - name: Build workspace deps
+        run: pnpm --filter @masjidtv/shared --filter @masjidtv/db build
+
       - name: Typecheck
-        run: pnpm --filter @masjidtv/shared typecheck && pnpm --filter @masjidtv/db typecheck && pnpm --filter @masjidtv/server typecheck
+        run: pnpm --filter @masjidtv/shared typecheck && pnpm --filter @masjidtv/db typecheck && pnpm --filter @masjidtv/server typecheck && pnpm --filter @masjidtv/cloud typecheck && pnpm --filter @masjidtv/frontend typecheck
 
       - name: Lint
         run: pnpm lint

@@ -137,7 +137,19 @@ async function getWeekEntries(zone: string): Promise<JakimEntry[]> {
 
 export async function getEntryForDate(zone: string, dateKey: string): Promise<JakimEntry | null> {
   const entries = await getWeekEntries(zone);
-  return entries.find((e) => e.dateKey === dateKey) ?? null;
+  const found = entries.find((e) => e.dateKey === dateKey) ?? null;
+  if (found) return found;
+  // period=week hanya memulangkan minggu semasa (Ahad–Sabtu). Pada Sabtu,
+  // "esok" (Ahad) tiada dalam cache — dapatkan hari tunggal melalui permintaan
+  // duration supaya fallback tidak merosot kepada pengiraan tempatan secara
+  // senyap (mismatch minit vs JAKIM).
+  try {
+    const json = await apiFetch(zone, 'duration', { start: dateKey, end: dateKey });
+    const day = (json.prayerTime || []).map((e) => parseEntry(e as Record<string, unknown>)).find((e): e is JakimEntry => e !== null && e.dateKey === dateKey);
+    return day || null;
+  } catch {
+    return null;
+  }
 }
 
 export function addDays(dateKey: string, days: number): string {
@@ -196,21 +208,23 @@ export interface SyncResult {
 
 // Anggaran tarikh seterusnya (hari/bulan hijrah) melalui kalendar Umm al-Qura.
 function approximateNextOccurrence(month: number, day: number, now: Date): string | null {
-  const fmt = new Intl.DateTimeFormat('en-u-ca-islamic-umalqura', {
+  // Kunci padanan hijri DAN tarikh keluaran mesti konsisten dalam timezone
+  // yang sama (Asia/Kuala_Lumpur) — elak ralat ±1 hari bila server bukan MYT.
+  const gregFmt = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Asia/Kuala_Lumpur', year: 'numeric', month: '2-digit', day: '2-digit'
+  });
+  const hijriFmt = new Intl.DateTimeFormat('en-u-ca-islamic-umalqura', {
     timeZone: 'Asia/Kuala_Lumpur', year: 'numeric', month: 'numeric', day: 'numeric'
   });
   const start = new Date(now);
   start.setDate(start.getDate() + 1);
   for (let i = 0; i < 430; i++) {
     const p: Record<string, number> = {};
-    for (const part of fmt.formatToParts(start)) {
+    for (const part of hijriFmt.formatToParts(start)) {
       if (part.type !== 'literal') p[part.type] = Number(part.value);
     }
     if (p.month === month && p.day === day) {
-      const y = start.getFullYear();
-      const m = String(start.getMonth() + 1).padStart(2, '0');
-      const d = String(start.getDate()).padStart(2, '0');
-      return `${y}-${m}-${d}`;
+      return gregFmt.format(start);
     }
     start.setDate(start.getDate() + 1);
   }

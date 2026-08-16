@@ -13,12 +13,13 @@ import {
   sortAnnouncements, isAnnouncementActive,
   type Settings, type Stream
 } from '@masjidtv/shared';
-import { createCloudClient, applySchema, type CloudDatabase } from '@masjidtv/db';
+import { createCloudClient, applySchema } from '@masjidtv/db';
 import { CloudStore, type TenantRow } from './store.js';
 import {
   signToken, verifyToken, hashPassword, comparePassword, checkRateLimit, recordFailure, clearFailures
 } from './auth.js';
 import { verifyLicense, licenseStatus, type LicenseStatus } from './license.js';
+import { ASSETS } from './pages.generated.js';
 
 const PAIR_CODE_CHARS = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
 
@@ -45,7 +46,10 @@ export async function createCloudApp(): Promise<FastifyInstance> {
   const store = new CloudStore(db.db);
   await store.seedSuperuser();
 
-  const app = Fastify({ logger: false, bodyLimit: 150 * 1024 * 1024 });
+  // trustProxy: di Vercel, socket remote adalah IP LB dalaman — tanpa ini
+  // semua pelanggan berkongsi bucket rate-limit yang sama (30 kegagalan
+  // merata melumpuhkan login seluruh platform selama 15 minit).
+  const app = Fastify({ logger: false, bodyLimit: 1024 * 1024, trustProxy: true });
   const startedAt = Date.now();
 
   app.addHook('onClose', async () => {
@@ -117,14 +121,19 @@ export async function createCloudApp(): Promise<FastifyInstance> {
       jsonError(reply, 401, 'Tenant tidak wujud');
       return null;
     }
-    const lic = licenseStatus(tenant);
-    if (!lic.unlocked) {
-      jsonError(reply, 403, lic.message || 'Lesen diperlukan', 'LICENSE_REQUIRED');
-      return null;
-    }
     (req as FastifyRequest & TenantReq).tenant = tenant;
     (req as FastifyRequest & TenantReq).userId = user.id;
-    (req as FastifyRequest & TenantReq).license = lic;
+    (req as FastifyRequest & TenantReq).license = licenseStatus(tenant);
+    // Gerbang lesen: laluan lesen/password mesti kekal boleh diakses walaupun
+    // percubaan tamat — jika tidak, tenant tersekat tidak boleh mengaktifkan
+    // lesen (kebuntuan ayam-bertelur).
+    const path = req.url.split('?')[0];
+    const licenseExempt = (req.method === 'POST' && path === '/api/admin/license')
+      || (req.method === 'POST' && path === '/api/admin/password');
+    if (!licenseExempt && !(req as FastifyRequest & TenantReq).license!.unlocked) {
+      jsonError(reply, 403, (req as FastifyRequest & TenantReq).license!.message || 'Lesen diperlukan', 'LICENSE_REQUIRED');
+      return null;
+    }
     return tenant;
   }
 
@@ -154,6 +163,133 @@ export async function createCloudApp(): Promise<FastifyInstance> {
   function ipOf(req: FastifyRequest): string {
     return req.ip || req.socket?.remoteAddress || 'x';
   }
+
+  // --- pages & static assets (parity with reference cloud/app.js) -------
+
+  const CSP = {
+    display: [
+      "default-src 'self'",
+      "script-src 'self'",
+      "style-src 'self' 'unsafe-inline'",
+      "img-src 'self' data: blob: https: http:",
+      "media-src 'self' blob: data: https: http:",
+      "font-src 'self' data:",
+      "connect-src 'self' https: http:",
+      "frame-src http: https:",
+      "object-src 'none'",
+      "base-uri 'self'",
+      "form-action 'self'",
+      "frame-ancestors 'none'"
+    ].join('; '),
+    admin: [
+      "default-src 'self'",
+      "script-src 'self'",
+      "style-src 'self' 'unsafe-inline'",
+      "img-src 'self' data: blob: https: http:",
+      "media-src 'self' blob: https: http:",
+      "font-src 'self' data:",
+      "connect-src 'self' https:",
+      "frame-src 'none'",
+      "object-src 'none'",
+      "base-uri 'self'",
+      "form-action 'self'",
+      "frame-ancestors 'none'"
+    ].join('; '),
+    api: "default-src 'none'; frame-ancestors 'none'"
+  };
+  function cspFor(p: string): string {
+    if (p === '/display') return CSP.display;
+    if (p === '/admin') return CSP.admin;
+    if (p === '/sw.js') {
+      return [
+        "default-src 'self'",
+        "script-src 'self'",
+        "connect-src 'self' https: http:",
+        "img-src 'self' data: blob: https: http:",
+        "media-src 'self' blob: data: https: http:"
+      ].join('; ');
+    }
+    return CSP.api;
+  }
+
+  app.addHook('onRequest', async (req, reply) => {
+    reply.header('X-Frame-Options', 'DENY');
+    reply.header('X-Content-Type-Options', 'nosniff');
+    reply.header('Referrer-Policy', 'strict-origin-when-cross-origin');
+    reply.header('Permissions-Policy', 'geolocation=(), microphone=()');
+    reply.header('Content-Security-Policy', cspFor(req.url.split('?')[0]));
+  });
+
+  function contentTypeFor(urlPath: string): string {
+    if (urlPath.endsWith('.webmanifest')) return 'application/manifest+json';
+    if (urlPath.endsWith('.png')) return 'image/png';
+    if (urlPath.endsWith('.svg')) return 'image/svg+xml';
+    if (urlPath.endsWith('.js')) return 'application/javascript';
+    if (urlPath.endsWith('.css')) return 'text/css';
+    return 'application/octet-stream';
+  }
+
+  // Embedded assets served before any route (base64 in pages.generated.ts).
+  app.addHook('onRequest', async (req, reply) => {
+    const urlPath = req.url.split('?')[0];
+    const b64 = ASSETS[urlPath];
+    if (!b64) return;
+    reply.header('Cache-Control', 'no-cache');
+    reply.type(contentTypeFor(urlPath)).send(Buffer.from(b64, 'base64'));
+  });
+
+  function htmlPage(name: '/display.html' | '/admin.html'): string {
+    return Buffer.from(ASSETS[name], 'base64').toString('utf8');
+  }
+
+  function displayDomainKey(host: string | undefined): string | null {
+    try {
+      const map = JSON.parse(process.env.DISPLAY_DOMAIN_KEYS || '{}') as Record<string, string>;
+      const h = String(host || '');
+      return map[h] || map[h.replace(/^www\./, '')] || null;
+    } catch {
+      return null;
+    }
+  }
+
+  app.get('/', async (req, reply) => {
+    const mapped = displayDomainKey(req.hostname);
+    if (mapped) return reply.redirect('/display?key=' + encodeURIComponent(mapped), 302);
+    reply.redirect('/admin');
+  });
+
+  app.get('/display', async (req, reply) => {
+    const page = htmlPage('/display.html');
+    const q = req.query as { key?: string; token?: string };
+    if (!q.key && !q.token) {
+      const mapped = displayDomainKey(req.hostname);
+      if (mapped) {
+        // No redirect: the display service worker swallows navigational
+        // redirects. Inject the key via <meta> (CSP-safe); display.js reads
+        // it and rewrites the URL via history.replaceState.
+        const inject = `<meta name="tvm-key" content="${mapped.replace(/"/g, '&quot;')}">`;
+        return reply.type('text/html').send(
+          page.replace('<meta charset="utf-8">', `<meta charset="utf-8">\n  ${inject}`)
+        );
+      }
+    }
+    reply.type('text/html').send(page);
+  });
+
+  app.get('/admin', async (_req, reply) => {
+    reply.type('text/html').send(htmlPage('/admin.html'));
+  });
+
+  // Convenience alias: the superuser console lives inside /admin (login as
+  // user "admin") — the reference has no separate /super page.
+  app.get('/super', async (_req, reply) => {
+    reply.redirect('/admin');
+  });
+
+  app.get('/sw.js', async (_req, reply) => {
+    reply.header('Cache-Control', 'no-cache, no-store');
+    reply.type('application/javascript').send(Buffer.from(ASSETS['/sw.js'], 'base64').toString('utf8'));
+  });
 
   // --- auth endpoints ----------------------------------------------------
 
@@ -205,6 +341,7 @@ export async function createCloudApp(): Promise<FastifyInstance> {
       return jsonError(reply, 401, 'Username atau kata laluan salah');
     }
     await clearFailures(db.db, key);
+    await clearFailures(db.db, ipKey);
     const token = signToken({ userId: user.id, tenantId: user.tenantId, role: 'admin', version: user.tokenVersion || 0 });
     reply.send({ token, role: 'admin', username: user.username, name: user.name });
   });
@@ -297,9 +434,8 @@ export async function createCloudApp(): Promise<FastifyInstance> {
       const wasEnabled = tenant.settings.eventsSync.enabled;
       const updated = await store.updateSettings(tenant.id, (req.body || {}) as Record<string, unknown>);
       if (before !== updated!.prayer.zone || (!wasEnabled && updated!.eventsSync.enabled)) {
-        syncEventsFor(updated!, (patch) => {
-          store.updateSettings(tenant.id, patch as Record<string, unknown>);
-          return Promise.resolve();
+        syncEventsFor(updated!, async (patch) => {
+          await store.updateSettings(tenant.id, patch as Record<string, unknown>);
         }, false).catch(() => {});
       }
       reply.send(updated);
@@ -399,7 +535,7 @@ export async function createCloudApp(): Promise<FastifyInstance> {
     const { contentType } = (req.body || {}) as { contentType?: string };
     const type = UPLOAD_TYPES[contentType || ''];
     if (!type) return jsonError(reply, 400, 'Jenis fail tidak disokong');
-    const pathname = `media/${Date.now()}-${crypto.randomBytes(4).toString('hex')}.${type.ext}`;
+    const pathname = `media/${tenant.id}/${Date.now()}-${crypto.randomBytes(4).toString('hex')}.${type.ext}`;
     try {
       const signedToken = await issueSignedToken({
         token: blobToken, pathname, operations: ['put'],
@@ -419,7 +555,11 @@ export async function createCloudApp(): Promise<FastifyInstance> {
     if (!tenant) return;
     const blobToken = process.env.VERCEL_BLOB_READ_WRITE_TOKEN || process.env.BLOB_READ_WRITE_TOKEN;
     const { pathname, kind } = (req.body || {}) as { pathname?: string; kind?: string };
-    if (!blobToken || !String(pathname || '').startsWith('media/')) return jsonError(reply, 400, 'Parameter tidak sah');
+    // Laluan mesti dalam ruang nama tenant (media/<tenantId>/…) supaya satu
+    // tenant tidak boleh mendaftar blob tenant lain ke akaunnya.
+    if (!blobToken || !/^[\w./-]+$/.test(String(pathname || '')) || !String(pathname).startsWith(`media/${tenant.id}/`)) {
+      return jsonError(reply, 400, 'Parameter tidak sah');
+    }
     try {
       const blob = await head(String(pathname), { token: blobToken });
       const mediaKind = ['image', 'video', 'audio'].includes(kind || '') ? kind : 'video';
@@ -433,9 +573,8 @@ export async function createCloudApp(): Promise<FastifyInstance> {
   app.post('/api/admin/events/sync', async (req, reply) => {
     const tenant = await requireAdmin(req, reply);
     if (!tenant) return;
-    const result = await syncEventsFor(tenant.settings, (patch) => {
-      store.updateSettings(tenant.id, patch as Record<string, unknown>);
-      return Promise.resolve();
+    const result = await syncEventsFor(tenant.settings, async (patch) => {
+      await store.updateSettings(tenant.id, patch as Record<string, unknown>);
     }, true);
     reply.send(result);
   });
@@ -520,9 +659,8 @@ export async function createCloudApp(): Promise<FastifyInstance> {
     const existing = await store.getUserByUsername(String(username));
     if (existing) return jsonError(reply, 409, 'Username sudah wujud');
     const tenant = await store.createTenant({ name: String(name).trim(), username: String(username).trim(), password: String(password) });
-    syncEventsFor(tenant.settings, (patch) => {
-      store.updateSettings(tenant.id, patch as Record<string, unknown>);
-      return Promise.resolve();
+    syncEventsFor(tenant.settings, async (patch) => {
+      await store.updateSettings(tenant.id, patch as Record<string, unknown>);
     }, true).catch(() => {});
     reply.status(201).send({ id: tenant.id, name: tenant.name, apiKey: tenant.apiKey, trialUntil: tenant.trialUntil, status: tenant.status });
   });
@@ -659,7 +797,12 @@ export async function createCloudApp(): Promise<FastifyInstance> {
     if (s.status === 'paired') return jsonError(reply, 400, 'Kod sudah digunakan');
     const token = crypto.randomBytes(24).toString('hex');
     await store.createDevice(tenant.id, s.deviceId, String(name || '').slice(0, 60), token);
-    await store.pairSession(s.code, tenant.id);
+    // CAS: hanya satu admin boleh menuntut sesi — yang kalah perlu maklum.
+    const claimed = await store.pairSession(s.code, tenant.id);
+    if (!claimed) {
+      await store.deleteDeviceByToken(tenant.id, token);
+      return jsonError(reply, 409, 'Kod sudah digunakan');
+    }
     reply.send({ ok: true, token });
   });
 

@@ -10,7 +10,7 @@ export interface UploadTypeDef {
 export const UPLOAD_TYPES: Record<string, UploadTypeDef> = {
   'image/png': { ext: 'png', kind: 'image', magic: (b) => b.slice(0, 4).toString('hex').startsWith('89504e47') },
   'image/jpeg': { ext: 'jpg', kind: 'image', magic: (b) => b.slice(0, 2).toString('hex') === 'ffd8' },
-  'image/webp': { ext: 'webp', kind: 'image', magic: (b) => b.slice(0, 4).toString('ascii') === 'RIFF' },
+  'image/webp': { ext: 'webp', kind: 'image', magic: (b) => b.slice(0, 4).toString('ascii') === 'RIFF' && b.slice(8, 12).toString('ascii') === 'WEBP' },
   'image/gif': { ext: 'gif', kind: 'image', magic: (b) => b.slice(0, 4).toString('hex') === '47494638' },
   'video/mp4': { ext: 'mp4', kind: 'video', magic: (b) => b.slice(4, 8).toString('ascii') === 'ftyp' },
   'video/quicktime': { ext: 'mov', kind: 'video', magic: (b) => b.slice(4, 8).toString('ascii') === 'ftyp' },

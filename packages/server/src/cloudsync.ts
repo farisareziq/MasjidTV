@@ -38,6 +38,9 @@ function saveCache(cacheDir: string, p: string, data: unknown): void {
 function rewriteUrls(value: unknown): unknown {
   if (typeof value === 'string') {
     if (value.startsWith('/uploads/')) return `${CLOUD_URL}${value}`;
+    // Relay HLS adalah tidak sah di pelayan lokal (tiada ffmpeg dalam mod
+    // cloud) — arahkan terus ke hos cloud. URL mutlak tidak disentuh.
+    if (value.startsWith('/relay/')) return `${CLOUD_URL}${value}`;
     return value;
   }
   if (Array.isArray(value)) return value.map(rewriteUrls);
@@ -101,4 +104,8 @@ export function applyCloudSync(app: FastifyInstance, dataDir: string): void {
   app.get('/api/today', async (_req, reply) => syncEndpoint(reply, '/api/today', false));
 
   app.get('/admin', async (_req, reply) => reply.redirect(`${CLOUD_URL}/admin`));
+  // Paparan tempatan kekal boleh dilalui (kiosk/watchdog membuka /display):
+  // halakan ke hos cloud — TV kemudian berkhidmat terus dari cloud.
+  app.get('/', async (_req, reply) => reply.redirect(`${CLOUD_URL}/display`));
+  app.get('/display', async (_req, reply) => reply.redirect(`${CLOUD_URL}/display`));
 }

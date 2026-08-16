@@ -1,9 +1,7 @@
-'use strict';
-
+"use strict";
 const $ = (id) => document.getElementById(id);
-
 const state = {
-  token: localStorage.getItem('tvm_token') || '',
+  token: localStorage.getItem("tvm_token") || "",
   editingId: null,
   methods: {},
   status: null,
@@ -13,613 +11,613 @@ const state = {
   ffmpegOk: null,
   toastTimer: null
 };
-
 const WEEKDAYS = [
-  ['sunday', 'Sunday'], ['monday', 'Monday'], ['tuesday', 'Tuesday'],
-  ['wednesday', 'Wednesday'], ['thursday', 'Thursday'], ['friday', 'Friday'],
-  ['saturday', 'Saturday']
+  ["sunday", "Sunday"],
+  ["monday", "Monday"],
+  ["tuesday", "Tuesday"],
+  ["wednesday", "Wednesday"],
+  ["thursday", "Thursday"],
+  ["friday", "Friday"],
+  ["saturday", "Saturday"]
 ];
-
-const STREAM_TYPES = ['rtsp', 'rtmp', 'onvif', 'hls', 'youtube', 'webrtc'];
-
+const STREAM_TYPES = ["rtsp", "rtmp", "onvif", "hls", "youtube", "webrtc"];
 const COLOR_PRESETS = {
-  navy: { bgTop: '#06101f', bgBottom: '#0a1a2f', text: '#f3f6fb', muted: '#8fa4bd', gold: '#e0bc6a', teal: '#62d9c6' },
-  emerald: { bgTop: '#03130f', bgBottom: '#08271c', text: '#f0faf5', muted: '#8fb5a4', gold: '#e6c976', teal: '#5ee6b0' },
-  royal: { bgTop: '#0a0f2e', bgBottom: '#151d52', text: '#f2f3ff', muted: '#9aa3d8', gold: '#d9b45c', teal: '#6fb7ff' },
-  maroon: { bgTop: '#220711', bgBottom: '#421127', text: '#fdf1f4', muted: '#c99aa8', gold: '#e8c37a', teal: '#ff9d76' },
-  light: { bgTop: '#eef2f7', bgBottom: '#ffffff', text: '#12233d', muted: '#5d7189', gold: '#a97c1f', teal: '#0d8f7c' }
+  navy: { bgTop: "#06101f", bgBottom: "#0a1a2f", text: "#f3f6fb", muted: "#8fa4bd", gold: "#e0bc6a", teal: "#62d9c6" },
+  emerald: { bgTop: "#03130f", bgBottom: "#08271c", text: "#f0faf5", muted: "#8fb5a4", gold: "#e6c976", teal: "#5ee6b0" },
+  royal: { bgTop: "#0a0f2e", bgBottom: "#151d52", text: "#f2f3ff", muted: "#9aa3d8", gold: "#d9b45c", teal: "#6fb7ff" },
+  maroon: { bgTop: "#220711", bgBottom: "#421127", text: "#fdf1f4", muted: "#c99aa8", gold: "#e8c37a", teal: "#ff9d76" },
+  light: { bgTop: "#eef2f7", bgBottom: "#ffffff", text: "#12233d", muted: "#5d7189", gold: "#a97c1f", teal: "#0d8f7c" }
 };
-
-const ADMIN_LANG_KEY = 'tvm_admin_lang';
-let adminLang = localStorage.getItem(ADMIN_LANG_KEY) || 'en';
-
+const ADMIN_LANG_KEY = "tvm_admin_lang";
+let adminLang = localStorage.getItem(ADMIN_LANG_KEY) || "en";
 const I18N = {
   en: {
-    loginSub: 'Manage the mosque signage system',
-    loginPassword: 'Admin password',
-    signIn: 'Sign in',
-    overview: 'Overview',
-    announcements: 'Announcements',
-    settings: 'Settings',
-    signOut: 'Sign out',
-    overviewSub: 'Live status of the signage system.',
-    server: 'Server',
-    nextPrayer: 'Next prayer',
-    prayerFajr: 'Fajr',
-    prayerDhuhr: 'Dhuhr',
-    prayerAsr: 'Asr',
-    prayerMaghrib: 'Maghrib',
-    prayerIsha: 'Isha',
-    announcementsTitle: 'Announcements',
-    nextIslamicEvent: 'Next Islamic event',
-    signageScreen: 'Signage screen',
-    openDisplay: 'Open display',
-    copyUrl: 'Copy URL',
-    notes: 'Notes',
-    note1: 'Point any screen on the network to {url} and open it fullscreen (Edge kiosk handles this automatically on the mini PC).',
-    notePassword: '⚠️ The default admin password file still exists at {file}. Change the password in Settings and the file is removed.',
-    noteJakim: 'Prayer times and hijri date come from the official JAKIM e-Solat API (selected zone), with automatic offline calculation fallback.',
-    noteAudio: '🔊 Adhan/Iqamah audio is configured — the screen will call at prayer times.',
-    noteStreams: '📡 {count} live stream(s) configured. RTSP/RTMP/ONVIF need ffmpeg on the mini PC.',
-    noteEvents: '📅 Islamic events auto-synced from JAKIM takwim.',
-    runningFor: 'Running for {time} • v{version}',
-    activeNow: '{n} active now',
-    eventDays: '{n} days • {date}',
-    eventToday: 'Hari ini! / Today!',
-    announcementsSub: 'Shown in the slideshow and ticker on every screen.',
-    newAnnouncement: '+ New announcement',
-    refresh: 'Refresh',
-    editAnnouncement: 'Edit announcement',
-    title: 'Title',
-    category: 'Category',
-    message: 'Message',
-    startDate: 'Start date (optional)',
-    endDate: 'End date (optional)',
-    priority: 'Priority (0–10)',
-    active: 'Active',
-    mediaOptional: 'Media — image or video (optional)',
-    removeImage: 'Remove image',
-    removeVideo: 'Remove video',
-    save: 'Save',
-    cancel: 'Cancel',
-    catAnnouncement: 'Announcement',
-    catEvent: 'Event',
-    catGeneral: 'General',
-    catWelcome: 'Welcome',
-    catTabung: 'Tabung / Collection',
-    video: 'video',
-    emptyAnnouncements: 'No announcements yet. Click “+ New announcement” to add the first one.',
-    pause: 'Pause',
-    activate: 'Activate',
-    edit: 'Edit',
-    delete: 'Delete',
-    statusActive: 'active',
-    statusInactive: 'inactive',
-    from: 'from {d}',
-    until: 'until {d}',
-    priorityN: 'priority {n}',
-    deleteConfirm: 'Delete “{title}”?',
-    settingsSub: 'Changes apply to all screens automatically.',
-    navProfil: 'Mosque Profile',
-    navProfilSub: 'Mosque details, location, weather and account.',
-    navPrayer: 'Prayer Times',
-    navPrayerSub: 'Prayer schedule, azan/iqamah and audio.',
-    navDisplay: 'Display',
-    navDisplaySub: 'Screen layout, colours and test mode.',
-    navContent: 'Content & Media',
-    navContentSub: 'Live streams, Islamic events and duty roster.',
-    mosque: 'Mosque',
-    location: 'Location',
-    prayerTimes: 'Prayer times',
-    audioTitle: 'Audio — Azan & Iqamah',
-    displayTitle: 'Display',
-    liveStreams: 'Live streams (IP camera / ONVIF / RTSP / RTMP / HLS / WebRTC / YouTube)',
-    eventsTitle: 'Islamic events (countdown)',
-    dutyTitle: 'Imam & Bilal duty',
-    weatherTitle: 'Weather',
-    hijriTitle: 'Hijri date',
-    passwordTitle: 'Change admin password',
-    name: 'Name',
-    tagline: 'Tagline',
-    address: 'Address',
-    logoOptional: 'Logo (optional)',
-    removeLogo: 'Remove logo',
-    saveMosque: 'Save mosque',
-    locationSub: 'Used for prayer-time calculation and weather. Latitude/longitude in decimal degrees.',
-    latitude: 'Latitude',
-    longitude: 'Longitude',
-    placeName: 'Place name',
-    saveLocation: 'Save location',
-    jakimZone: 'JAKIM zone (official prayer times)',
-    timeSource: 'Time source',
-    sourceJakim: 'JAKIM API (e-Solat) — with local fallback',
-    sourceLocal: 'Local calculation only',
-    fallbackMethod: 'Fallback calculation method',
-    timezone: 'Timezone (IANA)',
-    showImsak: 'Show Imsak',
-    imsakOffset: 'Imsak offset (min before Fajr)',
-    showSunrise: 'Show Syuruk/Sunrise',
-    azanLead: 'Azan countdown starts (min before adhan)',
-    iqamahOffset: 'Iqamah after adhan (minutes)',
-    jemaahDur: 'Solat Jemaah screen (minutes)',
-    afterIqamah: 'After iqamah display',
-    afterIqamahJemaah: 'Solat Jemaah screen',
-    afterIqamahBlack: 'Black screen with clock (top-right)',
-    adjustments: 'Adjustments (minutes)',
-    iqamahFixed: 'Iqamah fixed times (HH:MM, optional — leave empty to use the offset above)',
-    fajr: 'Fajr',
-    sunrise: 'Sunrise',
-    dhuhr: 'Dhuhr',
-    asr: 'Asr',
-    maghrib: 'Maghrib',
-    isha: 'Isha',
-    savePrayer: 'Save prayer settings',
-    audioSub: 'The screen plays the adhan at the start of each prayer and the iqamah call at the configured iqamah time. Upload your own audio files or paste a URL.',
-    audioEnabled: 'Audio enabled',
-    adhanAudio: 'Azan audio',
-    iqamahAudio: 'Iqamah audio',
-    saveAudio: 'Save audio settings',
-    languageLabel: 'Language',
-    colourPreset: 'Colour preset',
-    clockFormat: 'Clock format',
-    showSeconds: 'Show seconds',
-    slideshowInterval: 'Slideshow interval (seconds)',
-    tickerSpeed: 'Ticker speed',
-    safeMargin: 'Safe margin (% of screen, for TV overscan)',
-    mediaFit: 'Media fit mode',
-    mediaFitStretch: 'Stretch — full, no bars & no crop',
-    mediaFitFit: 'Fit — original ratio, black bars',
-    mediaFitCrop: 'Crop — full, edges trimmed',
-    showTicker: 'Show ticker',
-    tickerCustom: 'Ticker custom text (optional — replaces system announcements, one message per line)',
-    showWeather: 'Show weather',
-    bannerStatic: 'Static banner',
-    bannerHint: 'Full-screen static banner for events. The azan/iqamah countdown still runs as usual on top of it.',
-    bannerEnabled: 'Show static banner (full screen)',
-    bannerTitle: 'Banner title',
-    bannerMessage: 'Banner message',
-    bannerImage: 'Banner background image (optional)',
-    bannerUploaded: 'Banner image uploaded',
-    coloursBg: 'Colours & background',
-    bgTop: 'Background (top)',
-    bgBottom: 'Background (bottom)',
-    textColour: 'Text',
-    mutedText: 'Muted text',
-    accentGold: 'Accent (gold)',
-    accentTeal: 'Accent 2 (teal)',
-    bgPhoto: 'Background photo (optional)',
-    removePhoto: 'Remove photo',
-    photoOpacity: 'Photo opacity',
-    saveDisplay: 'Save display settings',
-    testModeTitle: 'Test mode — azan & iqamah countdown',
-    testModeSub: 'Simulate the clock and date to preview the full-screen azan/iqamah flow. The display follows the simulated time; audio is muted during simulation.',
-    testEnabled: 'Enable test mode',
-    testDate: 'Simulated date',
-    testTime: 'Simulated time',
-    testPrayer: 'Quick set — prayer',
-    testMinus5: 'T − 5 min',
-    testAzan: 'Adhan time',
-    testIqamah: 'Iqamah time',
-    saveTestMode: 'Save test mode',
-    presetCustom: '— Custom —',
-    presetNavy: 'Navy & Gold (default)',
-    presetEmerald: 'Emerald & Gold',
-    presetRoyal: 'Royal Blue & Gold',
-    presetMaroon: 'Maroon & Gold',
-    presetLight: 'Light',
-    clock24: '24-hour',
-    clock12: '12-hour',
-    tickerSlow: 'Slow',
-    tickerNormal: 'Normal',
-    tickerFast: 'Fast',
-    streamsSub: 'RTSP, RTMP and ONVIF streams are converted to HLS by ffmpeg on this machine and shown in the slideshow. YouTube accepts a normal or live video URL. WebRTC uses a custom embed URL (e.g. your WebRTC gateway page).',
-    ffmpegPath: 'ffmpeg path (for RTSP/RTMP/ONVIF)',
-    saveFfmpeg: 'Save ffmpeg path',
-    addStream: '+ Add stream',
-    saveStreams: 'Save streams',
-    emptyStreams: 'No streams yet. Add an IP camera, YouTube video, or live stream URL.',
-    streamName: 'Name',
-    streamType: 'Type',
-    seconds: 'Seconds',
-    streamUrl: 'URL',
-    enabled: 'Enabled',
-    eventsSub: 'Auto-synced from the official JAKIM takwim — dates are updated according to the selected zone.',
-    eventsAuto: 'Auto-sync from JAKIM',
-    syncNow: 'Sync now',
-    addEvent: '+ Add event',
-    saveEvents: 'Save events',
-    nameBm: 'Name (BM)',
-    nameEn: 'Name (EN)',
-    date: 'Date',
-    repeatYearly: 'Repeat yearly',
-    emptyEvents: 'No Islamic events yet.',
-    eventNew: 'new',
-    eventNotUpcoming: 'not upcoming',
-    sourceJakim: 'JAKIM',
-    sourceAnggaran: 'estimate',
+    loginSub: "Manage the mosque signage system",
+    loginPassword: "Admin password",
+    signIn: "Sign in",
+    overview: "Overview",
+    announcements: "Announcements",
+    settings: "Settings",
+    signOut: "Sign out",
+    overviewSub: "Live status of the signage system.",
+    server: "Server",
+    nextPrayer: "Next prayer",
+    prayerFajr: "Fajr",
+    prayerDhuhr: "Dhuhr",
+    prayerAsr: "Asr",
+    prayerMaghrib: "Maghrib",
+    prayerIsha: "Isha",
+    announcementsTitle: "Announcements",
+    nextIslamicEvent: "Next Islamic event",
+    signageScreen: "Signage screen",
+    openDisplay: "Open display",
+    copyUrl: "Copy URL",
+    notes: "Notes",
+    note1: "Point any screen on the network to {url} and open it fullscreen (Edge kiosk handles this automatically on the mini PC).",
+    notePassword: "\u26A0\uFE0F The default admin password file still exists at {file}. Change the password in Settings and the file is removed.",
+    noteJakim: "Prayer times and hijri date come from the official JAKIM e-Solat API (selected zone), with automatic offline calculation fallback.",
+    noteAudio: "\u{1F50A} Adhan/Iqamah audio is configured \u2014 the screen will call at prayer times.",
+    noteStreams: "\u{1F4E1} {count} live stream(s) configured. RTSP/RTMP/ONVIF need ffmpeg on the mini PC.",
+    noteEvents: "\u{1F4C5} Islamic events auto-synced from JAKIM takwim.",
+    runningFor: "Running for {time} \u2022 v{version}",
+    activeNow: "{n} active now",
+    eventDays: "{n} days \u2022 {date}",
+    eventToday: "Hari ini! / Today!",
+    announcementsSub: "Shown in the slideshow and ticker on every screen.",
+    newAnnouncement: "+ New announcement",
+    refresh: "Refresh",
+    editAnnouncement: "Edit announcement",
+    title: "Title",
+    category: "Category",
+    message: "Message",
+    startDate: "Start date (optional)",
+    endDate: "End date (optional)",
+    priority: "Priority (0\u201310)",
+    active: "Active",
+    mediaOptional: "Media \u2014 image or video (optional)",
+    removeImage: "Remove image",
+    removeVideo: "Remove video",
+    save: "Save",
+    cancel: "Cancel",
+    catAnnouncement: "Announcement",
+    catEvent: "Event",
+    catGeneral: "General",
+    catWelcome: "Welcome",
+    catTabung: "Tabung / Collection",
+    video: "video",
+    emptyAnnouncements: "No announcements yet. Click \u201C+ New announcement\u201D to add the first one.",
+    pause: "Pause",
+    activate: "Activate",
+    edit: "Edit",
+    delete: "Delete",
+    statusActive: "active",
+    statusInactive: "inactive",
+    from: "from {d}",
+    until: "until {d}",
+    priorityN: "priority {n}",
+    deleteConfirm: "Delete \u201C{title}\u201D?",
+    settingsSub: "Changes apply to all screens automatically.",
+    navProfil: "Mosque Profile",
+    navProfilSub: "Mosque details, location, weather and account.",
+    navPrayer: "Prayer Times",
+    navPrayerSub: "Prayer schedule, azan/iqamah and audio.",
+    navDisplay: "Display",
+    navDisplaySub: "Screen layout, colours and test mode.",
+    navContent: "Content & Media",
+    navContentSub: "Live streams, Islamic events and duty roster.",
+    mosque: "Mosque",
+    location: "Location",
+    prayerTimes: "Prayer times",
+    audioTitle: "Audio \u2014 Azan & Iqamah",
+    displayTitle: "Display",
+    liveStreams: "Live streams (IP camera / ONVIF / RTSP / RTMP / HLS / WebRTC / YouTube)",
+    eventsTitle: "Islamic events (countdown)",
+    dutyTitle: "Imam & Bilal duty",
+    weatherTitle: "Weather",
+    hijriTitle: "Hijri date",
+    passwordTitle: "Change admin password",
+    name: "Name",
+    tagline: "Tagline",
+    address: "Address",
+    logoOptional: "Logo (optional)",
+    removeLogo: "Remove logo",
+    saveMosque: "Save mosque",
+    locationSub: "Used for prayer-time calculation and weather. Latitude/longitude in decimal degrees.",
+    latitude: "Latitude",
+    longitude: "Longitude",
+    placeName: "Place name",
+    saveLocation: "Save location",
+    jakimZone: "JAKIM zone (official prayer times)",
+    timeSource: "Time source",
+    sourceLocal: "Local calculation only",
+    fallbackMethod: "Fallback calculation method",
+    timezone: "Timezone (IANA)",
+    showImsak: "Show Imsak",
+    imsakOffset: "Imsak offset (min before Fajr)",
+    showSunrise: "Show Syuruk/Sunrise",
+    azanLead: "Azan countdown starts (min before adhan)",
+    iqamahOffset: "Iqamah after adhan (minutes)",
+    jemaahDur: "Solat Jemaah screen (minutes)",
+    afterIqamah: "After iqamah display",
+    afterIqamahJemaah: "Solat Jemaah screen",
+    afterIqamahBlack: "Black screen with clock (top-right)",
+    adjustments: "Adjustments (minutes)",
+    iqamahFixed: "Iqamah fixed times (HH:MM, optional \u2014 leave empty to use the offset above)",
+    fajr: "Fajr",
+    sunrise: "Sunrise",
+    dhuhr: "Dhuhr",
+    asr: "Asr",
+    maghrib: "Maghrib",
+    isha: "Isha",
+    savePrayer: "Save prayer settings",
+    audioSub: "The screen plays the adhan at the start of each prayer and the iqamah call at the configured iqamah time. Upload your own audio files or paste a URL.",
+    audioEnabled: "Audio enabled",
+    adhanAudio: "Azan audio",
+    iqamahAudio: "Iqamah audio",
+    saveAudio: "Save audio settings",
+    languageLabel: "Language",
+    colourPreset: "Colour preset",
+    clockFormat: "Clock format",
+    showSeconds: "Show seconds",
+    slideshowInterval: "Slideshow interval (seconds)",
+    tickerSpeed: "Ticker speed",
+    safeMargin: "Safe margin (% of screen, for TV overscan)",
+    mediaFit: "Media fit mode",
+    mediaFitStretch: "Stretch \u2014 full, no bars & no crop",
+    mediaFitFit: "Fit \u2014 original ratio, black bars",
+    mediaFitCrop: "Crop \u2014 full, edges trimmed",
+    showTicker: "Show ticker",
+    tickerCustom: "Ticker custom text (optional \u2014 replaces system announcements, one message per line)",
+    showWeather: "Show weather",
+    bannerStatic: "Static banner",
+    bannerHint: "Full-screen static banner for events. The azan/iqamah countdown still runs as usual on top of it.",
+    bannerEnabled: "Show static banner (full screen)",
+    bannerTitle: "Banner title",
+    bannerMessage: "Banner message",
+    bannerImage: "Banner background image (optional)",
+    bannerUploaded: "Banner image uploaded",
+    coloursBg: "Colours & background",
+    bgTop: "Background (top)",
+    bgBottom: "Background (bottom)",
+    textColour: "Text",
+    mutedText: "Muted text",
+    accentGold: "Accent (gold)",
+    accentTeal: "Accent 2 (teal)",
+    bgPhoto: "Background photo (optional)",
+    removePhoto: "Remove photo",
+    photoOpacity: "Photo opacity",
+    saveDisplay: "Save display settings",
+    testModeTitle: "Test mode \u2014 azan & iqamah countdown",
+    testModeSub: "Simulate the clock and date to preview the full-screen azan/iqamah flow. The display follows the simulated time; audio is muted during simulation.",
+    testEnabled: "Enable test mode",
+    testDate: "Simulated date",
+    testTime: "Simulated time",
+    testPrayer: "Quick set \u2014 prayer",
+    testMinus5: "T \u2212 5 min",
+    testAzan: "Adhan time",
+    testIqamah: "Iqamah time",
+    saveTestMode: "Save test mode",
+    presetCustom: "\u2014 Custom \u2014",
+    presetNavy: "Navy & Gold (default)",
+    presetEmerald: "Emerald & Gold",
+    presetRoyal: "Royal Blue & Gold",
+    presetMaroon: "Maroon & Gold",
+    presetLight: "Light",
+    clock24: "24-hour",
+    clock12: "12-hour",
+    tickerSlow: "Slow",
+    tickerNormal: "Normal",
+    tickerFast: "Fast",
+    streamsSub: "RTSP, RTMP and ONVIF streams are converted to HLS by ffmpeg on this machine and shown in the slideshow. YouTube accepts a normal or live video URL. WebRTC uses a custom embed URL (e.g. your WebRTC gateway page).",
+    ffmpegPath: "ffmpeg path (for RTSP/RTMP/ONVIF)",
+    saveFfmpeg: "Save ffmpeg path",
+    addStream: "+ Add stream",
+    saveStreams: "Save streams",
+    emptyStreams: "No streams yet. Add an IP camera, YouTube video, or live stream URL.",
+    streamName: "Name",
+    streamType: "Type",
+    seconds: "Seconds",
+    streamUrl: "URL",
+    enabled: "Enabled",
+    eventsSub: "Auto-synced from the official JAKIM takwim \u2014 dates are updated according to the selected zone.",
+    eventsAuto: "Auto-sync from JAKIM",
+    syncNow: "Sync now",
+    addEvent: "+ Add event",
+    saveEvents: "Save events",
+    nameBm: "Name (BM)",
+    nameEn: "Name (EN)",
+    date: "Date",
+    repeatYearly: "Repeat yearly",
+    emptyEvents: "No Islamic events yet.",
+    eventNew: "new",
+    eventNotUpcoming: "not upcoming",
+    sourceJakim: "JAKIM",
+    sourceAnggaran: "estimate",
     rosterSub: "Today's duty is shown on the screen.",
-    saveRoster: 'Save roster',
-    imam: 'Imam',
-    bilal: 'Bilal',
-    weatherEnabled: 'Weather enabled',
-    unit: 'Unit',
-    saveWeather: 'Save weather',
-    celsius: 'Celsius',
-    fahrenheit: 'Fahrenheit',
-    hijriOffset: 'Day offset (−2 to +2)',
-    saveHijri: 'Save Hijri offset',
-    currentPassword: 'Current password',
-    newPassword: 'New password (min 6 chars)',
-    confirmPassword: 'Confirm new password',
-    changePassword: 'Change password',
-    sessionExpired: 'Session expired — please sign in again',
-    requestFailed: 'Request failed ({s})',
-    wrongPassword: 'Wrong password',
-    signInFailed: 'Sign in failed',
-    screenUrlCopied: 'Screen URL copied',
-    copyFailed: 'Copy failed — select the URL manually',
-    annPaused: 'Announcement paused',
-    annActivated: 'Announcement activated',
-    annDeleted: 'Announcement deleted',
-    annUpdated: 'Announcement updated',
-    annCreated: 'Announcement created',
-    annRefreshed: 'Announcements refreshed',
-    notFound: 'Not found',
-    mediaUploaded: 'Media uploaded',
-    uploadFailed: 'Upload failed',
-    logoUploaded: 'Logo uploaded — click “Save mosque” to apply',
-    azanUploaded: 'Azan audio uploaded — click “Save audio settings” to apply',
-    iqamahUploaded: 'Iqamah audio uploaded — click “Save audio settings” to apply',
-    bgUploaded: 'Background photo uploaded — click “Save display settings” to apply',
-    settingsSaved: 'Settings saved',
-    streamsSaved: 'Streams saved & relay restarted',
-    syncInProgress: 'Syncing with JAKIM…',
-    syncDone: 'Sync complete: {n} dates',
-    syncFailed: 'Sync failed',
-    eventsSaved: 'Events saved',
-    passwordChanged: 'Password changed',
-    fillPasswords: 'Fill in all password fields',
-    pwTooShort: 'New password must be at least 6 characters',
-    pwMismatch: 'New passwords do not match',
-    idleLogout: 'Session ended due to inactivity — please sign in again',
-    logoMustImage: 'Logo must be an image',
-    bgMustImage: 'Background must be an image',
-    checkingFfmpeg: 'Checking ffmpeg…',
-    ffmpegOk: '✅ ffmpeg detected — RTSP/RTMP/ONVIF relays available.',
-    ffmpegMissing: '⚠️ ffmpeg NOT found. Install ffmpeg and set its path above for RTSP/RTMP/ONVIF streams (HLS, YouTube and WebRTC embeds work without it).',
-    statusRunning: 'running',
-    statusStarting: 'starting',
-    statusReady: 'ready',
-    statusNoFfmpeg: 'no ffmpeg',
-    statusDisabled: 'disabled',
-    statusStopped: 'stopped',
-    lastSynced: 'Last: {t}',
-    neverSynced: 'not yet',
-    todayDuty: 'today',
-    daysShort: '{n}d'
-    ,
-    sunday: 'Sunday', monday: 'Monday', tuesday: 'Tuesday', wednesday: 'Wednesday', thursday: 'Thursday', friday: 'Friday', saturday: 'Saturday'
+    saveRoster: "Save roster",
+    imam: "Imam",
+    bilal: "Bilal",
+    weatherEnabled: "Weather enabled",
+    unit: "Unit",
+    saveWeather: "Save weather",
+    celsius: "Celsius",
+    fahrenheit: "Fahrenheit",
+    hijriOffset: "Day offset (\u22122 to +2)",
+    saveHijri: "Save Hijri offset",
+    currentPassword: "Current password",
+    newPassword: "New password (min 6 chars)",
+    confirmPassword: "Confirm new password",
+    changePassword: "Change password",
+    sessionExpired: "Session expired \u2014 please sign in again",
+    requestFailed: "Request failed ({s})",
+    wrongPassword: "Wrong password",
+    signInFailed: "Sign in failed",
+    screenUrlCopied: "Screen URL copied",
+    copyFailed: "Copy failed \u2014 select the URL manually",
+    annPaused: "Announcement paused",
+    annActivated: "Announcement activated",
+    annDeleted: "Announcement deleted",
+    annUpdated: "Announcement updated",
+    annCreated: "Announcement created",
+    annRefreshed: "Announcements refreshed",
+    notFound: "Not found",
+    mediaUploaded: "Media uploaded",
+    uploadFailed: "Upload failed",
+    logoUploaded: "Logo uploaded \u2014 click \u201CSave mosque\u201D to apply",
+    azanUploaded: "Azan audio uploaded \u2014 click \u201CSave audio settings\u201D to apply",
+    iqamahUploaded: "Iqamah audio uploaded \u2014 click \u201CSave audio settings\u201D to apply",
+    bgUploaded: "Background photo uploaded \u2014 click \u201CSave display settings\u201D to apply",
+    settingsSaved: "Settings saved",
+    streamsSaved: "Streams saved & relay restarted",
+    syncInProgress: "Syncing with JAKIM\u2026",
+    syncDone: "Sync complete: {n} dates",
+    syncFailed: "Sync failed",
+    eventsSaved: "Events saved",
+    passwordChanged: "Password changed",
+    fillPasswords: "Fill in all password fields",
+    pwTooShort: "New password must be at least 6 characters",
+    pwMismatch: "New passwords do not match",
+    idleLogout: "Session ended due to inactivity \u2014 please sign in again",
+    logoMustImage: "Logo must be an image",
+    bgMustImage: "Background must be an image",
+    checkingFfmpeg: "Checking ffmpeg\u2026",
+    ffmpegOk: "\u2705 ffmpeg detected \u2014 RTSP/RTMP/ONVIF relays available.",
+    ffmpegMissing: "\u26A0\uFE0F ffmpeg NOT found. Install ffmpeg and set its path above for RTSP/RTMP/ONVIF streams (HLS, YouTube and WebRTC embeds work without it).",
+    statusRunning: "running",
+    statusStarting: "starting",
+    statusReady: "ready",
+    statusNoFfmpeg: "no ffmpeg",
+    statusDisabled: "disabled",
+    statusStopped: "stopped",
+    lastSynced: "Last: {t}",
+    neverSynced: "not yet",
+    todayDuty: "today",
+    daysShort: "{n}d",
+    sunday: "Sunday",
+    monday: "Monday",
+    tuesday: "Tuesday",
+    wednesday: "Wednesday",
+    thursday: "Thursday",
+    friday: "Friday",
+    saturday: "Saturday"
   },
   ms: {
-    loginSub: 'Urus sistem paparan masjid',
-    loginPassword: 'Kata laluan admin',
-    signIn: 'Log Masuk',
-    overview: 'Ringkasan',
-    announcements: 'Pengumuman',
-    settings: 'Tetapan',
-    signOut: 'Log Keluar',
-    overviewSub: 'Status langsung sistem paparan.',
-    server: 'Server',
-    nextPrayer: 'Solat Seterusnya',
-    prayerFajr: 'Subuh',
-    prayerDhuhr: 'Zohor',
-    prayerAsr: 'Asar',
-    prayerMaghrib: 'Maghrib',
-    prayerIsha: 'Isyak',
-    announcementsTitle: 'Pengumuman',
-    nextIslamicEvent: 'Hari Kebesaran Seterusnya',
-    signageScreen: 'Skrin Paparan',
-    openDisplay: 'Buka paparan',
-    copyUrl: 'Salin URL',
-    notes: 'Nota',
-    note1: 'Arahkan mana-mana skrin pada rangkaian ke {url} dan buka skrin penuh (Edge kiosk mengendalikannya automatik pada mini PC).',
-    notePassword: '⚠️ Fail kata laluan lalai masih wujud di {file}. Tukar kata laluan di Tetapan dan fail akan dipadam.',
-    noteJakim: 'Waktu solat dan tarikh hijrah datang dari API rasmi JAKIM e-Solat (zon terpilih), dengan fallback pengiraan tempatan automatik.',
-    noteAudio: '🔊 Audio azan/iqamah dikonfigurasi — skrin akan berbunyi pada waktu solat.',
-    noteStreams: '📡 {count} live stream dikonfigurasi. RTSP/RTMP/ONVIF memerlukan ffmpeg pada mini PC.',
-    noteEvents: '📅 Hari kebesaran Islam auto-sync dari takwim JAKIM.',
-    runningFor: 'Berjalan {time} • v{version}',
-    activeNow: '{n} aktif sekarang',
-    eventDays: '{n} hari • {date}',
-    eventToday: 'Hari ini!',
-    announcementsSub: 'Dipaparkan dalam slaid dan ticker pada setiap skrin.',
-    newAnnouncement: '+ Pengumuman baharu',
-    refresh: 'Muat Semula',
-    editAnnouncement: 'Kemas kini pengumuman',
-    title: 'Tajuk',
-    category: 'Kategori',
-    message: 'Mesej',
-    startDate: 'Tarikh mula (pilihan)',
-    endDate: 'Tarikh tamat (pilihan)',
-    priority: 'Keutamaan (0–10)',
-    active: 'Aktif',
-    mediaOptional: 'Media — imej atau video (pilihan)',
-    removeImage: 'Buang imej',
-    removeVideo: 'Buang video',
-    save: 'Simpan',
-    cancel: 'Batal',
-    catAnnouncement: 'Pengumuman',
-    catEvent: 'Acara',
-    catGeneral: 'Umum',
-    catWelcome: 'Selamat Datang',
-    catTabung: 'Tabung / Kutipan',
-    video: 'video',
-    emptyAnnouncements: 'Tiada pengumuman lagi. Klik “+ Pengumuman baharu” untuk menambah.',
-    pause: 'Jeda',
-    activate: 'Aktifkan',
-    edit: 'Sunting',
-    delete: 'Padam',
-    statusActive: 'aktif',
-    statusInactive: 'tidak aktif',
-    from: 'dari {d}',
-    until: 'hingga {d}',
-    priorityN: 'keutamaan {n}',
-    deleteConfirm: 'Padam “{title}”?',
-    settingsSub: 'Perubahan terpakai pada semua skrin secara automatik.',
-    navProfil: 'Profil Masjid',
-    navProfilSub: 'Maklumat masjid, lokasi, cuaca dan akaun.',
-    navPrayer: 'Waktu Solat',
-    navPrayerSub: 'Jadual solat, azan/iqamah dan audio.',
-    navDisplay: 'Paparan',
-    navDisplaySub: 'Susun atur skrin, warna dan mod ujian.',
-    navContent: 'Kandungan & Media',
-    navContentSub: 'Siaran langsung, acara Islam dan jadual bertugas.',
-    mosque: 'Masjid',
-    location: 'Lokasi',
-    prayerTimes: 'Waktu solat',
-    audioTitle: 'Audio — Azan & Iqamah',
-    displayTitle: 'Paparan',
-    liveStreams: 'Live stream (kamera IP / ONVIF / RTSP / RTMP / HLS / WebRTC / YouTube)',
-    eventsTitle: 'Hari Kebesaran Islam (countdown)',
-    dutyTitle: 'Imam & Bilal bertugas',
-    weatherTitle: 'Cuaca',
-    hijriTitle: 'Tarikh hijrah',
-    passwordTitle: 'Tukar kata laluan admin',
-    name: 'Nama',
-    tagline: 'Tagline',
-    address: 'Alamat',
-    logoOptional: 'Logo (pilihan)',
-    removeLogo: 'Buang logo',
-    saveMosque: 'Simpan masjid',
-    locationSub: 'Digunakan untuk pengiraan waktu solat dan cuaca. Latitud/longitud dalam darjah perpuluhan.',
-    latitude: 'Latitud',
-    longitude: 'Longitud',
-    placeName: 'Nama tempat',
-    saveLocation: 'Simpan lokasi',
-    jakimZone: 'Zon JAKIM (waktu solat rasmi)',
-    timeSource: 'Sumber masa',
-    sourceJakim: 'API JAKIM (e-Solat) — dengan fallback tempatan',
-    sourceLocal: 'Pengiraan tempatan sahaja',
-    fallbackMethod: 'Kaedah pengiraan fallback',
-    timezone: 'Zon waktu (IANA)',
-    showImsak: 'Papar Imsak',
-    imsakOffset: 'Jarak imsak (minit sebelum Subuh)',
-    showSunrise: 'Papar Syuruk',
-    azanLead: 'Countdown azan bermula (minit sebelum azan)',
-    iqamahOffset: 'Iqamah selepas azan (minit)',
-    jemaahDur: 'Paparan Solat Jemaah (minit)',
-    afterIqamah: 'Paparan selepas iqamah',
-    afterIqamahJemaah: 'Paparan Solat Jemaah',
-    afterIqamahBlack: 'Skrin hitam dengan jam (bucu kanan atas)',
-    adjustments: 'Pelarasan (minit)',
-    iqamahFixed: 'Masa tetap iqamah (HH:MM, pilihan — kosongkan untuk guna offset di atas)',
-    fajr: 'Subuh',
-    sunrise: 'Syuruk',
-    dhuhr: 'Zohor',
-    asr: 'Asar',
-    maghrib: 'Maghrib',
-    isha: 'Isyak',
-    savePrayer: 'Simpan tetapan solat',
-    audioSub: 'Skrin memainkan azan pada permulaan setiap solat dan panggilan iqamah pada masa iqamah yang ditetapkan. Muat naik fail audio sendiri atau tampal URL.',
-    audioEnabled: 'Audio diaktifkan',
-    adhanAudio: 'Audio azan',
-    iqamahAudio: 'Audio iqamah',
-    saveAudio: 'Simpan tetapan audio',
-    languageLabel: 'Bahasa',
-    colourPreset: 'Preset warna',
-    clockFormat: 'Format jam',
-    showSeconds: 'Papar saat',
-    slideshowInterval: 'Selang slaid (saat)',
-    tickerSpeed: 'Kelajuan ticker',
-    safeMargin: 'Margin selamat (% skrin, untuk overscan TV)',
-    mediaFit: 'Mod muat media',
-    mediaFitStretch: 'Stretch — penuh, tanpa bar & tanpa crop',
-    mediaFitFit: 'Fit — nisbah asal, bar hitam',
-    mediaFitCrop: 'Crop — penuh, tepi dipangkas',
-    showTicker: 'Papar ticker',
-    tickerCustom: 'Teks tersuai ticker (pilihan — ganti pengumuman sistem, satu mesej sebaris)',
-    showWeather: 'Papar cuaca',
-    bannerStatic: 'Banner statik',
-    bannerHint: 'Banner statik skrin penuh untuk majlis. Countdown azan/iqamah tetap berjalan seperti biasa di atasnya.',
-    bannerEnabled: 'Papar banner statik (skrin penuh)',
-    bannerTitle: 'Tajuk banner',
-    bannerMessage: 'Mesej banner',
-    bannerImage: 'Imej latar banner (pilihan)',
-    bannerUploaded: 'Imej banner dimuat naik',
-    coloursBg: 'Warna & latar',
-    bgTop: 'Latar (atas)',
-    bgBottom: 'Latar (bawah)',
-    textColour: 'Teks',
-    mutedText: 'Teks redup',
-    accentGold: 'Aksen (emas)',
-    accentTeal: 'Aksen 2 (teal)',
-    bgPhoto: 'Foto latar (pilihan)',
-    removePhoto: 'Buang foto',
-    photoOpacity: 'Kelegapan foto',
-    saveDisplay: 'Simpan tetapan paparan',
-    testModeTitle: 'Mod ujian — countdown azan & iqamah',
-    testModeSub: 'Simulasikan jam dan tarikh untuk melihat aliran azan/iqamah skrin penuh. Paparan mengikut masa simulasi; audio dibisukan semasa simulasi.',
-    testEnabled: 'Aktifkan mod ujian',
-    testDate: 'Tarikh simulasi',
-    testTime: 'Jam simulasi',
-    testPrayer: 'Set pantas — solat',
-    testMinus5: 'T − 5 min',
-    testAzan: 'Waktu azan',
-    testIqamah: 'Waktu iqamah',
-    saveTestMode: 'Simpan mod ujian',
-    presetCustom: '— Tersuai —',
-    presetNavy: 'Navy & Emas (lalai)',
-    presetEmerald: 'Emerald & Emas',
-    presetRoyal: 'Biru Diraja & Emas',
-    presetMaroon: 'Maroon & Emas',
-    presetLight: 'Cerah',
-    clock24: '24 jam',
-    clock12: '12 jam',
-    tickerSlow: 'Perlahan',
-    tickerNormal: 'Normal',
-    tickerFast: 'Pantas',
-    streamsSub: 'Stream RTSP, RTMP dan ONVIF ditukar ke HLS oleh ffmpeg pada mesin ini dan dipaparkan dalam slaid. YouTube menerima URL video biasa atau live. WebRTC menggunakan URL embed tersuai (cth. halaman gateway WebRTC anda).',
-    ffmpegPath: 'Laluan ffmpeg (untuk RTSP/RTMP/ONVIF)',
-    saveFfmpeg: 'Simpan laluan ffmpeg',
-    addStream: '+ Tambah stream',
-    saveStreams: 'Simpan stream',
-    emptyStreams: 'Tiada stream lagi. Tambah kamera IP, video YouTube, atau URL live stream.',
-    streamName: 'Nama',
-    streamType: 'Jenis',
-    seconds: 'Saat',
-    streamUrl: 'URL',
-    enabled: 'Aktif',
-    eventsSub: 'Auto-sync dari takwim rasmi JAKIM — tarikh dikemas kini mengikut zon yang dipilih.',
-    eventsAuto: 'Auto-sync dari JAKIM',
-    syncNow: 'Sync sekarang',
-    addEvent: '+ Tambah acara',
-    saveEvents: 'Simpan acara',
-    nameBm: 'Nama (BM)',
-    nameEn: 'Nama (EN)',
-    date: 'Tarikh',
-    repeatYearly: 'Berulang tahunan',
-    emptyEvents: 'Tiada hari kebesaran lagi.',
-    eventNew: 'baharu',
-    eventNotUpcoming: 'tidak akan datang',
-    sourceJakim: 'JAKIM',
-    sourceAnggaran: 'anggaran',
-    rosterSub: 'Tugas hari ini dipaparkan pada skrin.',
-    saveRoster: 'Simpan jadual',
-    imam: 'Imam',
-    bilal: 'Bilal',
-    weatherEnabled: 'Cuaca diaktifkan',
-    unit: 'Unit',
-    saveWeather: 'Simpan cuaca',
-    celsius: 'Celsius',
-    fahrenheit: 'Fahrenheit',
-    hijriOffset: 'Offset hari (−2 hingga +2)',
-    saveHijri: 'Simpan offset hijrah',
-    currentPassword: 'Kata laluan semasa',
-    newPassword: 'Kata laluan baharu (min 6 aksara)',
-    confirmPassword: 'Sahkan kata laluan baharu',
-    changePassword: 'Tukar kata laluan',
-    sessionExpired: 'Sesi tamat — sila log masuk semula',
-    requestFailed: 'Permintaan gagal ({s})',
-    wrongPassword: 'Kata laluan salah',
-    signInFailed: 'Log masuk gagal',
-    screenUrlCopied: 'URL skrin disalin',
-    copyFailed: 'Salinan gagal — pilih URL secara manual',
-    annPaused: 'Pengumuman dijeda',
-    annActivated: 'Pengumuman diaktifkan',
-    annDeleted: 'Pengumuman dipadam',
-    annUpdated: 'Pengumuman dikemas kini',
-    annCreated: 'Pengumuman dicipta',
-    annRefreshed: 'Pengumuman dimuat semula',
-    notFound: 'Tidak ditemui',
-    mediaUploaded: 'Media dimuat naik',
-    uploadFailed: 'Muat naik gagal',
-    logoUploaded: 'Logo dimuat naik — klik “Simpan masjid” untuk terpakai',
-    azanUploaded: 'Audio azan dimuat naik — klik “Simpan tetapan audio” untuk terpakai',
-    iqamahUploaded: 'Audio iqamah dimuat naik — klik “Simpan tetapan audio” untuk terpakai',
-    bgUploaded: 'Foto latar dimuat naik — klik “Simpan tetapan paparan” untuk terpakai',
-    settingsSaved: 'Tetapan disimpan',
-    streamsSaved: 'Stream disimpan & relay dimulakan semula',
-    syncInProgress: 'Menyelaraskan dengan JAKIM…',
-    syncDone: 'Sync selesai: {n} tarikh',
-    syncFailed: 'Sync gagal',
-    eventsSaved: 'Acara disimpan',
-    passwordChanged: 'Kata laluan ditukar',
-    fillPasswords: 'Isi semua ruangan kata laluan',
-    pwTooShort: 'Kata laluan baharu mesti sekurang-kurangnya 6 aksara',
-    pwMismatch: 'Kata laluan baharu tidak sepadan',
-    idleLogout: 'Sesi tamat kerana tidak aktif — sila log masuk semula',
-    logoMustImage: 'Logo mestilah imej',
-    bgMustImage: 'Latar mestilah imej',
-    checkingFfmpeg: 'Menyemak ffmpeg…',
-    ffmpegOk: '✅ ffmpeg dikesan — relay RTSP/RTMP/ONVIF tersedia.',
-    ffmpegMissing: '⚠️ ffmpeg TIDAK dijumpai. Pasang ffmpeg dan tetapkan laluannya di atas untuk stream RTSP/RTMP/ONVIF (HLS, YouTube dan embed WebRTC berfungsi tanpanya).',
-    statusRunning: 'berjalan',
-    statusStarting: 'bermula',
-    statusReady: 'sedia',
-    statusNoFfmpeg: 'tiada ffmpeg',
-    statusDisabled: 'dilumpuhkan',
-    statusStopped: 'berhenti',
-    lastSynced: 'Terakhir: {t}',
-    neverSynced: 'belum pernah',
-    todayDuty: 'hari ini',
-    daysShort: '{n}h'
-    ,
-    sunday: 'Ahad', monday: 'Isnin', tuesday: 'Selasa', wednesday: 'Rabu', thursday: 'Khamis', friday: 'Jumaat', saturday: 'Sabtu'
+    loginSub: "Urus sistem paparan masjid",
+    loginPassword: "Kata laluan admin",
+    signIn: "Log Masuk",
+    overview: "Ringkasan",
+    announcements: "Pengumuman",
+    settings: "Tetapan",
+    signOut: "Log Keluar",
+    overviewSub: "Status langsung sistem paparan.",
+    server: "Server",
+    nextPrayer: "Solat Seterusnya",
+    prayerFajr: "Subuh",
+    prayerDhuhr: "Zohor",
+    prayerAsr: "Asar",
+    prayerMaghrib: "Maghrib",
+    prayerIsha: "Isyak",
+    announcementsTitle: "Pengumuman",
+    nextIslamicEvent: "Hari Kebesaran Seterusnya",
+    signageScreen: "Skrin Paparan",
+    openDisplay: "Buka paparan",
+    copyUrl: "Salin URL",
+    notes: "Nota",
+    note1: "Arahkan mana-mana skrin pada rangkaian ke {url} dan buka skrin penuh (Edge kiosk mengendalikannya automatik pada mini PC).",
+    notePassword: "\u26A0\uFE0F Fail kata laluan lalai masih wujud di {file}. Tukar kata laluan di Tetapan dan fail akan dipadam.",
+    noteJakim: "Waktu solat dan tarikh hijrah datang dari API rasmi JAKIM e-Solat (zon terpilih), dengan fallback pengiraan tempatan automatik.",
+    noteAudio: "\u{1F50A} Audio azan/iqamah dikonfigurasi \u2014 skrin akan berbunyi pada waktu solat.",
+    noteStreams: "\u{1F4E1} {count} live stream dikonfigurasi. RTSP/RTMP/ONVIF memerlukan ffmpeg pada mini PC.",
+    noteEvents: "\u{1F4C5} Hari kebesaran Islam auto-sync dari takwim JAKIM.",
+    runningFor: "Berjalan {time} \u2022 v{version}",
+    activeNow: "{n} aktif sekarang",
+    eventDays: "{n} hari \u2022 {date}",
+    eventToday: "Hari ini!",
+    announcementsSub: "Dipaparkan dalam slaid dan ticker pada setiap skrin.",
+    newAnnouncement: "+ Pengumuman baharu",
+    refresh: "Muat Semula",
+    editAnnouncement: "Kemas kini pengumuman",
+    title: "Tajuk",
+    category: "Kategori",
+    message: "Mesej",
+    startDate: "Tarikh mula (pilihan)",
+    endDate: "Tarikh tamat (pilihan)",
+    priority: "Keutamaan (0\u201310)",
+    active: "Aktif",
+    mediaOptional: "Media \u2014 imej atau video (pilihan)",
+    removeImage: "Buang imej",
+    removeVideo: "Buang video",
+    save: "Simpan",
+    cancel: "Batal",
+    catAnnouncement: "Pengumuman",
+    catEvent: "Acara",
+    catGeneral: "Umum",
+    catWelcome: "Selamat Datang",
+    catTabung: "Tabung / Kutipan",
+    video: "video",
+    emptyAnnouncements: "Tiada pengumuman lagi. Klik \u201C+ Pengumuman baharu\u201D untuk menambah.",
+    pause: "Jeda",
+    activate: "Aktifkan",
+    edit: "Sunting",
+    delete: "Padam",
+    statusActive: "aktif",
+    statusInactive: "tidak aktif",
+    from: "dari {d}",
+    until: "hingga {d}",
+    priorityN: "keutamaan {n}",
+    deleteConfirm: "Padam \u201C{title}\u201D?",
+    settingsSub: "Perubahan terpakai pada semua skrin secara automatik.",
+    navProfil: "Profil Masjid",
+    navProfilSub: "Maklumat masjid, lokasi, cuaca dan akaun.",
+    navPrayer: "Waktu Solat",
+    navPrayerSub: "Jadual solat, azan/iqamah dan audio.",
+    navDisplay: "Paparan",
+    navDisplaySub: "Susun atur skrin, warna dan mod ujian.",
+    navContent: "Kandungan & Media",
+    navContentSub: "Siaran langsung, acara Islam dan jadual bertugas.",
+    mosque: "Masjid",
+    location: "Lokasi",
+    prayerTimes: "Waktu solat",
+    audioTitle: "Audio \u2014 Azan & Iqamah",
+    displayTitle: "Paparan",
+    liveStreams: "Live stream (kamera IP / ONVIF / RTSP / RTMP / HLS / WebRTC / YouTube)",
+    eventsTitle: "Hari Kebesaran Islam (countdown)",
+    dutyTitle: "Imam & Bilal bertugas",
+    weatherTitle: "Cuaca",
+    hijriTitle: "Tarikh hijrah",
+    passwordTitle: "Tukar kata laluan admin",
+    name: "Nama",
+    tagline: "Tagline",
+    address: "Alamat",
+    logoOptional: "Logo (pilihan)",
+    removeLogo: "Buang logo",
+    saveMosque: "Simpan masjid",
+    locationSub: "Digunakan untuk pengiraan waktu solat dan cuaca. Latitud/longitud dalam darjah perpuluhan.",
+    latitude: "Latitud",
+    longitude: "Longitud",
+    placeName: "Nama tempat",
+    saveLocation: "Simpan lokasi",
+    jakimZone: "Zon JAKIM (waktu solat rasmi)",
+    timeSource: "Sumber masa",
+    sourceLocal: "Pengiraan tempatan sahaja",
+    fallbackMethod: "Kaedah pengiraan fallback",
+    timezone: "Zon waktu (IANA)",
+    showImsak: "Papar Imsak",
+    imsakOffset: "Jarak imsak (minit sebelum Subuh)",
+    showSunrise: "Papar Syuruk",
+    azanLead: "Countdown azan bermula (minit sebelum azan)",
+    iqamahOffset: "Iqamah selepas azan (minit)",
+    jemaahDur: "Paparan Solat Jemaah (minit)",
+    afterIqamah: "Paparan selepas iqamah",
+    afterIqamahJemaah: "Paparan Solat Jemaah",
+    afterIqamahBlack: "Skrin hitam dengan jam (bucu kanan atas)",
+    adjustments: "Pelarasan (minit)",
+    iqamahFixed: "Masa tetap iqamah (HH:MM, pilihan \u2014 kosongkan untuk guna offset di atas)",
+    fajr: "Subuh",
+    sunrise: "Syuruk",
+    dhuhr: "Zohor",
+    asr: "Asar",
+    maghrib: "Maghrib",
+    isha: "Isyak",
+    savePrayer: "Simpan tetapan solat",
+    audioSub: "Skrin memainkan azan pada permulaan setiap solat dan panggilan iqamah pada masa iqamah yang ditetapkan. Muat naik fail audio sendiri atau tampal URL.",
+    audioEnabled: "Audio diaktifkan",
+    adhanAudio: "Audio azan",
+    iqamahAudio: "Audio iqamah",
+    saveAudio: "Simpan tetapan audio",
+    languageLabel: "Bahasa",
+    colourPreset: "Preset warna",
+    clockFormat: "Format jam",
+    showSeconds: "Papar saat",
+    slideshowInterval: "Selang slaid (saat)",
+    tickerSpeed: "Kelajuan ticker",
+    safeMargin: "Margin selamat (% skrin, untuk overscan TV)",
+    mediaFit: "Mod muat media",
+    mediaFitStretch: "Stretch \u2014 penuh, tanpa bar & tanpa crop",
+    mediaFitFit: "Fit \u2014 nisbah asal, bar hitam",
+    mediaFitCrop: "Crop \u2014 penuh, tepi dipangkas",
+    showTicker: "Papar ticker",
+    tickerCustom: "Teks tersuai ticker (pilihan \u2014 ganti pengumuman sistem, satu mesej sebaris)",
+    showWeather: "Papar cuaca",
+    bannerStatic: "Banner statik",
+    bannerHint: "Banner statik skrin penuh untuk majlis. Countdown azan/iqamah tetap berjalan seperti biasa di atasnya.",
+    bannerEnabled: "Papar banner statik (skrin penuh)",
+    bannerTitle: "Tajuk banner",
+    bannerMessage: "Mesej banner",
+    bannerImage: "Imej latar banner (pilihan)",
+    bannerUploaded: "Imej banner dimuat naik",
+    coloursBg: "Warna & latar",
+    bgTop: "Latar (atas)",
+    bgBottom: "Latar (bawah)",
+    textColour: "Teks",
+    mutedText: "Teks redup",
+    accentGold: "Aksen (emas)",
+    accentTeal: "Aksen 2 (teal)",
+    bgPhoto: "Foto latar (pilihan)",
+    removePhoto: "Buang foto",
+    photoOpacity: "Kelegapan foto",
+    saveDisplay: "Simpan tetapan paparan",
+    testModeTitle: "Mod ujian \u2014 countdown azan & iqamah",
+    testModeSub: "Simulasikan jam dan tarikh untuk melihat aliran azan/iqamah skrin penuh. Paparan mengikut masa simulasi; audio dibisukan semasa simulasi.",
+    testEnabled: "Aktifkan mod ujian",
+    testDate: "Tarikh simulasi",
+    testTime: "Jam simulasi",
+    testPrayer: "Set pantas \u2014 solat",
+    testMinus5: "T \u2212 5 min",
+    testAzan: "Waktu azan",
+    testIqamah: "Waktu iqamah",
+    saveTestMode: "Simpan mod ujian",
+    presetCustom: "\u2014 Tersuai \u2014",
+    presetNavy: "Navy & Emas (lalai)",
+    presetEmerald: "Emerald & Emas",
+    presetRoyal: "Biru Diraja & Emas",
+    presetMaroon: "Maroon & Emas",
+    presetLight: "Cerah",
+    clock24: "24 jam",
+    clock12: "12 jam",
+    tickerSlow: "Perlahan",
+    tickerNormal: "Normal",
+    tickerFast: "Pantas",
+    streamsSub: "Stream RTSP, RTMP dan ONVIF ditukar ke HLS oleh ffmpeg pada mesin ini dan dipaparkan dalam slaid. YouTube menerima URL video biasa atau live. WebRTC menggunakan URL embed tersuai (cth. halaman gateway WebRTC anda).",
+    ffmpegPath: "Laluan ffmpeg (untuk RTSP/RTMP/ONVIF)",
+    saveFfmpeg: "Simpan laluan ffmpeg",
+    addStream: "+ Tambah stream",
+    saveStreams: "Simpan stream",
+    emptyStreams: "Tiada stream lagi. Tambah kamera IP, video YouTube, atau URL live stream.",
+    streamName: "Nama",
+    streamType: "Jenis",
+    seconds: "Saat",
+    streamUrl: "URL",
+    enabled: "Aktif",
+    eventsSub: "Auto-sync dari takwim rasmi JAKIM \u2014 tarikh dikemas kini mengikut zon yang dipilih.",
+    eventsAuto: "Auto-sync dari JAKIM",
+    syncNow: "Sync sekarang",
+    addEvent: "+ Tambah acara",
+    saveEvents: "Simpan acara",
+    nameBm: "Nama (BM)",
+    nameEn: "Nama (EN)",
+    date: "Tarikh",
+    repeatYearly: "Berulang tahunan",
+    emptyEvents: "Tiada hari kebesaran lagi.",
+    eventNew: "baharu",
+    eventNotUpcoming: "tidak akan datang",
+    sourceJakim: "JAKIM",
+    sourceAnggaran: "anggaran",
+    rosterSub: "Tugas hari ini dipaparkan pada skrin.",
+    saveRoster: "Simpan jadual",
+    imam: "Imam",
+    bilal: "Bilal",
+    weatherEnabled: "Cuaca diaktifkan",
+    unit: "Unit",
+    saveWeather: "Simpan cuaca",
+    celsius: "Celsius",
+    fahrenheit: "Fahrenheit",
+    hijriOffset: "Offset hari (\u22122 hingga +2)",
+    saveHijri: "Simpan offset hijrah",
+    currentPassword: "Kata laluan semasa",
+    newPassword: "Kata laluan baharu (min 6 aksara)",
+    confirmPassword: "Sahkan kata laluan baharu",
+    changePassword: "Tukar kata laluan",
+    sessionExpired: "Sesi tamat \u2014 sila log masuk semula",
+    requestFailed: "Permintaan gagal ({s})",
+    wrongPassword: "Kata laluan salah",
+    signInFailed: "Log masuk gagal",
+    screenUrlCopied: "URL skrin disalin",
+    copyFailed: "Salinan gagal \u2014 pilih URL secara manual",
+    annPaused: "Pengumuman dijeda",
+    annActivated: "Pengumuman diaktifkan",
+    annDeleted: "Pengumuman dipadam",
+    annUpdated: "Pengumuman dikemas kini",
+    annCreated: "Pengumuman dicipta",
+    annRefreshed: "Pengumuman dimuat semula",
+    notFound: "Tidak ditemui",
+    mediaUploaded: "Media dimuat naik",
+    uploadFailed: "Muat naik gagal",
+    logoUploaded: "Logo dimuat naik \u2014 klik \u201CSimpan masjid\u201D untuk terpakai",
+    azanUploaded: "Audio azan dimuat naik \u2014 klik \u201CSimpan tetapan audio\u201D untuk terpakai",
+    iqamahUploaded: "Audio iqamah dimuat naik \u2014 klik \u201CSimpan tetapan audio\u201D untuk terpakai",
+    bgUploaded: "Foto latar dimuat naik \u2014 klik \u201CSimpan tetapan paparan\u201D untuk terpakai",
+    settingsSaved: "Tetapan disimpan",
+    streamsSaved: "Stream disimpan & relay dimulakan semula",
+    syncInProgress: "Menyelaraskan dengan JAKIM\u2026",
+    syncDone: "Sync selesai: {n} tarikh",
+    syncFailed: "Sync gagal",
+    eventsSaved: "Acara disimpan",
+    passwordChanged: "Kata laluan ditukar",
+    fillPasswords: "Isi semua ruangan kata laluan",
+    pwTooShort: "Kata laluan baharu mesti sekurang-kurangnya 6 aksara",
+    pwMismatch: "Kata laluan baharu tidak sepadan",
+    idleLogout: "Sesi tamat kerana tidak aktif \u2014 sila log masuk semula",
+    logoMustImage: "Logo mestilah imej",
+    bgMustImage: "Latar mestilah imej",
+    checkingFfmpeg: "Menyemak ffmpeg\u2026",
+    ffmpegOk: "\u2705 ffmpeg dikesan \u2014 relay RTSP/RTMP/ONVIF tersedia.",
+    ffmpegMissing: "\u26A0\uFE0F ffmpeg TIDAK dijumpai. Pasang ffmpeg dan tetapkan laluannya di atas untuk stream RTSP/RTMP/ONVIF (HLS, YouTube dan embed WebRTC berfungsi tanpanya).",
+    statusRunning: "berjalan",
+    statusStarting: "bermula",
+    statusReady: "sedia",
+    statusNoFfmpeg: "tiada ffmpeg",
+    statusDisabled: "dilumpuhkan",
+    statusStopped: "berhenti",
+    lastSynced: "Terakhir: {t}",
+    neverSynced: "belum pernah",
+    todayDuty: "hari ini",
+    daysShort: "{n}h",
+    sunday: "Ahad",
+    monday: "Isnin",
+    tuesday: "Selasa",
+    wednesday: "Rabu",
+    thursday: "Khamis",
+    friday: "Jumaat",
+    saturday: "Sabtu"
   }
 };
-
 function t(key, vars = {}) {
   let s = (I18N[adminLang] && I18N[adminLang][key]) ?? (I18N.en[key] ?? key);
   for (const [k, v] of Object.entries(vars)) s = s.replaceAll(`{${k}}`, String(v));
   return s;
 }
-
 function applyLang() {
   document.documentElement.lang = adminLang;
-  document.querySelectorAll('[data-i18n]').forEach((el) => { el.textContent = t(el.dataset.i18n); });
-  document.querySelectorAll('[data-i18n-placeholder]').forEach((el) => { el.placeholder = t(el.dataset.i18nPlaceholder); });
-  const sel = document.getElementById('adminLang');
+  document.querySelectorAll("[data-i18n]").forEach((el) => {
+    el.textContent = t(el.dataset.i18n);
+  });
+  document.querySelectorAll("[data-i18n-placeholder]").forEach((el) => {
+    el.placeholder = t(el.dataset.i18nPlaceholder);
+  });
+  const sel = $("adminLang");
   if (sel) sel.value = adminLang;
   renderAll();
 }
-
 function setAdminLang(lang) {
-  adminLang = lang === 'ms' ? 'ms' : 'en';
+  adminLang = lang === "ms" ? "ms" : "en";
   localStorage.setItem(ADMIN_LANG_KEY, adminLang);
   applyLang();
 }
-
 function renderAll() {
   if (!state.status) return;
   renderOverview();
   renderAnnouncements(state.announcements || []);
   populateSettings(state.settings || {});
 }
-
-// Auto-logout apabila idle melebihi 10 minit (boleh dipendekkan untuk ujian).
-const IDLE_TIMEOUT_MS = Number(window.TVM_IDLE_MS) || 10 * 60 * 1000;
+const IDLE_TIMEOUT_MS = Number(window.TVM_IDLE_MS) || 10 * 60 * 1e3;
 let idleTimer = null;
 let lastMousemove = 0;
 let lastScroll = 0;
 let lastActivity = Date.now();
-
 function resetIdleTimer() {
   if (!state.token) return;
   lastActivity = Date.now();
   clearTimeout(idleTimer);
   idleTimer = setTimeout(idleLogout, IDLE_TIMEOUT_MS);
 }
-
 function idleLogout() {
   clearTimeout(idleTimer);
-  state.token = '';
-  localStorage.removeItem('tvm_token');
+  state.token = "";
+  localStorage.removeItem("tvm_token");
   showLogin();
-  toast(t('idleLogout'), 'err');
+  toast(t("idleLogout"), "err");
 }
-
-// PWA/telefon: bila app kembali ke latar depan, timer background mungkin
-// tergantung. Semak masa idle sebenar - logout serta-merta jika terlebih.
 function checkIdleAfterResume() {
   if (!state.token) return;
   const elapsed = Date.now() - lastActivity;
@@ -630,162 +628,165 @@ function checkIdleAfterResume() {
   clearTimeout(idleTimer);
   idleTimer = setTimeout(idleLogout, IDLE_TIMEOUT_MS - elapsed);
 }
-
-document.addEventListener('pointerdown', resetIdleTimer, { passive: true });
-document.addEventListener('keydown', resetIdleTimer);
-document.addEventListener('touchstart', resetIdleTimer, { passive: true });
-document.addEventListener('wheel', resetIdleTimer, { passive: true });
-document.addEventListener('mousemove', () => {
+document.addEventListener("pointerdown", resetIdleTimer, { passive: true });
+document.addEventListener("keydown", resetIdleTimer);
+document.addEventListener("touchstart", resetIdleTimer, { passive: true });
+document.addEventListener("wheel", resetIdleTimer, { passive: true });
+document.addEventListener("mousemove", () => {
   const now = Date.now();
-  if (now - lastMousemove > 5000) {
+  if (now - lastMousemove > 5e3) {
     lastMousemove = now;
     resetIdleTimer();
   }
 }, { passive: true });
-document.addEventListener('scroll', () => {
+document.addEventListener("scroll", () => {
   const now = Date.now();
-  if (now - lastScroll > 5000) {
+  if (now - lastScroll > 5e3) {
     lastScroll = now;
     resetIdleTimer();
   }
 }, { passive: true });
-document.addEventListener('visibilitychange', () => { if (!document.hidden) checkIdleAfterResume(); });
-window.addEventListener('focus', checkIdleAfterResume);
-window.addEventListener('pageshow', checkIdleAfterResume);
-
-// ------------------------------------------------------------------ helpers
-
+document.addEventListener("visibilitychange", () => {
+  if (!document.hidden) checkIdleAfterResume();
+});
+window.addEventListener("focus", checkIdleAfterResume);
+window.addEventListener("pageshow", checkIdleAfterResume);
 async function api(path, options = {}) {
-  const headers = { ...(options.headers || {}) };
+  const headers = { ...options.headers || {} };
   if (state.token) headers.Authorization = `Bearer ${state.token}`;
-  if (options.body && typeof options.body !== 'string') {
-    headers['Content-Type'] = 'application/json';
+  if (options.body && typeof options.body !== "string") {
+    headers["Content-Type"] = "application/json";
     options.body = JSON.stringify(options.body);
   }
-  const res = await fetch(path, { ...options, headers });
-  if (res.status === 401 && path !== '/api/admin/login') {
+  const res = await fetch(path, { ...options, headers, body: options.body });
+  if (res.status === 401 && path !== "/api/admin/login") {
     showLogin();
-    throw new Error(t('sessionExpired'));
+    throw new Error(t("sessionExpired"));
   }
   if (!res.ok) {
-    let message = t('requestFailed', { s: res.status });
+    let message = t("requestFailed", { s: res.status });
     try {
       const j = await res.json();
       if (j.error) message = j.error;
-    } catch { /* ignore */ }
+    } catch {
+    }
     throw new Error(message);
   }
   return res.json();
 }
-
 const EXT_MIME = {
-  mp4: 'video/mp4', mov: 'video/quicktime', m4v: 'video/x-m4v', mkv: 'video/x-matroska',
-  webm: 'video/webm', ogv: 'video/ogg', avi: 'video/x-msvideo', mpg: 'video/mpeg', mpeg: 'video/mpeg',
-  '3gp': 'video/3gpp', '3g2': 'video/3gpp2', ts: 'video/mp2t', flv: 'video/x-flv',
-  mp3: 'audio/mpeg', wav: 'audio/wav', ogg: 'audio/ogg', m4a: 'audio/mp4', aac: 'audio/aac',
-  jpg: 'image/jpeg', jpeg: 'image/jpeg', png: 'image/png', gif: 'image/gif', webp: 'image/webp'
+  mp4: "video/mp4",
+  mov: "video/quicktime",
+  m4v: "video/x-m4v",
+  mkv: "video/x-matroska",
+  webm: "video/webm",
+  ogv: "video/ogg",
+  avi: "video/x-msvideo",
+  mpg: "video/mpeg",
+  mpeg: "video/mpeg",
+  "3gp": "video/3gpp",
+  "3g2": "video/3gpp2",
+  ts: "video/mp2t",
+  flv: "video/x-flv",
+  mp3: "audio/mpeg",
+  wav: "audio/wav",
+  ogg: "audio/ogg",
+  m4a: "audio/mp4",
+  aac: "audio/aac",
+  jpg: "image/jpeg",
+  jpeg: "image/jpeg",
+  png: "image/png",
+  gif: "image/gif",
+  webp: "image/webp"
 };
-
 function fileMime(file) {
-  if (file.type && file.type !== 'application/octet-stream') return file.type;
-  const ext = (file.name.split('.').pop() || '').toLowerCase();
-  return EXT_MIME[ext] || 'application/octet-stream';
+  if (file.type && file.type !== "application/octet-stream") return file.type;
+  const ext = (file.name.split(".").pop() || "").toLowerCase();
+  return EXT_MIME[ext] || "application/octet-stream";
 }
-
 async function uploadFile(file) {
   const mime = fileMime(file);
-  const res = await fetch('/api/admin/upload', {
-    method: 'POST',
-    headers: { Authorization: `Bearer ${state.token}`, 'Content-Type': mime },
+  const res = await fetch("/api/admin/upload", {
+    method: "POST",
+    headers: { Authorization: `Bearer ${state.token}`, "Content-Type": mime },
     body: file
   });
   if (!res.ok) {
     const j = await res.json().catch(() => ({}));
-    throw new Error(j.error || t('uploadFailed'));
+    throw new Error(j.error || t("uploadFailed"));
   }
   return res.json();
 }
-
-function toast(message, kind = 'ok') {
-  const el = $('toast');
+function toast(message, kind = "ok") {
+  const el = $("toast");
   el.textContent = message;
   el.className = `toast ${kind}`;
   el.hidden = false;
   clearTimeout(state.toastTimer);
-  state.toastTimer = setTimeout(() => { el.hidden = true; }, 3500);
+  state.toastTimer = setTimeout(() => {
+    el.hidden = true;
+  }, 3500);
 }
-
 function showLogin() {
-  $('appView').hidden = true;
-  $('loginView').hidden = false;
-  $('loginPassword').focus();
+  $("appView").hidden = true;
+  $("loginView").hidden = false;
+  $("loginPassword").focus();
 }
-
 function showApp() {
-  $('loginView').hidden = true;
-  $('appView').hidden = false;
+  $("loginView").hidden = true;
+  $("appView").hidden = false;
 }
-
 function switchView(name) {
-  document.querySelectorAll('.nav-btn').forEach((b) => b.classList.toggle('active', b.dataset.view === name));
-  document.querySelectorAll('.view').forEach((v) => v.classList.toggle('active', v.id === `view-${name}`));
+  document.querySelectorAll(".nav-btn").forEach((b) => b.classList.toggle("active", b.dataset.view === name));
+  document.querySelectorAll(".view").forEach((v) => v.classList.toggle("active", v.id === `view-${name}`));
 }
-
-document.querySelectorAll('.nav-btn').forEach((btn) => {
-  btn.addEventListener('click', () => switchView(btn.dataset.view));
+document.querySelectorAll(".nav-btn").forEach((btn) => {
+  btn.addEventListener("click", () => switchView(btn.dataset.view));
 });
-
-const langSelect = document.getElementById('adminLang');
-if (langSelect) langSelect.addEventListener('change', (e) => setAdminLang(e.target.value));
-
-// -------------------------------------------------------------------- login
-
-$('loginForm').addEventListener('submit', async (e) => {
+const langSelect = document.getElementById("adminLang");
+if (langSelect) langSelect.addEventListener("change", (e) => setAdminLang(e.target.value));
+$("loginForm").addEventListener("submit", async (e) => {
   e.preventDefault();
-  const password = $('loginPassword').value;
-  $('loginError').hidden = true;
+  const password = $("loginPassword").value;
+  $("loginError").hidden = true;
   try {
-    const res = await fetch('/api/admin/login', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+    const res = await fetch("/api/admin/login", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ password })
     });
     if (!res.ok) {
       const j = await res.json().catch(() => ({}));
-      throw new Error(j.error === 'Wrong password' ? t('wrongPassword') : (j.error || t('signInFailed')));
+      throw new Error(j.error === "Wrong password" ? t("wrongPassword") : j.error || t("signInFailed"));
     }
     const data = await res.json();
     state.token = data.token;
-    localStorage.setItem('tvm_token', state.token);
-    $('loginPassword').value = '';
+    localStorage.setItem("tvm_token", state.token);
+    $("loginPassword").value = "";
     await loadApp();
     resetIdleTimer();
   } catch (err) {
-    $('loginError').textContent = err.message;
-    $('loginError').hidden = false;
+    $("loginError").textContent = err.message;
+    $("loginError").hidden = false;
   }
 });
-
-$('logoutBtn').addEventListener('click', () => {
+$("logoutBtn").addEventListener("click", () => {
   clearTimeout(idleTimer);
-  state.token = '';
-  localStorage.removeItem('tvm_token');
+  state.token = "";
+  localStorage.removeItem("tvm_token");
   showLogin();
 });
-
-// ------------------------------------------------------------------ overview
-
 async function loadApp() {
   showApp();
   try {
     const [status, settings, methods, zonesRes, announcements, today, streamsRes] = await Promise.all([
-      api('/api/admin/status'),
-      api('/api/admin/settings'),
-      api('/api/methods'),
-      api('/api/zones'),
-      api('/api/admin/announcements'),
-      api('/api/today'),
-      api('/api/admin/streams')
+      api("/api/admin/status"),
+      api("/api/admin/settings"),
+      api("/api/methods"),
+      api("/api/zones"),
+      api("/api/admin/announcements"),
+      api("/api/today"),
+      api("/api/admin/streams")
     ]);
     state.status = status;
     state.methods = methods;
@@ -795,172 +796,156 @@ async function loadApp() {
     state.ffmpegOk = streamsRes.ffmpegOk;
     state.announcements = announcements;
     state.settings = settings;
-    $('sideMosque').textContent = status.mosque;
-    $('sideVersion').textContent = `v${status.version}`;
+    $("sideMosque").textContent = status.mosque;
+    $("sideVersion").textContent = `v${status.version}`;
     renderOverview();
     renderAnnouncements(announcements);
     populateSettings(settings);
-    switchView('overview');
+    switchView("overview");
   } catch (err) {
-    toast(err.message, 'err');
+    toast(err.message, "err");
   }
 }
-
 function renderOverview() {
   const s = state.status;
-  $('ovServer').textContent = `${s.mosque} • ${s.language.toUpperCase()}`;
-  $('ovUptime').textContent = t('runningFor', { time: formatUptime(s.uptime), version: s.version });
-  $('ovAnnouncements').textContent = s.counts.announcements;
-  $('ovActive').textContent = t('activeNow', { n: s.counts.activeAnnouncements });
+  $("ovServer").textContent = `${s.mosque} \u2022 ${s.language.toUpperCase()}`;
+  $("ovUptime").textContent = t("runningFor", { time: formatUptime(s.uptime), version: s.version });
+  $("ovAnnouncements").textContent = String(s.counts.announcements);
+  $("ovActive").textContent = t("activeNow", { n: s.counts.activeAnnouncements });
   if (s.nextEvent) {
-    $('ovEvent').textContent = s.nextEvent.today ? `🎉 ${s.nextEvent.name}` : s.nextEvent.name;
-    $('ovEventDays').textContent = s.nextEvent.today ? t('eventToday') : t('eventDays', { n: s.nextEvent.daysLeft, date: s.nextEvent.next });
+    $("ovEvent").textContent = s.nextEvent.today ? `\u{1F389} ${s.nextEvent.name}` : s.nextEvent.name;
+    $("ovEventDays").textContent = s.nextEvent.today ? t("eventToday") : t("eventDays", { n: s.nextEvent.daysLeft, date: s.nextEvent.next });
   }
-  $('ovScreenUrl').textContent = s.screenUrl;
+  $("ovScreenUrl").textContent = s.screenUrl;
   const urlHtml = `<strong>${escapeHtml(s.screenUrl)}</strong>`;
-  $('note1').innerHTML = t('note1', { url: urlHtml });
-  $('passwordNote').hidden = !s.adminPasswordFile;
+  $("note1").innerHTML = t("note1", { url: urlHtml });
+  $("passwordNote").hidden = !s.adminPasswordFile;
   if (s.adminPasswordFile) {
-    $('passwordNote').innerHTML = t('notePassword', { file: '<code>server/data/ADMIN_PASSWORD.txt</code>' });
+    $("passwordNote").innerHTML = t("notePassword", { file: "<code>server/data/ADMIN_PASSWORD.txt</code>" });
   }
-  $('audioNote').hidden = !s.audioEnabled;
-  $('streamNote').hidden = s.streamCount === 0;
-  $('streamNote').innerHTML = t('noteStreams', { count: `${s.activeStreamCount}/${s.streamCount}` });
-  $('eventsSyncNote').hidden = !(s.eventsSync?.enabled);
+  $("audioNote").hidden = !s.audioEnabled;
+  $("streamNote").hidden = s.streamCount === 0;
+  $("streamNote").innerHTML = t("noteStreams", { count: `${s.activeStreamCount}/${s.streamCount}` });
+  $("eventsSyncNote").hidden = !s.eventsSync?.enabled;
   renderNextPrayer();
 }
-
 function renderNextPrayer() {
   const next = state.today?.next;
   if (!next) return;
   const nameKey = `prayer${next.key.charAt(0).toUpperCase()}${next.key.slice(1)}`;
-  $('ovNextPrayer').textContent = `${t(nameKey).toUpperCase()} ${next.time.time}`;
+  $("ovNextPrayer").textContent = `${t(nameKey).toUpperCase()} ${next.time.time}`;
   updateNextCountdown();
 }
-
 function updateNextCountdown() {
   const next = state.today?.next;
   if (!next) return;
   const remain = next.time.ms - Date.now();
-  $('ovCountdown').textContent = remain > 0 ? `in ${formatDuration(remain)}` : 'now';
+  $("ovCountdown").textContent = remain > 0 ? `in ${formatDuration(remain)}` : "now";
 }
-
 function formatDuration(ms) {
-  const s = Math.max(0, Math.floor(ms / 1000));
+  const s = Math.max(0, Math.floor(ms / 1e3));
   const h = Math.floor(s / 3600);
-  const m = Math.floor((s % 3600) / 60);
+  const m = Math.floor(s % 3600 / 60);
   const sec = s % 60;
-  const pad = (n) => String(n).padStart(2, '0');
+  const pad = (n) => String(n).padStart(2, "0");
   return `${pad(h)}:${pad(m)}:${pad(sec)}`;
 }
-
 function formatUptime(seconds) {
   const d = Math.floor(seconds / 86400);
-  const h = Math.floor((seconds % 86400) / 3600);
-  const m = Math.floor((seconds % 3600) / 60);
+  const h = Math.floor(seconds % 86400 / 3600);
+  const m = Math.floor(seconds % 3600 / 60);
   return d ? `${d}d ${h}h ${m}m` : h ? `${h}h ${m}m` : `${m}m`;
 }
-
-setInterval(updateNextCountdown, 1000);
-
-$('openDisplayBtn').addEventListener('click', () => {
-  if (state.status) window.open(state.status.screenUrl, '_blank');
+setInterval(updateNextCountdown, 1e3);
+$("openDisplayBtn").addEventListener("click", () => {
+  if (state.status) window.open(state.status.screenUrl, "_blank");
 });
-
-$('copyUrlBtn').addEventListener('click', async () => {
+$("copyUrlBtn").addEventListener("click", async () => {
   if (!state.status) return;
   try {
     await navigator.clipboard.writeText(state.status.screenUrl);
-    toast(t('screenUrlCopied'));
+    toast(t("screenUrlCopied"));
   } catch {
-    toast(t('copyFailed'), 'err');
+    toast(t("copyFailed"), "err");
   }
 });
-
-// ------------------------------------------------------------- announcements
-
 function renderAnnouncements(items) {
-  const list = $('announcementList');
+  const list = $("announcementList");
   if (!items.length) {
-    list.innerHTML = `<div class="empty-state">${escapeHtml(t('emptyAnnouncements'))}</div>`;
+    list.innerHTML = `<div class="empty-state">${escapeHtml(t("emptyAnnouncements"))}</div>`;
     return;
   }
   const catLabel = (cat) => t(`cat${cat.charAt(0).toUpperCase()}${cat.slice(1)}`);
   list.innerHTML = items.map((a) => `
-    <div class="announcement-item${a.active ? '' : ' inactive'}">
+    <div class="announcement-item${a.active ? "" : " inactive"}">
       <div>
         <div class="ann-title">${escapeHtml(a.title)}</div>
         <div class="ann-meta">
-          <span class="chip ${a.category}">${escapeHtml(catLabel(a.category))}</span>
-          <span class="chip ${a.status}">${t(a.status === 'active' ? 'statusActive' : 'statusInactive')}</span>
-          ${a.video ? `<span class="chip event">${t('video')}</span>` : ''}
-          ${a.start ? `<span>${t('from', { d: a.start })}</span>` : ''}
-          ${a.end ? `<span>${t('until', { d: a.end })}</span>` : ''}
-          <span>${t('priorityN', { n: a.priority })}</span>
+          <span class="chip ${escapeHtml(a.category)}">${escapeHtml(catLabel(a.category))}</span>
+          <span class="chip ${a.status}">${t(a.status === "active" ? "statusActive" : "statusInactive")}</span>
+          ${a.video ? `<span class="chip event">${t("video")}</span>` : ""}
+          ${a.start ? `<span>${t("from", { d: a.start })}</span>` : ""}
+          ${a.end ? `<span>${t("until", { d: a.end })}</span>` : ""}          <span>${t("priorityN", { n: a.priority })}</span>
         </div>
-        ${a.message ? `<p class="ann-msg">${escapeHtml(a.message)}</p>` : ''}
+        ${a.message ? `<p class="ann-msg">${escapeHtml(a.message)}</p>` : ""}
       </div>
       <div class="ann-actions">
-        <button class="btn ghost sm" data-action="toggle" data-id="${a.id}">${a.active ? t('pause') : t('activate')}</button>
-        <button class="btn ghost sm" data-action="edit" data-id="${a.id}">${t('edit')}</button>
-        <button class="btn danger sm" data-action="delete" data-id="${a.id}">${t('delete')}</button>
+        <button class="btn ghost sm" data-action="toggle" data-id="${escapeHtml(a.id)}">${a.active ? t("pause") : t("activate")}</button>
+        <button class="btn ghost sm" data-action="edit" data-id="${escapeHtml(a.id)}">${t("edit")}</button>
+        <button class="btn danger sm" data-action="delete" data-id="${escapeHtml(a.id)}">${t("delete")}</button>
       </div>
-    </div>`).join('');
+    </div>`).join("");
 }
-
-$('announcementList').addEventListener('click', async (e) => {
-  const btn = e.target.closest('[data-action]');
+$("announcementList").addEventListener("click", async (e) => {
+  const btn = e.target.closest("[data-action]");
   if (!btn) return;
   const id = btn.dataset.id;
   const action = btn.dataset.action;
   try {
-    if (action === 'toggle') {
-      const current = await api('/api/admin/announcements').then((list) => list.find((x) => x.id === id));
-      if (!current) throw new Error(t('notFound'));
-      await api(`/api/admin/announcements/${id}`, { method: 'PUT', body: { active: !current.active } });
-      toast(current.active ? t('annPaused') : t('annActivated'));
-    } else if (action === 'edit') {
-      const current = await api('/api/admin/announcements').then((list) => list.find((x) => x.id === id));
+    if (action === "toggle") {
+      const current = await api("/api/admin/announcements").then((list) => list.find((x) => x.id === id));
+      if (!current) throw new Error(t("notFound"));
+      await api(`/api/admin/announcements/${id}`, { method: "PUT", body: { active: !current.active } });
+      toast(current.active ? t("annPaused") : t("annActivated"));
+    } else if (action === "edit") {
+      const current = await api("/api/admin/announcements").then((list) => list.find((x) => x.id === id));
       openAnnouncementForm(current);
       return;
-    } else if (action === 'delete') {
-      if (!confirm(t('deleteConfirm', { title: btn.closest('.announcement-item').querySelector('.ann-title').textContent }))) return;
-      await api(`/api/admin/announcements/${id}`, { method: 'DELETE' });
-      toast(t('annDeleted'));
+    } else if (action === "delete") {
+      if (!confirm(t("deleteConfirm", { title: btn.closest(".announcement-item").querySelector(".ann-title").textContent }))) return;
+      await api(`/api/admin/announcements/${id}`, { method: "DELETE" });
+      toast(t("annDeleted"));
     }
     await refreshAnnouncements();
   } catch (err) {
-    toast(err.message, 'err');
+    toast(err.message, "err");
   }
 });
-
 async function refreshAnnouncements() {
-  const items = await api('/api/admin/announcements');
+  const items = await api("/api/admin/announcements");
   renderAnnouncements(items);
 }
-
 function openAnnouncementForm(item) {
   state.editingId = item ? item.id : null;
-  $('announcementFormTitle').textContent = item ? t('editAnnouncement') : t('newAnnouncement');
-  $('anTitle').value = item?.title || '';
-  $('anCategory').value = item?.category || 'announcement';
-  $('anMessage').value = item?.message || '';
-  $('anStart').value = item?.start || '';
-  $('anEnd').value = item?.end || '';
-  $('anPriority').value = item?.priority ?? 0;
-  $('anActive').checked = item ? item.active : true;
-  $('anImageUrl').value = item?.image || '';
-  $('anVideoUrl').value = item?.video || '';
-  setMediaPreview(item?.image || '', item?.video || '');
-  $('announcementForm').hidden = false;
-  $('announcementForm').scrollIntoView({ behavior: 'smooth', block: 'start' });
+  $("announcementFormTitle").textContent = item ? t("editAnnouncement") : t("newAnnouncement");
+  $("anTitle").value = item?.title || "";
+  $("anCategory").value = item?.category || "announcement";
+  $("anMessage").value = item?.message || "";
+  $("anStart").value = item?.start || "";
+  $("anEnd").value = item?.end || "";
+  $("anPriority").value = item?.priority ?? 0;
+  $("anActive").checked = item ? item.active : true;
+  $("anImageUrl").value = item?.image || "";
+  $("anVideoUrl").value = item?.video || "";
+  setMediaPreview(item?.image || "", item?.video || "");
+  $("announcementForm").hidden = false;
+  $("announcementForm").scrollIntoView({ behavior: "smooth", block: "start" });
 }
-
 function setMediaPreview(imageUrl, videoUrl) {
-  const img = $('anImagePreview');
-  const imgClear = $('anImageClear');
-  const vid = $('anVideoPreview');
-  const vidClear = $('anVideoClear');
+  const img = $("anImagePreview");
+  const imgClear = $("anImageClear");
+  const vid = $("anVideoPreview");
+  const vidClear = $("anVideoClear");
   img.hidden = true;
   imgClear.hidden = true;
   vid.hidden = true;
@@ -975,188 +960,177 @@ function setMediaPreview(imageUrl, videoUrl) {
     imgClear.hidden = false;
   }
 }
-
-$('newAnnouncementBtn').addEventListener('click', () => openAnnouncementForm(null));
-$('refreshAnnouncementsBtn').addEventListener('click', async () => {
+$("newAnnouncementBtn").addEventListener("click", () => openAnnouncementForm(null));
+$("refreshAnnouncementsBtn").addEventListener("click", async () => {
   try {
     await refreshAnnouncements();
-    toast(t('annRefreshed'));
+    toast(t("annRefreshed"));
   } catch (err) {
-    toast(err.message, 'err');
+    toast(err.message, "err");
   }
 });
-$('anCancel').addEventListener('click', () => {
-  $('announcementForm').hidden = true;
+$("anCancel").addEventListener("click", () => {
+  $("announcementForm").hidden = true;
   state.editingId = null;
 });
-
-$('anImage').addEventListener('change', async (e) => {
+$("anImage").addEventListener("change", async (e) => {
   const file = e.target.files[0];
   if (!file) return;
   try {
     const data = await uploadFile(file);
-    if (data.kind === 'video') {
-      $('anVideoUrl').value = data.url;
-      $('anImageUrl').value = '';
-      setMediaPreview('', data.url);
+    if (data.kind === "video") {
+      $("anVideoUrl").value = data.url;
+      $("anImageUrl").value = "";
+      setMediaPreview("", data.url);
     } else {
-      $('anImageUrl').value = data.url;
-      $('anVideoUrl').value = '';
-      setMediaPreview(data.url, '');
+      $("anImageUrl").value = data.url;
+      $("anVideoUrl").value = "";
+      setMediaPreview(data.url, "");
     }
-    toast(t('mediaUploaded'));
+    toast(t("mediaUploaded"));
   } catch (err) {
-    toast(err.message, 'err');
+    toast(err.message, "err");
   }
 });
-
-$('anImageClear').addEventListener('click', () => {
-  $('anImageUrl').value = '';
-  $('anImage').value = '';
-  setMediaPreview('', $('anVideoUrl').value);
+$("anImageClear").addEventListener("click", () => {
+  $("anImageUrl").value = "";
+  $("anImage").value = "";
+  setMediaPreview("", $("anVideoUrl").value);
 });
-
-$('anVideoClear').addEventListener('click', () => {
-  $('anVideoUrl').value = '';
-  $('anImage').value = '';
-  setMediaPreview($('anImageUrl').value, '');
+$("anVideoClear").addEventListener("click", () => {
+  $("anVideoUrl").value = "";
+  $("anImage").value = "";
+  setMediaPreview($("anImageUrl").value, "");
 });
-
-$('anSave').addEventListener('click', async () => {
+$("anSave").addEventListener("click", async () => {
   const payload = {
-    title: $('anTitle').value,
-    message: $('anMessage').value,
-    category: $('anCategory').value,
-    start: $('anStart').value || null,
-    end: $('anEnd').value || null,
-    priority: Number($('anPriority').value) || 0,
-    active: $('anActive').checked,
-    image: $('anImageUrl').value || null,
-    video: $('anVideoUrl').value || null
+    title: $("anTitle").value,
+    message: $("anMessage").value,
+    category: $("anCategory").value,
+    start: $("anStart").value || null,
+    end: $("anEnd").value || null,
+    priority: Number($("anPriority").value) || 0,
+    active: $("anActive").checked,
+    image: $("anImageUrl").value || null,
+    video: $("anVideoUrl").value || null
   };
   try {
     if (state.editingId) {
-      await api(`/api/admin/announcements/${state.editingId}`, { method: 'PUT', body: payload });
-      toast(t('annUpdated'));
+      await api(`/api/admin/announcements/${state.editingId}`, { method: "PUT", body: payload });
+      toast(t("annUpdated"));
     } else {
-      await api('/api/admin/announcements', { method: 'POST', body: payload });
-      toast(t('annCreated'));
+      await api("/api/admin/announcements", { method: "POST", body: payload });
+      toast(t("annCreated"));
     }
-    $('announcementForm').hidden = true;
+    $("announcementForm").hidden = true;
     state.editingId = null;
     await refreshAnnouncements();
     await refreshStatus();
   } catch (err) {
-    toast(err.message, 'err');
+    toast(err.message, "err");
   }
 });
-
 async function refreshStatus() {
-  state.status = await api('/api/admin/status');
+  state.status = await api("/api/admin/status");
   renderOverview();
 }
-
-// ------------------------------------------------------------------ settings
-
+let settingsDirty = false;
+document.addEventListener("input", () => {
+  settingsDirty = true;
+}, true);
+document.addEventListener("change", () => {
+  settingsDirty = true;
+}, true);
 function populateSettings(s) {
-  $('stMosqueName').value = s.mosque.name;
-  $('stTagline').value = s.mosque.tagline;
-  $('stAddress').value = s.mosque.address;
-  $('stLogoUrl').value = s.mosque.logo || '';
-  setLogoPreview(s.mosque.logo || '');
-  $('stLat').value = s.location.latitude;
-  $('stLng').value = s.location.longitude;
-  $('stPlace').value = s.location.name;
-  $('stSource').value = s.prayer.source;
-  $('stEventsAuto').checked = s.eventsSync.enabled !== false;
-  $('stTimezone').value = s.prayer.timezone;
-  $('stShowImsak').checked = s.prayer.showImsak;
-  $('stImsakOffset').value = s.prayer.imsakOffset;
-  $('stShowSunrise').checked = s.prayer.showSunrise;
-  $('stAzanLead').value = s.prayer.azanLeadMinutes ?? 5;
-  $('stIqamahOffset').value = s.prayer.iqamahOffsetMinutes ?? 10;
-  $('stJemaahDur').value = s.prayer.jemaahDurationMinutes ?? 15;
-  $('stAfterIqamah').value = s.prayer.afterIqamah === 'black' ? 'black' : 'jemaah';
-  $('stAdjFajr').value = s.prayer.adjustments.fajr;
-  $('stAdjSunrise').value = s.prayer.adjustments.sunrise;
-  $('stAdjDhuhr').value = s.prayer.adjustments.dhuhr;
-  $('stAdjAsr').value = s.prayer.adjustments.asr;
-  $('stAdjMaghrib').value = s.prayer.adjustments.maghrib;
-  $('stAdjIsha').value = s.prayer.adjustments.isha;
-  $('stIqFajr').value = s.prayer.iqamah.fajr || '';
-  $('stIqDhuhr').value = s.prayer.iqamah.dhuhr || '';
-  $('stIqAsr').value = s.prayer.iqamah.asr || '';
-  $('stIqMaghrib').value = s.prayer.iqamah.maghrib || '';
-  $('stIqIsha').value = s.prayer.iqamah.isha || '';
-  $('stLanguage').value = s.display.language;
+  $("stMosqueName").value = s.mosque.name;
+  $("stTagline").value = s.mosque.tagline;
+  $("stAddress").value = s.mosque.address;
+  $("stLogoUrl").value = s.mosque.logo || "";
+  setLogoPreview(s.mosque.logo || "");
+  $("stLat").value = s.location.latitude;
+  $("stLng").value = s.location.longitude;
+  $("stPlace").value = s.location.name;
+  $("stSource").value = s.prayer.source;
+  $("stEventsAuto").checked = s.eventsSync.enabled !== false;
+  $("stTimezone").value = s.prayer.timezone;
+  $("stShowImsak").checked = s.prayer.showImsak;
+  $("stImsakOffset").value = s.prayer.imsakOffset;
+  $("stShowSunrise").checked = s.prayer.showSunrise;
+  $("stAzanLead").value = s.prayer.azanLeadMinutes ?? 5;
+  $("stIqamahOffset").value = s.prayer.iqamahOffsetMinutes ?? 10;
+  $("stJemaahDur").value = s.prayer.jemaahDurationMinutes ?? 15;
+  $("stAfterIqamah").value = s.prayer.afterIqamah === "black" ? "black" : "jemaah";
+  $("stAdjFajr").value = s.prayer.adjustments.fajr;
+  $("stAdjSunrise").value = s.prayer.adjustments.sunrise;
+  $("stAdjDhuhr").value = s.prayer.adjustments.dhuhr;
+  $("stAdjAsr").value = s.prayer.adjustments.asr;
+  $("stAdjMaghrib").value = s.prayer.adjustments.maghrib;
+  $("stAdjIsha").value = s.prayer.adjustments.isha;
+  $("stIqFajr").value = s.prayer.iqamah.fajr || "";
+  $("stIqDhuhr").value = s.prayer.iqamah.dhuhr || "";
+  $("stIqAsr").value = s.prayer.iqamah.asr || "";
+  $("stIqMaghrib").value = s.prayer.iqamah.maghrib || "";
+  $("stIqIsha").value = s.prayer.iqamah.isha || "";
+  $("stLanguage").value = s.display.language;
   const colors = s.display.colors || COLOR_PRESETS.navy;
-  const presetKey = Object.entries(COLOR_PRESETS).find(([, p]) =>
-    p.bgTop === colors.bgTop && p.bgBottom === colors.bgBottom && p.gold === colors.gold && p.teal === colors.teal
-  )?.[0] || '';
-  $('stColorPreset').value = presetKey;
-  $('stBgTop').value = colors.bgTop || '#06101f';
-  $('stBgBottom').value = colors.bgBottom || '#0a1a2f';
-  $('stText').value = colors.text || '#f3f6fb';
-  $('stMuted').value = colors.muted || '#8fa4bd';
-  $('stGold').value = colors.gold || '#e0bc6a';
-  $('stTeal').value = colors.teal || '#62d9c6';
-  $('stBgImage').value = s.display.backgroundImage || '';
-  $('stBgClear').hidden = !s.display.backgroundImage;
-  $('stBgOpacity').value = s.display.backgroundOpacity ?? 0;
-  $('stBgOpacityVal').textContent = `${s.display.backgroundOpacity ?? 0}%`;
+  const presetKey = Object.entries(COLOR_PRESETS).find(
+    ([, p]) => p.bgTop === colors.bgTop && p.bgBottom === colors.bgBottom && p.gold === colors.gold && p.teal === colors.teal
+  )?.[0] || "";
+  $("stColorPreset").value = presetKey;
+  $("stBgTop").value = colors.bgTop || "#06101f";
+  $("stBgBottom").value = colors.bgBottom || "#0a1a2f";
+  $("stText").value = colors.text || "#f3f6fb";
+  $("stMuted").value = colors.muted || "#8fa4bd";
+  $("stGold").value = colors.gold || "#e0bc6a";
+  $("stTeal").value = colors.teal || "#62d9c6";
+  $("stBgImage").value = s.display.backgroundImage || "";
+  $("stBgClear").hidden = !s.display.backgroundImage;
+  $("stBgOpacity").value = s.display.backgroundOpacity ?? 0;
+  $("stBgOpacityVal").textContent = `${s.display.backgroundOpacity ?? 0}%`;
   const tm = s.display.testMode || {};
-  $('stTestEnabled').checked = tm.enabled === true;
-  $('stTestDate').value = tm.date || '';
-  $('stTestTime').value = tm.time || '';
+  $("stTestEnabled").checked = tm.enabled === true;
+  $("stTestDate").value = tm.date || "";
+  $("stTestTime").value = tm.time || "";
   updateTestRef();
-  $('stClockFormat').value = s.display.clockFormat;
-  $('stShowSeconds').checked = s.display.showSeconds !== false;
-  $('stSlideInterval').value = s.display.slideshowInterval;
-  $('stTickerSpeed').value = s.display.tickerSpeed || 'normal';
-  $('stSafeMargin').value = s.display.safeMargin ?? 2;
-  $('stMediaFit').value = s.display.mediaFit || 'stretch';
-  $('stShowTicker').checked = s.display.showTicker;
-  $('stTickerCustom').value = s.display.tickerCustom || '';
-  $('stShowWeather').checked = s.display.showWeather;
+  $("stClockFormat").value = s.display.clockFormat;
+  $("stShowSeconds").checked = s.display.showSeconds !== false;
+  $("stSlideInterval").value = s.display.slideshowInterval;
+  $("stTickerSpeed").value = s.display.tickerSpeed || "normal";
+  $("stSafeMargin").value = s.display.safeMargin ?? 2;
+  $("stMediaFit").value = s.display.mediaFit || "stretch";
+  $("stShowTicker").checked = s.display.showTicker;
+  $("stTickerCustom").value = s.display.tickerCustom || "";
+  $("stShowWeather").checked = s.display.showWeather;
   const sb = s.display.staticBanner || {};
-  $('stBannerEnabled').checked = sb.enabled === true;
-  $('stBannerTitle').value = sb.title || '';
-  $('stBannerMessage').value = sb.message || '';
-  $('stBannerImage').value = sb.image || '';
-  $('stBannerClear').hidden = !sb.image;
-  $('stWeatherEnabled').checked = s.weather.enabled;
-  $('stWeatherUnit').value = s.weather.unit;
-  $('stHijriOffset').value = s.hijriOffset;
-  $('stAudioEnabled').checked = s.audio.enabled;
-  $('stAdhanUrl').value = s.audio.adhanUrl || '';
-  $('stIqamahUrl').value = s.audio.iqamahUrl || '';
-  $('stFfmpegPath').value = s.media.ffmpegPath || 'ffmpeg';
-
-  const methodSelect = $('stMethod');
-  methodSelect.innerHTML = Object.entries(state.methods)
-    .map(([key, m]) => `<option value="${key}" ${key === s.prayer.method ? 'selected' : ''}>${escapeHtml(m.label)}</option>`)
-    .join('');
-
-  const zoneSelect = $('stZone');
-  zoneSelect.innerHTML = Object.entries(state.zones)
-    .map(([negeri, list]) => {
-      const opts = list
-        .map((z) => `<option value="${z.zone}" ${z.zone === s.prayer.zone ? 'selected' : ''}>${z.zone} — ${escapeHtml(z.label)}</option>`)
-        .join('');
-      return `<optgroup label="${escapeHtml(negeri)}">${opts}</optgroup>`;
-    })
-    .join('');
-
+  $("stBannerEnabled").checked = sb.enabled === true;
+  $("stBannerTitle").value = sb.title || "";
+  $("stBannerMessage").value = sb.message || "";
+  $("stBannerImage").value = sb.image || "";
+  $("stBannerClear").hidden = !sb.image;
+  $("stWeatherEnabled").checked = s.weather.enabled;
+  $("stWeatherUnit").value = s.weather.unit;
+  $("stHijriOffset").value = s.hijriOffset;
+  $("stAudioEnabled").checked = s.audio.enabled;
+  $("stAdhanUrl").value = s.audio.adhanUrl || "";
+  $("stIqamahUrl").value = s.audio.iqamahUrl || "";
+  $("stFfmpegPath").value = s.media.ffmpegPath || "ffmpeg";
+  const methodSelect = $("stMethod");
+  methodSelect.innerHTML = Object.entries(state.methods).map(([key, m]) => `<option value="${key}" ${key === s.prayer.method ? "selected" : ""}>${escapeHtml(m.label)}</option>`).join("");
+  const zoneSelect = $("stZone");
+  zoneSelect.innerHTML = Object.entries(state.zones).map(([negeri, list]) => {
+    const opts = list.map((z) => `<option value="${z.zone}" ${z.zone === s.prayer.zone ? "selected" : ""}>${z.zone} \u2014 ${escapeHtml(z.label)}</option>`).join("");
+    return `<optgroup label="${escapeHtml(negeri)}">${opts}</optgroup>`;
+  }).join("");
   renderEvents(s.events || []);
   renderEventsSyncStatus(s.eventsSync || {});
   renderRoster(s.roster || {});
   renderStreams();
   renderFfmpegStatus();
+  settingsDirty = false;
 }
-
 function setLogoPreview(url) {
-  const preview = $('stLogoPreview');
-  const clear = $('stLogoClear');
+  const preview = $("stLogoPreview");
+  const clear = $("stLogoClear");
   if (url) {
     preview.src = url;
     preview.hidden = false;
@@ -1166,167 +1140,146 @@ function setLogoPreview(url) {
     clear.hidden = true;
   }
 }
-
-$('stLogoFile').addEventListener('change', async (e) => {
+$("stLogoFile").addEventListener("change", async (e) => {
   const file = e.target.files[0];
   if (!file) return;
   try {
     const data = await uploadFile(file);
-    if (data.kind !== 'image') throw new Error(t('logoMustImage'));
-    $('stLogoUrl').value = data.url;
+    if (data.kind !== "image") throw new Error(t("logoMustImage"));
+    $("stLogoUrl").value = data.url;
     setLogoPreview(data.url);
-    toast(t('logoUploaded'));
+    toast(t("logoUploaded"));
   } catch (err) {
-    toast(err.message, 'err');
+    toast(err.message, "err");
   }
 });
-
-$('stLogoClear').addEventListener('click', () => {
-  $('stLogoUrl').value = '';
-  $('stLogoFile').value = '';
-  setLogoPreview('');
+$("stLogoClear").addEventListener("click", () => {
+  $("stLogoUrl").value = "";
+  $("stLogoFile").value = "";
+  setLogoPreview("");
 });
-
-$('stColorPreset').addEventListener('change', (e) => {
+$("stColorPreset").addEventListener("change", (e) => {
   const p = COLOR_PRESETS[e.target.value];
   if (!p) return;
-  $('stBgTop').value = p.bgTop;
-  $('stBgBottom').value = p.bgBottom;
-  $('stText').value = p.text;
-  $('stMuted').value = p.muted;
-  $('stGold').value = p.gold;
-  $('stTeal').value = p.teal;
+  $("stBgTop").value = p.bgTop;
+  $("stBgBottom").value = p.bgBottom;
+  $("stText").value = p.text;
+  $("stMuted").value = p.muted;
+  $("stGold").value = p.gold;
+  $("stTeal").value = p.teal;
 });
-
-$('stBgFile').addEventListener('change', async (e) => {
+$("stBgFile").addEventListener("change", async (e) => {
   const file = e.target.files[0];
   if (!file) return;
   try {
     const data = await uploadFile(file);
-    if (data.kind !== 'image') throw new Error(t('bgMustImage'));
-    $('stBgImage').value = data.url;
-    $('stBgClear').hidden = false;
-    toast(t('bgUploaded'));
+    if (data.kind !== "image") throw new Error(t("bgMustImage"));
+    $("stBgImage").value = data.url;
+    $("stBgClear").hidden = false;
+    toast(t("bgUploaded"));
   } catch (err) {
-    toast(err.message, 'err');
+    toast(err.message, "err");
   }
 });
-
-$('stBgClear').addEventListener('click', () => {
-  $('stBgImage').value = '';
-  $('stBgFile').value = '';
-  $('stBgClear').hidden = true;
+$("stBgClear").addEventListener("click", () => {
+  $("stBgImage").value = "";
+  $("stBgFile").value = "";
+  $("stBgClear").hidden = true;
 });
-
-$('stBgOpacity').addEventListener('input', (e) => {
-  $('stBgOpacityVal').textContent = `${e.target.value}%`;
+$("stBgOpacity").addEventListener("input", (e) => {
+  $("stBgOpacityVal").textContent = `${e.target.value}%`;
 });
-
-$('stBannerFile').addEventListener('change', async (e) => {
+$("stBannerFile").addEventListener("change", async (e) => {
   const file = e.target.files[0];
   if (!file) return;
   try {
     const data = await uploadFile(file);
-    if (data.kind !== 'image') throw new Error(t('bannerImage') + ': ' + t('logoMustImage'));
-    $('stBannerImage').value = data.url;
-    $('stBannerClear').hidden = false;
-    toast(t('bannerUploaded'));
+    if (data.kind !== "image") throw new Error(t("bannerImage") + ": " + t("logoMustImage"));
+    $("stBannerImage").value = data.url;
+    $("stBannerClear").hidden = false;
+    toast(t("bannerUploaded"));
   } catch (err) {
-    toast(err.message, 'err');
+    toast(err.message, "err");
   }
 });
-
-$('stBannerClear').addEventListener('click', () => {
-  $('stBannerImage').value = '';
-  $('stBannerFile').value = '';
-  $('stBannerClear').hidden = true;
+$("stBannerClear").addEventListener("click", () => {
+  $("stBannerImage").value = "";
+  $("stBannerFile").value = "";
+  $("stBannerClear").hidden = true;
 });
-
-// ------------------------------------------------------- mod ujian (simulasi)
-
 function shiftTime(hhmm, mins) {
-  const [h, m] = String(hhmm).split(':').map(Number);
-  const d = new Date(2000, 0, 1, h, m + mins);
-  return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+  const [h, m] = String(hhmm).split(":").map(Number);
+  const d = new Date(2e3, 0, 1, h, m + mins);
+  return `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
 }
-
 function updateTestRef() {
-  const key = $('stTestPrayer')?.value || 'fajr';
+  const key = $("stTestPrayer")?.value || "fajr";
   const p = state.today?.prayers?.[key];
   if (!p) {
-    $('stTestRef').textContent = '';
+    $("stTestRef").textContent = "";
     return;
   }
   const iq = state.today?.iqamah?.[key]?.time;
   const name = t(`prayer${key.charAt(0).toUpperCase()}${key.slice(1)}`);
-  $('stTestRef').textContent = `${name} • azan ${p.time}${iq ? ` → iqamah ${iq}` : ''}`;
+  $("stTestRef").textContent = `${name} \u2022 azan ${p.time}${iq ? ` \u2192 iqamah ${iq}` : ""}`;
 }
-
-$('stTestPrayer').addEventListener('change', updateTestRef);
-
+$("stTestPrayer").addEventListener("change", updateTestRef);
 function setTestTimeFromPrayer(shiftMins) {
-  const key = $('stTestPrayer').value;
+  const key = $("stTestPrayer").value;
   const p = state.today?.prayers?.[key];
-  if (!p) return toast(t('requestFailed', { s: 404 }), 'err');
+  if (!p) return toast(t("requestFailed", { s: 404 }), "err");
   let time = p.time;
   if (shiftMins === -5) {
     time = shiftTime(p.time, -5);
-  } else if (shiftMins === 'iqamah') {
-    time = state.today?.iqamah?.[key]?.time || shiftTime(p.time, Number($('stIqamahOffset').value) || 10);
+  } else if (shiftMins === "iqamah") {
+    time = state.today?.iqamah?.[key]?.time || shiftTime(p.time, Number($("stIqamahOffset").value) || 10);
   }
-  $('stTestTime').value = time;
+  $("stTestTime").value = time;
 }
-
-$('stTestMinus5').addEventListener('click', () => setTestTimeFromPrayer(-5));
-$('stTestAzan').addEventListener('click', () => setTestTimeFromPrayer(0));
-$('stTestIqamah').addEventListener('click', () => setTestTimeFromPrayer('iqamah'));
-
-$('stTestSave').addEventListener('click', async () => {
+$("stTestMinus5").addEventListener("click", () => setTestTimeFromPrayer(-5));
+$("stTestAzan").addEventListener("click", () => setTestTimeFromPrayer(0));
+$("stTestIqamah").addEventListener("click", () => setTestTimeFromPrayer("iqamah"));
+$("stTestSave").addEventListener("click", async () => {
   try {
-    await api('/api/admin/settings', {
-      method: 'PUT',
+    await api("/api/admin/settings", {
+      method: "PUT",
       body: {
         display: {
           testMode: {
-            enabled: $('stTestEnabled').checked,
-            date: $('stTestDate').value,
-            time: $('stTestTime').value
+            enabled: $("stTestEnabled").checked,
+            date: $("stTestDate").value,
+            time: $("stTestTime").value
           }
         }
       }
     });
-    toast(t('settingsSaved'));
+    toast(t("settingsSaved"));
   } catch (err) {
-    toast(err.message, 'err');
+    toast(err.message, "err");
   }
 });
-
-$('stAdhanFile').addEventListener('change', async (e) => {
+$("stAdhanFile").addEventListener("change", async (e) => {
   const file = e.target.files[0];
   if (!file) return;
   try {
     const data = await uploadFile(file);
-    $('stAdhanUrl').value = data.url;
-    toast(t('azanUploaded'));
+    $("stAdhanUrl").value = data.url;
+    toast(t("azanUploaded"));
   } catch (err) {
-    toast(err.message, 'err');
+    toast(err.message, "err");
   }
 });
-
-$('stIqamahFile').addEventListener('change', async (e) => {
+$("stIqamahFile").addEventListener("change", async (e) => {
   const file = e.target.files[0];
   if (!file) return;
   try {
     const data = await uploadFile(file);
-    $('stIqamahUrl').value = data.url;
-    toast(t('iqamahUploaded'));
+    $("stIqamahUrl").value = data.url;
+    toast(t("iqamahUploaded"));
   } catch (err) {
-    toast(err.message, 'err');
+    toast(err.message, "err");
   }
 });
-
-// ------------------------------------------------------------------- streams
-
 function renderStreams() {
   const statusMap = new Map((state.streamsStatus || []).map((s) => [s.id, s]));
   const current = [...statusMap.values()].map((s) => ({
@@ -1337,9 +1290,9 @@ function renderStreams() {
     duration: s.duration,
     enabled: s.enabled
   }));
-  const list = $('streamList');
+  const list = $("streamList");
   if (!current.length) {
-    list.innerHTML = `<div class="empty-state">${escapeHtml(t('emptyStreams'))}</div>`;
+    list.innerHTML = `<div class="empty-state">${escapeHtml(t("emptyStreams"))}</div>`;
     return;
   }
   list.innerHTML = current.map((s) => {
@@ -1349,114 +1302,110 @@ function renderStreams() {
       <div class="stream-row" data-id="${s.id}">
         <label><span data-i18n="streamName">Name</span><input type="text" class="st-name" value="${escapeHtml(s.name)}" placeholder="Camera 1"></label>
         <label><span data-i18n="streamType">Type</span><select class="st-type">
-          ${STREAM_TYPES.map((ty) => `<option value="${ty}" ${ty === s.type ? 'selected' : ''}>${ty.toUpperCase()}</option>`).join('')}
+          ${STREAM_TYPES.map((ty) => `<option value="${ty}" ${ty === s.type ? "selected" : ""}>${ty.toUpperCase()}</option>`).join("")}
         </select></label>
         <label><span data-i18n="seconds">Seconds</span><input type="number" class="st-duration" min="10" max="600" value="${s.duration || 30}"></label>
-        <label class="st-url-wrap"><span data-i18n="streamUrl">URL</span><input type="text" class="st-url" value="${escapeHtml(s.url)}" placeholder="rtsp://… / https://youtu.be/… / https://…"></label>
-        <label class="checkbox-label"><input type="checkbox" class="st-enabled" ${s.enabled ? 'checked' : ''}> <span data-i18n="enabled">Enabled</span></label>
+        <label class="st-url-wrap"><span data-i18n="streamUrl">URL</span><input type="text" class="st-url" value="${escapeHtml(s.url)}" placeholder="rtsp://\u2026 / https://youtu.be/\u2026 / https://\u2026"></label>
+        <label class="checkbox-label"><input type="checkbox" class="st-enabled" ${s.enabled ? "checked" : ""}> <span data-i18n="enabled">Enabled</span></label>
         <span class="status-chip ${chip.cls}">${chip.text}</span>
-        <button class="row-del" data-del>✕</button>
+        <button class="row-del" data-del>\u2715</button>
       </div>`;
-  }).join('');
+  }).join("");
 }
-
 function streamStatusChip(status) {
   switch (status) {
-    case 'running': return { cls: 'ok', text: t('statusRunning') };
-    case 'starting': return { cls: 'warn', text: t('statusStarting') };
-    case 'configured': return { cls: 'ok', text: t('statusReady') };
-    case 'ffmpeg-missing': return { cls: 'err', text: t('statusNoFfmpeg') };
-    case 'disabled': return { cls: 'neutral', text: t('statusDisabled') };
-    default: return { cls: 'err', text: status || t('statusStopped') };
+    case "running":
+      return { cls: "ok", text: t("statusRunning") };
+    case "starting":
+      return { cls: "warn", text: t("statusStarting") };
+    case "configured":
+      return { cls: "ok", text: t("statusReady") };
+    case "ffmpeg-missing":
+      return { cls: "err", text: t("statusNoFfmpeg") };
+    case "disabled":
+      return { cls: "neutral", text: t("statusDisabled") };
+    default:
+      return { cls: "err", text: status || t("statusStopped") };
   }
 }
-
-$('streamList').addEventListener('click', (e) => {
-  const del = e.target.closest('[data-del]');
+$("streamList").addEventListener("click", (e) => {
+  const del = e.target.closest("[data-del]");
   if (!del) return;
-  const row = del.closest('.stream-row');
+  const row = del.closest(".stream-row");
   state.streamsStatus = collectStreams().filter((s) => s.id !== row.dataset.id);
   renderStreams();
 });
-
-$('addStreamBtn').addEventListener('click', () => {
-  const draft = { id: `draft-${Date.now()}`, name: '', type: 'rtsp', url: '', duration: 30, enabled: true };
+$("addStreamBtn").addEventListener("click", () => {
+  const draft = { id: `draft-${Date.now()}`, name: "", type: "rtsp", url: "", duration: 30, enabled: true };
   state.streamsStatus = [...collectStreams(), draft];
   renderStreams();
 });
-
 function collectStreams() {
-  const rows = document.querySelectorAll('#streamList .stream-row');
-  return [...rows].map((row) => ({
-    id: row.dataset.id,
-    name: row.querySelector('.st-name').value,
-    type: row.querySelector('.st-type').value,
-    url: row.querySelector('.st-url').value,
-    duration: Number(row.querySelector('.st-duration').value) || 30,
-    enabled: row.querySelector('.st-enabled').checked
-  }));
+  const rows = document.querySelectorAll("#streamList .stream-row");
+  return [...rows].map((row) => {
+    const el = row;
+    const q = (sel) => el.querySelector(sel);
+    return {
+      id: el.dataset.id,
+      name: q(".st-name").value,
+      type: q(".st-type").value,
+      url: q(".st-url").value,
+      duration: Number(q(".st-duration").value) || 30,
+      enabled: q(".st-enabled").checked
+    };
+  });
 }
-
-$('saveStreamsBtn').addEventListener('click', async () => {
+$("saveStreamsBtn").addEventListener("click", async () => {
   try {
-    const res = await api('/api/admin/streams', { method: 'PUT', body: { streams: collectStreams() } });
+    const res = await api("/api/admin/streams", { method: "PUT", body: { streams: collectStreams() } });
     state.streamsStatus = res.streams || [];
     renderStreams();
     renderFfmpegStatus();
-    toast(t('streamsSaved'));
+    toast(t("streamsSaved"));
     await refreshStatus();
   } catch (err) {
-    toast(err.message, 'err');
+    toast(err.message, "err");
   }
 });
-
 function renderFfmpegStatus() {
-  const el = $('ffmpegStatus');
+  const el = $("ffmpegStatus");
   if (state.ffmpegOk === null) {
-    el.textContent = t('checkingFfmpeg');
-    el.style.color = '';
+    el.textContent = t("checkingFfmpeg");
+    el.style.color = "";
   } else if (state.ffmpegOk) {
-    el.textContent = t('ffmpegOk');
-    el.style.color = 'var(--teal)';
+    el.textContent = t("ffmpegOk");
+    el.style.color = "var(--teal)";
   } else {
-    el.textContent = t('ffmpegMissing');
-    el.style.color = 'var(--danger)';
+    el.textContent = t("ffmpegMissing");
+    el.style.color = "var(--danger)";
   }
 }
-
-// -------------------------------------------------------------------- events
-
 function renderEvents(events) {
-  const list = $('eventList');
+  const list = $("eventList");
   if (!events.length) {
-    list.innerHTML = `<div class="empty-state">${escapeHtml(t('emptyEvents'))}</div>`;
+    list.innerHTML = `<div class="empty-state">${escapeHtml(t("emptyEvents"))}</div>`;
     return;
   }
   list.innerHTML = events.map((e) => {
     const next = eventPreview(e);
-    const chip = next
-      ? `<span class="status-chip warn">${next.date} • ${t('daysShort', { n: next.days })}</span>`
-      : `<span class="status-chip neutral">${t('eventNotUpcoming')}</span>`;
-    const sourceChip = e.source === 'jakim'
-      ? `<span class="status-chip ok">${t('sourceJakim')}</span>`
-      : (e.source === 'anggaran' ? `<span class="status-chip warn">${t('sourceAnggaran')}</span>` : '');
+    const chip = next ? `<span class="status-chip warn">${next.date} \u2022 ${t("daysShort", { n: next.days })}</span>` : `<span class="status-chip neutral">${t("eventNotUpcoming")}</span>`;
+    const sourceChip = e.source === "jakim" ? `<span class="status-chip ok">${t("sourceJakim")}</span>` : e.source === "anggaran" ? `<span class="status-chip warn">${t("sourceAnggaran")}</span>` : "";
     return `
       <div class="event-row" data-id="${e.id}">
         <label><span data-i18n="nameBm">Name (BM)</span><input type="text" class="ev-name" value="${escapeHtml(e.name)}" placeholder="Awal Ramadan"></label>
-        <label><span data-i18n="nameEn">Name (EN)</span><input type="text" class="ev-nameen" value="${escapeHtml(e.nameEn || '')}" placeholder="Start of Ramadan"></label>
+        <label><span data-i18n="nameEn">Name (EN)</span><input type="text" class="ev-nameen" value="${escapeHtml(e.nameEn || "")}" placeholder="Start of Ramadan"></label>
         <label><span data-i18n="date">Date</span><input type="date" class="ev-date" value="${e.date}"></label>
-        <label class="checkbox-label"><input type="checkbox" class="ev-rec" ${e.recurring ? 'checked' : ''}> <span data-i18n="repeatYearly">Repeat yearly</span></label>
+        <label class="checkbox-label"><input type="checkbox" class="ev-rec" ${e.recurring ? "checked" : ""}> <span data-i18n="repeatYearly">Repeat yearly</span></label>
         ${sourceChip}
         ${chip}
-        <button class="row-del" data-del>✕</button>
+        <button class="row-del" data-del>\u2715</button>
       </div>`;
-  }).join('');
+  }).join("");
 }
-
 function eventPreview(e) {
-  const now = new Date();
+  const now = /* @__PURE__ */ new Date();
   const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-  const [y, m, d] = e.date.split('-').map(Number);
+  const [y, m, d] = e.date.split("-").map(Number);
   let next;
   if (e.recurring === false) {
     next = new Date(y, m - 1, d);
@@ -1465,21 +1414,19 @@ function eventPreview(e) {
     next = new Date(now.getFullYear(), m - 1, d);
     if (next < today) next = new Date(now.getFullYear() + 1, m - 1, d);
   }
-  const days = Math.round((next - today) / 86400000);
-  const pad = (n) => String(n).padStart(2, '0');
+  const days = Math.round((next.getTime() - today.getTime()) / 864e5);
+  const pad = (n) => String(n).padStart(2, "0");
   return { date: `${next.getFullYear()}-${pad(next.getMonth() + 1)}-${pad(next.getDate())}`, days };
 }
-
-$('eventList').addEventListener('click', (e) => {
-  const del = e.target.closest('[data-del]');
+$("eventList").addEventListener("click", (e) => {
+  const del = e.target.closest("[data-del]");
   if (!del) return;
-  del.closest('.event-row').remove();
+  del.closest(".event-row").remove();
 });
-
-$('addEventBtn').addEventListener('click', () => {
-  const today = new Date();
-  const row = document.createElement('div');
-  row.className = 'event-row';
+$("addEventBtn").addEventListener("click", () => {
+  const today = /* @__PURE__ */ new Date();
+  const row = document.createElement("div");
+  row.className = "event-row";
   row.dataset.id = `evt-${Date.now()}`;
   row.innerHTML = `
     <label>Name (BM)<input type="text" class="ev-name" placeholder="Awal Ramadan"></label>
@@ -1487,280 +1434,257 @@ $('addEventBtn').addEventListener('click', () => {
     <label>Date<input type="date" class="ev-date" value="${today.toISOString().slice(0, 10)}"></label>
     <label class="checkbox-label"><input type="checkbox" class="ev-rec" checked> Repeat yearly</label>
     <span class="status-chip neutral">new</span>
-    <button class="row-del" data-del>✕</button>`;
-  $('eventList').appendChild(row);
+    <button class="row-del" data-del>\u2715</button>`;
+  $("eventList").appendChild(row);
 });
-
 function collectEvents() {
-  return [...document.querySelectorAll('#eventList .event-row')].map((row) => ({
-    id: row.dataset.id,
-    name: row.querySelector('.ev-name').value,
-    nameEn: row.querySelector('.ev-nameen').value,
-    date: row.querySelector('.ev-date').value,
-    recurring: row.querySelector('.ev-rec').checked,
-    custom: !String(row.dataset.id).startsWith('jakim-')
-  }));
+  return [...document.querySelectorAll("#eventList .event-row")].map((rowEl) => {
+    const row = rowEl;
+    const q = (sel) => row.querySelector(sel);
+    return {
+      id: row.dataset.id,
+      name: q(".ev-name").value,
+      nameEn: q(".ev-nameen").value,
+      date: q(".ev-date").value,
+      recurring: q(".ev-rec").checked,
+      custom: !String(row.dataset.id).startsWith("jakim-")
+    };
+  });
 }
-
 function renderEventsSyncStatus(sync) {
-  const el = $('eventsSyncStatus');
-  const last = sync.lastSynced ? t('lastSynced', { t: new Date(sync.lastSynced).toLocaleString() }) : t('neverSynced');
-  const status = sync.status === 'ok' ? '✅' : sync.status === 'error' ? '⚠️' : '⏳';
-  el.textContent = `${status} ${sync.message || '—'} • ${last}`;
+  const el = $("eventsSyncStatus");
+  const last = sync.lastSynced ? t("lastSynced", { t: new Date(sync.lastSynced).toLocaleString() }) : t("neverSynced");
+  const status = sync.status === "ok" ? "\u2705" : sync.status === "error" ? "\u26A0\uFE0F" : "\u23F3";
+  el.textContent = `${status} ${sync.message || "\u2014"} \u2022 ${last}`;
 }
-
-$('syncEventsBtn').addEventListener('click', async () => {
+$("syncEventsBtn").addEventListener("click", async () => {
   try {
-    toast(t('syncInProgress'));
-    const result = await api('/api/admin/events/sync', { method: 'POST', body: {} });
-    if (!result.ok) throw new Error(result.message || 'Sync gagal');
-    const settings = await api('/api/admin/settings');
+    toast(t("syncInProgress"));
+    const result = await api("/api/admin/events/sync", { method: "POST", body: {} });
+    if (!result.ok) throw new Error(result.message || "Sync gagal");
+    const settings = await api("/api/admin/settings");
     renderEvents(settings.events || []);
     renderEventsSyncStatus(settings.eventsSync || {});
-    toast(t('syncDone', { n: result.synced }));
+    toast(t("syncDone", { n: result.synced }));
     await refreshStatus();
   } catch (err) {
-    toast(err.message, 'err');
+    toast(err.message, "err");
   }
 });
-
-$('saveEventsBtn').addEventListener('click', async () => {
+$("saveEventsBtn").addEventListener("click", async () => {
   try {
-    const updated = await api('/api/admin/settings', {
-      method: 'PUT',
-      body: { events: collectEvents(), eventsSync: { enabled: $('stEventsAuto').checked } }
+    const updated = await api("/api/admin/settings", {
+      method: "PUT",
+      body: { events: collectEvents(), eventsSync: { enabled: $("stEventsAuto").checked } }
     });
     renderEvents(updated.events || []);
     renderEventsSyncStatus(updated.eventsSync || {});
-    toast(t('eventsSaved'));
+    toast(t("eventsSaved"));
     await refreshStatus();
-    if ($('stEventsAuto').checked) {
-      const result = await api('/api/admin/events/sync', { method: 'POST', body: {} });
-      if (!result.ok) throw new Error(result.message || 'Sync gagal');
-      const settings = await api('/api/admin/settings');
+    if ($("stEventsAuto").checked) {
+      const result = await api("/api/admin/events/sync", { method: "POST", body: {} });
+      if (!result.ok) throw new Error(result.message || "Sync gagal");
+      const settings = await api("/api/admin/settings");
       renderEvents(settings.events || []);
       renderEventsSyncStatus(settings.eventsSync || {});
     }
   } catch (err) {
-    toast(err.message, 'err');
+    toast(err.message, "err");
   }
 });
-
-// -------------------------------------------------------------------- roster
-
 function renderRoster(roster) {
-  const todayIdx = new Date().getDay(); // 0 = Sunday
-  $('rosterGrid').innerHTML = WEEKDAYS.map(([key], i) => {
+  const todayIdx = (/* @__PURE__ */ new Date()).getDay();
+  $("rosterGrid").innerHTML = WEEKDAYS.map(([key], i) => {
     const entry = roster[key] || {};
     const isToday = i === todayIdx;
     return `
-      <div class="roster-row${isToday ? ' today' : ''}">
-        <span class="day-label">${t(key)}${isToday ? ` • ${t('todayDuty')}` : ''}</span>
-        <label><span data-i18n="imam">Imam</span><input type="text" data-day="${key}" data-role="imam" value="${escapeHtml(entry.imam || '')}" placeholder="Ustaz…"></label>
-        <label><span data-i18n="bilal">Bilal</span><input type="text" data-day="${key}" data-role="bilal" value="${escapeHtml(entry.bilal || '')}" placeholder="En.…"></label>
+      <div class="roster-row${isToday ? " today" : ""}">
+        <span class="day-label">${t(key)}${isToday ? ` \u2022 ${t("todayDuty")}` : ""}</span>
+        <label><span data-i18n="imam">Imam</span><input type="text" data-day="${key}" data-role="imam" value="${escapeHtml(entry.imam || "")}" placeholder="Ustaz\u2026"></label>
+        <label><span data-i18n="bilal">Bilal</span><input type="text" data-day="${key}" data-role="bilal" value="${escapeHtml(entry.bilal || "")}" placeholder="En.\u2026"></label>
       </div>`;
-  }).join('');
+  }).join("");
 }
-
 function collectRoster() {
   const roster = {};
-  document.querySelectorAll('#rosterGrid .roster-row').forEach((row) => {
-    const day = row.querySelector('[data-role="imam"]').dataset.day;
-    roster[day] = {
-      imam: row.querySelector('[data-role="imam"]').value,
-      bilal: row.querySelector('[data-role="bilal"]').value
-    };
+  document.querySelectorAll("#rosterGrid .roster-row").forEach((rowEl) => {
+    const row = rowEl;
+    const imam = row.querySelector('[data-role="imam"]');
+    const bilal = row.querySelector('[data-role="bilal"]');
+    const day = imam.dataset.day;
+    roster[day] = { imam: imam.value, bilal: bilal.value };
   });
   return roster;
 }
-
-// ------------------------------------------------------------- save sections
-
-document.querySelectorAll('[data-save]').forEach((btn) => {
-  btn.addEventListener('click', async () => {
+document.querySelectorAll("[data-save]").forEach((btnEl) => {
+  const btn = btnEl;
+  btn.addEventListener("click", async () => {
     const section = btn.dataset.save;
     const patch = buildPatch(section);
     try {
-      const updated = await api('/api/admin/settings', { method: 'PUT', body: patch });
+      const updated = await api("/api/admin/settings", { method: "PUT", body: patch });
       populateSettings(updated);
-      toast(t('settingsSaved'));
-      if (section === 'ffmpeg') {
-        const res = await api('/api/admin/streams');
+      toast(t("settingsSaved"));
+      if (section === "ffmpeg") {
+        const res = await api("/api/admin/streams");
         state.ffmpegOk = res.ffmpegOk;
         state.streamsStatus = res.streams || [];
         renderStreams();
         renderFfmpegStatus();
       }
     } catch (err) {
-      toast(err.message, 'err');
+      toast(err.message, "err");
     }
   });
 });
-
 function buildPatch(section) {
   switch (section) {
-    case 'mosque':
+    case "mosque":
       return {
         mosque: {
-          name: $('stMosqueName').value,
-          tagline: $('stTagline').value,
-          address: $('stAddress').value,
-          logo: $('stLogoUrl').value
+          name: $("stMosqueName").value,
+          tagline: $("stTagline").value,
+          address: $("stAddress").value,
+          logo: $("stLogoUrl").value
         }
       };
-    case 'location':
-      return { location: { latitude: $('stLat').value, longitude: $('stLng').value, name: $('stPlace').value } };
-    case 'prayer':
+    case "location":
+      return { location: { latitude: $("stLat").value, longitude: $("stLng").value, name: $("stPlace").value } };
+    case "prayer":
       return {
         prayer: {
-          zone: $('stZone').value,
-          source: $('stSource').value,
-          method: $('stMethod').value,
-          timezone: $('stTimezone').value,
-          showImsak: $('stShowImsak').checked,
-          imsakOffset: Number($('stImsakOffset').value),
-          showSunrise: $('stShowSunrise').checked,
-          azanLeadMinutes: Number($('stAzanLead').value) || 5,
-          iqamahOffsetMinutes: Number($('stIqamahOffset').value) || 10,
-          jemaahDurationMinutes: Number($('stJemaahDur').value) || 15,
-          afterIqamah: $('stAfterIqamah').value,
+          zone: $("stZone").value,
+          source: $("stSource").value,
+          method: $("stMethod").value,
+          timezone: $("stTimezone").value,
+          showImsak: $("stShowImsak").checked,
+          imsakOffset: Number($("stImsakOffset").value),
+          showSunrise: $("stShowSunrise").checked,
+          azanLeadMinutes: Number($("stAzanLead").value) || 5,
+          iqamahOffsetMinutes: Number($("stIqamahOffset").value) || 10,
+          jemaahDurationMinutes: Number($("stJemaahDur").value) || 15,
+          afterIqamah: $("stAfterIqamah").value,
           adjustments: {
-            fajr: Number($('stAdjFajr').value) || 0,
-            sunrise: Number($('stAdjSunrise').value) || 0,
-            dhuhr: Number($('stAdjDhuhr').value) || 0,
-            asr: Number($('stAdjAsr').value) || 0,
-            maghrib: Number($('stAdjMaghrib').value) || 0,
-            isha: Number($('stAdjIsha').value) || 0
+            fajr: Number($("stAdjFajr").value) || 0,
+            sunrise: Number($("stAdjSunrise").value) || 0,
+            dhuhr: Number($("stAdjDhuhr").value) || 0,
+            asr: Number($("stAdjAsr").value) || 0,
+            maghrib: Number($("stAdjMaghrib").value) || 0,
+            isha: Number($("stAdjIsha").value) || 0
           },
           iqamah: {
-            fajr: $('stIqFajr').value || '',
-            dhuhr: $('stIqDhuhr').value || '',
-            asr: $('stIqAsr').value || '',
-            maghrib: $('stIqMaghrib').value || '',
-            isha: $('stIqIsha').value || ''
+            fajr: $("stIqFajr").value || "",
+            dhuhr: $("stIqDhuhr").value || "",
+            asr: $("stIqAsr").value || "",
+            maghrib: $("stIqMaghrib").value || "",
+            isha: $("stIqIsha").value || ""
           }
         }
       };
-    case 'audio':
+    case "audio":
       return {
         audio: {
-          enabled: $('stAudioEnabled').checked,
-          adhanUrl: $('stAdhanUrl').value,
-          iqamahUrl: $('stIqamahUrl').value
+          enabled: $("stAudioEnabled").checked,
+          adhanUrl: $("stAdhanUrl").value,
+          iqamahUrl: $("stIqamahUrl").value
         }
       };
-    case 'display':
+    case "display":
       return {
         display: {
-          language: $('stLanguage').value,
-          clockFormat: $('stClockFormat').value,
-          showSeconds: $('stShowSeconds').checked,
-          slideshowInterval: Number($('stSlideInterval').value),
-          tickerSpeed: $('stTickerSpeed').value,
-          safeMargin: Number($('stSafeMargin').value) || 0,
-          mediaFit: $('stMediaFit').value,
+          language: $("stLanguage").value,
+          clockFormat: $("stClockFormat").value,
+          showSeconds: $("stShowSeconds").checked,
+          slideshowInterval: Number($("stSlideInterval").value),
+          tickerSpeed: $("stTickerSpeed").value,
+          safeMargin: Number($("stSafeMargin").value) || 0,
+          mediaFit: $("stMediaFit").value,
           colors: {
-            bgTop: $('stBgTop').value,
-            bgBottom: $('stBgBottom').value,
-            text: $('stText').value,
-            muted: $('stMuted').value,
-            gold: $('stGold').value,
-            teal: $('stTeal').value
+            bgTop: $("stBgTop").value,
+            bgBottom: $("stBgBottom").value,
+            text: $("stText").value,
+            muted: $("stMuted").value,
+            gold: $("stGold").value,
+            teal: $("stTeal").value
           },
-          backgroundImage: $('stBgImage').value,
-          backgroundOpacity: Number($('stBgOpacity').value) || 0,
-          showTicker: $('stShowTicker').checked,
-          tickerCustom: $('stTickerCustom').value,
-          showWeather: $('stShowWeather').checked,
+          backgroundImage: $("stBgImage").value,
+          backgroundOpacity: Number($("stBgOpacity").value) || 0,
+          showTicker: $("stShowTicker").checked,
+          tickerCustom: $("stTickerCustom").value,
+          showWeather: $("stShowWeather").checked,
           staticBanner: {
-            enabled: $('stBannerEnabled').checked,
-            title: $('stBannerTitle').value,
-            message: $('stBannerMessage').value,
-            image: $('stBannerImage').value
+            enabled: $("stBannerEnabled").checked,
+            title: $("stBannerTitle").value,
+            message: $("stBannerMessage").value,
+            image: $("stBannerImage").value
           }
         }
       };
-    case 'ffmpeg':
-      return { media: { ffmpegPath: $('stFfmpegPath').value } };
-    case 'roster':
+    case "ffmpeg":
+      return { media: { ffmpegPath: $("stFfmpegPath").value } };
+    case "roster":
       return { roster: collectRoster() };
-    case 'weather':
-      return { weather: { enabled: $('stWeatherEnabled').checked, unit: $('stWeatherUnit').value } };
-    case 'hijri':
-      return { hijriOffset: Number($('stHijriOffset').value) || 0 };
+    case "weather":
+      return { weather: { enabled: $("stWeatherEnabled").checked, unit: $("stWeatherUnit").value } };
+    case "hijri":
+      return { hijriOffset: Number($("stHijriOffset").value) || 0 };
     default:
       return {};
   }
 }
-
-$('pwSaveBtn').addEventListener('click', async () => {
-  const current = $('pwCurrent').value;
-  const next = $('pwNew').value;
-  const confirm = $('pwConfirm').value;
-  if (!current || !next) return toast(t('fillPasswords'), 'err');
-  if (next.length < 6) return toast(t('pwTooShort'), 'err');
-  if (next !== confirm) return toast(t('pwMismatch'), 'err');
+$("pwSaveBtn").addEventListener("click", async () => {
+  const current = $("pwCurrent").value;
+  const next = $("pwNew").value;
+  const confirm2 = $("pwConfirm").value;
+  if (!current || !next) return toast(t("fillPasswords"), "err");
+  if (next.length < 6) return toast(t("pwTooShort"), "err");
+  if (next !== confirm2) return toast(t("pwMismatch"), "err");
   try {
-    await api('/api/admin/password', { method: 'POST', body: { currentPassword: current, newPassword: next } });
-    $('pwCurrent').value = '';
-    $('pwNew').value = '';
-    $('pwConfirm').value = '';
-    toast(t('passwordChanged'));
+    await api("/api/admin/password", { method: "POST", body: { currentPassword: current, newPassword: next } });
+    $("pwCurrent").value = "";
+    $("pwNew").value = "";
+    $("pwConfirm").value = "";
+    toast(t("passwordChanged"));
     await refreshStatus();
   } catch (err) {
-    toast(err.message, 'err');
+    toast(err.message, "err");
   }
 });
-
-// ------------------------------------------------------- auto-sync 10 saat
-
 async function syncAdminData() {
   if (!state.token) return;
-  const editing = ['INPUT', 'SELECT', 'TEXTAREA'].includes(document.activeElement?.tagName);
+  const editing = ["INPUT", "SELECT", "TEXTAREA"].includes(document.activeElement?.tagName);
   try {
     const [status, today, announcements] = await Promise.all([
-      api('/api/admin/status'),
-      api('/api/today'),
-      api('/api/admin/announcements')
+      api("/api/admin/status"),
+      api("/api/today"),
+      api("/api/admin/announcements")
     ]);
     state.status = status;
     state.today = today;
     state.announcements = announcements;
     renderOverview();
     renderAnnouncements(announcements);
-    if (!editing) {
-      const settings = await api('/api/admin/settings');
+    if (!editing && !settingsDirty) {
+      const settings = await api("/api/admin/settings");
       state.settings = settings;
       populateSettings(settings);
     }
   } catch (err) {
-    // Senyap semasa sync latar (cth. sesi tamat)
   }
 }
-
-setInterval(syncAdminData, 10000);
-
-// ----------------------------------------------------------------------- boot
-
+setInterval(syncAdminData, 1e4);
 function escapeHtml(str) {
-  return String(str ?? '')
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;');
+  return String(str ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 }
-
 if (state.token) {
   loadApp().then(() => resetIdleTimer()).catch(() => showLogin());
 } else {
   showLogin();
 }
-
 applyLang();
-
-// PWA — daftar service worker supaya admin boleh dipasang di telefon/tab.
-if ('serviceWorker' in navigator) {
-  window.addEventListener('load', () => {
-    navigator.serviceWorker.register('/sw.js').catch(() => {});
+if ("serviceWorker" in navigator) {
+  window.addEventListener("load", () => {
+    navigator.serviceWorker.register("/sw.js").catch(() => {
+    });
   });
 }

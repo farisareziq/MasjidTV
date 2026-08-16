@@ -5,8 +5,8 @@
   "description": "MasjidTV cloud multi-tenant Fastify app (Vercel + Turso + Blob)",
   "main": "./dist/index.js",
   "scripts": {
-    "build": "tsc -p tsconfig.json",
-    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "build": "node scripts/gen-pages.mjs && tsc -p tsconfig.json",
+    "typecheck": "node scripts/gen-pages.mjs && tsc -p tsconfig.json --noEmit",
     "vercel-build": "node scripts/build.mjs",
     "dev": "node --import tsx src/dev.ts"
   },

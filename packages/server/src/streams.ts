@@ -14,12 +14,16 @@ interface RelayEntry {
   proc: ReturnType<typeof spawn> | null;
   status: 'starting' | 'running' | 'stopped' | 'error';
   startedAt: number;
+  /** Ditandakan true oleh stopRelay — halang exit handler menjadualkan semula. */
+  stopped?: boolean;
 }
 
 export class StreamManager {
   private procs = new Map<string, RelayEntry>();
   private restartTimers = new Map<string, { timer: ReturnType<typeof setTimeout>; count: number }>();
   private ffmpegOk: boolean | null = null;
+  private ffmpegCheck: Promise<boolean> | null = null;
+  private closed = false;
 
   constructor(
     private dataDir: string,
@@ -33,13 +37,19 @@ export class StreamManager {
 
   async checkFfmpeg(): Promise<boolean> {
     if (this.ffmpegOk !== null) return this.ffmpegOk;
+    // Coalesce semakan serentak (startup checkFfmpeg berlumba PUT /streams).
+    if (this.ffmpegCheck) return this.ffmpegCheck;
     const fp = this.getFfmpegPath() || 'ffmpeg';
-    this.ffmpegOk = await new Promise<boolean>((resolve) => {
+    this.ffmpegCheck = new Promise<boolean>((resolve) => {
       const p = spawn(fp, ['-version'], { windowsHide: true, stdio: 'ignore' });
       p.on('error', () => resolve(false));
       p.on('exit', (code) => resolve(code === 0));
+    }).then((ok) => {
+      this.ffmpegOk = ok;
+      this.ffmpegCheck = null;
+      return ok;
     });
-    return this.ffmpegOk;
+    return this.ffmpegCheck;
   }
 
   resetFfmpegCheck(): void {
@@ -78,6 +88,8 @@ export class StreamManager {
       args.push('-rw_timeout', '10000000');
     }
     args.push(
+      '-loglevel', 'error',
+      '-nostats',
       '-i', stream.url,
       '-c:v', 'libx264',
       '-preset', 'veryfast',
@@ -98,28 +110,36 @@ export class StreamManager {
     const entry: RelayEntry = { proc: null, status: 'starting', startedAt: Date.now() };
     this.procs.set(stream.id, entry);
 
-    const proc = spawn(fp, args, { windowsHide: true });
+    // stdio ignore: ffmpeg menulis log statistik berterusan ke stderr; paip
+    // yang tidak dibaca akan penuh (~64KB) dan ffmpeg tersekat menulis —
+    // relay membeku tanpa keluar. Matikan log melalui flag + jangan paip.
+    const proc = spawn(fp, args, { windowsHide: true, stdio: ['ignore', 'ignore', 'pipe'] });
     entry.proc = proc;
+    // Jangan biarkan paip stderr mengumpul — longgarkan walaupun -loglevel error.
+    proc.stderr?.on('data', () => {});
     proc.on('error', () => {
       entry.status = 'error';
       this.procs.delete(stream.id);
-      this.scheduleRestart(stream);
+      if (!entry.stopped) this.scheduleRestart(stream);
     });
     proc.on('exit', () => {
       entry.status = 'stopped';
       this.procs.delete(stream.id);
-      this.scheduleRestart(stream);
+      if (!entry.stopped) this.scheduleRestart(stream);
     });
 
-    setTimeout(() => {
+    const statusTimer = setTimeout(() => {
       const cur = this.procs.get(stream.id);
       if (cur === entry && entry.status === 'starting') entry.status = 'running';
     }, 5000);
+    statusTimer.unref?.();
   }
 
   private scheduleRestart(stream: Stream): void {
     this.clearRestartTimer(stream.id);
-    if (this.ffmpegOk === false) return;
+    // Selepas stopAll()/shutdown, JANGAN jadualkan semula — jika tidak,
+    // pemasa akan menyalakan ffmpeg baharu selepas pelayan ditutup.
+    if (this.closed || this.ffmpegOk === false) return;
     const count = (this.restartTimers.get(stream.id)?.count || 0) + 1;
     const delay = Math.min(60000, 5000 * Math.pow(2, Math.min(count, 4)));
     const timer = setTimeout(() => {
@@ -127,25 +147,30 @@ export class StreamManager {
       const s = this.getStreams().find((x) => x.id === stream.id);
       if (s && s.enabled && isRelayType(s.type)) this.startRelay(s);
     }, delay);
+    timer.unref?.();
     this.restartTimers.set(stream.id, { timer, count });
   }
 
   stopRelay(id: string): void {
     this.clearRestartTimer(id);
     const entry = this.procs.get(id);
-    if (entry?.proc) {
-      try {
-        entry.proc.kill();
-      } catch {
-        /* already dead */
+    if (entry) {
+      entry.stopped = true; // halang exit-handler menyalakan semula
+      if (entry.proc) {
+        try {
+          entry.proc.kill();
+        } catch {
+          /* already dead */
+        }
       }
+      this.procs.delete(id);
     }
-    this.procs.delete(id);
   }
 
   // Hentikan SEMUA relay + pemasa mula semula — dipanggil onClose supaya
   // tiada proses ffmpeg yatim selepas pelayan ditutup/dimulakan semula.
   stopAll(): void {
+    this.closed = true;
     for (const id of [...this.restartTimers.keys()]) {
       this.clearRestartTimer(id);
     }
@@ -156,6 +181,7 @@ export class StreamManager {
 
   async sync(): Promise<void> {
     if (this.ffmpegOk === null) await this.checkFfmpeg();
+    if (this.closed) return;
     const streams = this.getStreams();
     const wanted = new Set(streams.filter((s) => s.enabled && isRelayType(s.type)).map((s) => s.id));
     for (const id of [...this.procs.keys()]) {

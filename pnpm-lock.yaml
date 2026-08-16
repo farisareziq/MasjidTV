@@ -8,6 +8,9 @@ importers:
 
   .:
     devDependencies:
+      '@eslint/js':
+        specifier: ^9.17.0
+        version: 9.39.5
       '@types/node':
         specifier: ^20.17.0
         version: 20.19.43
@@ -95,7 +98,17 @@ importers:
         specifier: ^5.7.2
         version: 5.9.3
 
-  packages/frontend: {}
+  packages/frontend:
+    devDependencies:
+      '@masjidtv/shared':
+        specifier: workspace:*
+        version: link:../shared
+      esbuild:
+        specifier: ^0.28.2
+        version: 0.28.2
+      typescript:
+        specifier: ^5.7.2
+        version: 5.9.3
 
   packages/server:
     dependencies:

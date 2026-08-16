@@ -23,7 +23,7 @@ const PUBLIC_DIR = process.env.MASJIDTV_PUBLIC_DIR || defaultPublicDir();
 const PORT = Number(process.env.PORT) || 3000;
 
 startServer({ dataDir: DATA_DIR, publicDir: PUBLIC_DIR, port: PORT })
-  .then((app) => {
+  .then(() => {
     console.log('');
     console.log('  MasjidTV 1.0.0 — mosque signage server');
     console.log(`  Display screen : http://localhost:${PORT}/display`);

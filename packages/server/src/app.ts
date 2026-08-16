@@ -9,8 +9,7 @@ import {
   resolveQuranAnnouncements, content as builtinContent,
   UPLOAD_TYPES,
   publicSettings as buildPublicSettings, publicStream, buildTodayPayload,
-  sanitizeAnnouncementCreate, applyAnnouncementPatch, isRelayType,
-  sortAnnouncements, isAnnouncementActive,
+  isAnnouncementActive,
   type Settings, type Stream
 } from '@masjidtv/shared';
 import { Store } from './store.js';
@@ -66,7 +65,10 @@ export async function buildApp(opts: AppOptions): Promise<FastifyInstance> {
     () => store.getSettings().media.ffmpegPath
   );
 
-  const app = Fastify({ logger: false, bodyLimit: 150 * 1024 * 1024 });
+  // Had badan global kecil: auth berjalan SELEPAS badan dihurai, jadi had
+  // besar global membenarkan sesiapa sahaja di LAN memaksa buffer 150MB
+  // diperuntukkan sebelum 401. Laluan muat naik menaikkan hadnya sendiri.
+  const app = Fastify({ logger: false, bodyLimit: 1024 * 1024 });
   const tokens = new Map<string, number>();
   const loginAttempts = new Map<string, { count: number; until: number }>();
   const PORT = opts.port || Number(process.env.PORT) || 3000;
@@ -320,6 +322,9 @@ export async function buildApp(opts: AppOptions): Promise<FastifyInstance> {
     if (!store.changePassword(newPassword || '')) {
       return jsonError(reply, 400, 'New password must be at least 6 characters');
     }
+    // Tarik balik semua sesi sedia ada — token bocor tidak kekal sah selepas
+    // penukaran kata laluan.
+    tokens.clear();
     try {
       fs.unlinkSync(path.join(opts.dataDir, 'ADMIN_PASSWORD.txt'));
     } catch {
@@ -359,7 +364,7 @@ export async function buildApp(opts: AppOptions): Promise<FastifyInstance> {
   });
 
   // Media upload (raw body with magic-byte validation).
-  app.post('/api/admin/upload', { preHandler: requireAuth }, async (req, reply) => {
+  app.post('/api/admin/upload', { preHandler: requireAuth, bodyLimit: 150 * 1024 * 1024 }, async (req, reply) => {
     const contentType = req.headers['content-type'] || '';
     const type = UPLOAD_TYPES[contentType];
     if (!type) return jsonError(reply, 400, 'Unsupported file type');
@@ -431,6 +436,8 @@ export async function startServer(opts: AppOptions): Promise<FastifyInstance> {
       return Promise.resolve();
     }, false).then((r) => {
       console.log(`[jakim] events sync: ${r.ok ? `ok (${r.synced} tarikh)` : r.message}`);
+    }).catch((err) => {
+      console.error('[jakim] events sync gagal:', err instanceof Error ? err.message : err);
     });
     setInterval(() => {
       syncEventsFor(app.masjidStore.getSettings(), (patch) => {

@@ -39,7 +39,6 @@ export function isAnnouncementActive(item: Announcement, now: Date, timezone: st
 }
 
 function dateOrNull(v: unknown): string | null {
-  if (v === undefined) return undefined as never;
   return typeof v === 'string' && v ? v : null;
 }
 

@@ -1,6 +1,7 @@
 // Port logik validasi tetapan daripada server/config.js (kekal sama untuk pariti).
 
 import crypto from 'node:crypto';
+import { METHODS } from './prayers.js';
 import type { Settings, StreamType, Weekday } from './types.js';
 
 const WEEKDAYS: Weekday[] = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
@@ -43,39 +44,114 @@ export function isSafeStreamUrl(url: unknown, type: StreamType): boolean {
   return true;
 }
 
-// Parse hostname kepada IPv4/IPv6 literal; menyokong bentuk bukan bertitik.
-function parseIpLiteral(host: string): string | null {
+// Parse hostname kepada IPv4/IPv6; menyokong semua encoding inet_aton:
+// perpuluhan/heks/oktal bertitik, bentuk ringkas 1-3 bahagian, satu-integer,
+// dan IPv6 (termasuk ::, ::ffff: mapped).
+function parseIpLiteral(host: string): number[] | null {
   // IPv6 murni/mapped (contoh ::1, ::ffff:127.0.0.1)
   if (host.includes(':')) {
-    return normalizeIpv6(host);
+    return parseIpv6(host);
   }
-  // IPv4 bertitik
-  if (/^\d{1,3}(\.\d{1,3}){3}$/.test(host)) return host;
-  // IPv4 satu-integer / heks / oktal (contoh 2130706433, 0x7f000001)
+  // IPv4 bertitik (termasuk heks/oktal setiap bahagian) dan bentuk ringkas
+  // a / a.b / a.b.c / a.b.c.d (semantik inet_aton).
+  const parts = host.split('.');
+  if (parts.length >= 1 && parts.length <= 4 && parts.every((p) => /^[0-9a-fx]+$/i.test(p))) {
+    const vals = parts.map((p) => {
+      if (p === '') return NaN;
+      if (/^0[xX]/.test(p)) return parseInt(p.slice(2), 16);
+      if (p.length > 1 && p.startsWith('0')) return parseInt(p, 8);
+      return parseInt(p, 10);
+    });
+    if (vals.some((v) => !Number.isFinite(v) || v < 0)) return null;
+    if (parts.length === 4) {
+      if (vals.some((v) => v > 255)) return null;
+      return [...vals];
+    }
+    // Bentuk ringkas: bahagian terakhir memegang baki bit (8/16/24).
+    const lastMax = 256 ** (5 - parts.length); // a=2^32, a.b=2^24, a.b.c=2^16
+    if ((vals[vals.length - 1] as number) >= lastMax) return null;
+    if (vals.slice(0, -1).some((v) => v > 255)) return null;
+    const out: number[] = vals.slice(0, -1).map(Number);
+    while (out.length < 3) out.push(0);
+    out.push(vals[vals.length - 1] as number);
+    return out;
+  }
+  // IPv4 satu-integer / heks (contoh 2130706433, 0x7f000001)
   if (/^\d+$/.test(host) || /^0x[0-9a-f]+$/i.test(host)) {
     const n = host.startsWith('0x') || host.startsWith('0X')
       ? parseInt(host, 16)
-      : /^\d+$/.test(host) ? Number(host) : NaN;
+      : Number(host);
     if (!Number.isFinite(n) || n < 0 || n > 0xffffffff) return null;
-    return [(n >>> 24) & 255, (n >>> 16) & 255, (n >>> 8) & 255, n & 255].join('.');
+    return [(n >>> 24) & 255, (n >>> 16) & 255, (n >>> 8) & 255, n & 255];
   }
   return null;
 }
 
-function normalizeIpv6(host: string): string | null {
-  // Bentuk ::ffff:a.b.c.d — pokok kepada IPv4 untuk semakan.
-  const mapped = host.match(/^::ffff:(\d{1,3}(?:\.\d{1,3}){3})$/i);
-  if (mapped) return mapped[1];
-  return host; // IPv6 lain — semakan rentetan di bawah
+// Parse IPv6 (termasuk ::, bentuk ringkas, zon diabaikan) kepada 16 bait.
+function parseIpv6(host: string): number[] | null {
+  let h = host;
+  const zone = h.indexOf('%');
+  if (zone >= 0) h = h.slice(0, zone);
+  if (!h.includes(':')) return null;
+  const mapped = h.match(/^::ffff:(\d{1,3}(?:\.\d{1,3}){3})$/i);
+  if (mapped) {
+    const v4 = parseIpLiteral(mapped[1]);
+    return v4 ? [0, 0, 0, 0, 0, 0, ...v4] : null;
+  }
+  const halves = h.split('::');
+  if (halves.length > 2) return null;
+  const head = halves[0] ? halves[0].split(':').filter(Boolean) : [];
+  const tail = halves.length === 2 && halves[1] ? halves[1].split(':').filter(Boolean) : [];
+  // Bahagian berakhir dengan IPv4 dianggap sebagai 2 kumpulan terakhir.
+  const parseGroup = (s: string): number[] | null => {
+    if (/^\d{1,3}(\.\d{1,3}){3}$/.test(s)) {
+      const v4 = parseIpLiteral(s);
+      if (!v4) return null;
+      if (v4[0] > 255 || v4[1] > 255 || v4[2] > 255 || v4[3] > 255) return null;
+      return [(v4[0] << 8) | v4[1], (v4[2] << 8) | v4[3]];
+    }
+    if (!/^[0-9a-f]{1,4}$/i.test(s)) return null;
+    return [parseInt(s, 16)];
+  };
+  const headGroups: number[] = [];
+  for (const seg of head) {
+    const g = parseGroup(seg);
+    if (!g) return null;
+    headGroups.push(...g);
+  }
+  const tailGroups: number[] = [];
+  for (const seg of tail) {
+    const g = parseGroup(seg);
+    if (!g) return null;
+    tailGroups.push(...g);
+  }
+  const total = headGroups.length + tailGroups.length;
+  const fill = 8 - total;
+  if (halves.length === 2 ? fill < 0 : total !== 8) return null;
+  return [...headGroups, ...new Array(halves.length === 2 ? fill : 0).fill(0), ...tailGroups];
 }
 
-function isBlockedIp(ip: string): boolean {
-  // Loopback IPv4/IPv6
-  if (ip === '127.0.0.1' || ip.startsWith('127.') || ip === '0.0.0.0' || ip === '::1') return true;
-  // Link-local 169.254.0.0/16 (termasuk metadata cloud) dan 100.100.100.200
-  if (/^169\.254\./.test(ip) || ip === '100.100.100.200') return true;
-  // Link-local IPv6 fe80::/10
-  if (/^fe[89ab][0-9a-f]?:/i.test(ip)) return true;
+function isBlockedIp(bytes: number[]): boolean {
+  // Loopback IPv4/IPv6 (0.0.0.0/8 dan 127.0.0.0/8, ::, ::1)
+  if (bytes.length === 4) {
+    if (bytes[0] === 127 || bytes[0] === 0) return true;
+    // Link-local 169.254.0.0/16 (termasuk metadata cloud) dan 100.100.100.200
+    if (bytes[0] === 169 && bytes[1] === 254) return true;
+    if (bytes[0] === 100 && bytes[1] === 100 && bytes[2] === 100 && bytes[3] === 200) return true;
+    return false;
+  }
+  if (bytes.length === 16) {
+    const isAllZero = bytes.every((b) => b === 0);
+    if (isAllZero) return true; // ::
+    if (bytes.slice(0, 15).every((b) => b === 0) && bytes[15] === 1) return true; // ::1
+    // IPv4-mapped ::ffff:a.b.c.d -> semak sebagai IPv4
+    if (bytes.slice(0, 10).every((b) => b === 0) && bytes[10] === 0xff && bytes[11] === 0xff) {
+      return isBlockedIp(bytes.slice(12));
+    }
+    // Link-local fe80::/10
+    if (bytes[0] === 0xfe && (bytes[1] & 0xc0) === 0x80) return true;
+    return false;
+  }
   return false;
 }
 
@@ -105,10 +181,19 @@ export function applyPatch(current: Settings, patch: AnyPatch): Settings {
   if (patch.prayer && typeof patch.prayer === 'object') {
     const pr = settings.prayer;
     const p = patch.prayer as Record<string, unknown>;
-    if (typeof p.method === 'string') pr.method = p.method as Settings['prayer']['method'];
+    if (typeof p.method === 'string' && p.method in METHODS) pr.method = p.method as Settings['prayer']['method'];
     if (p.source === 'jakim' || p.source === 'local') pr.source = p.source;
     if (typeof p.zone === 'string' && /^[A-Z]{3}\d{2}$/.test(p.zone)) pr.zone = p.zone;
-    if (typeof p.timezone === 'string' && p.timezone.trim()) pr.timezone = p.timezone.trim();
+    // Zon waktu mesti sah — nilai tidak sah membuat new Intl.DateTimeFormat
+    // mempapar dan merosakkan /api/today.
+    if (typeof p.timezone === 'string' && p.timezone.trim()) {
+      try {
+        new Intl.DateTimeFormat(p.timezone.trim());
+        pr.timezone = p.timezone.trim();
+      } catch {
+        /* kekal nilai semasa */
+      }
+    }
     if (p.adjustments && typeof p.adjustments === 'object') {
       const a = p.adjustments as Record<string, unknown>;
       for (const key of Object.keys(pr.adjustments)) {
@@ -175,7 +260,7 @@ export function applyPatch(current: Settings, patch: AnyPatch): Settings {
       if (typeof s.message === 'string') sb.message = s.message.trim().slice(0, 300);
       if (typeof s.image === 'string') sb.image = s.image.trim().slice(0, 500);
     }
-    if (typeof p.fridayKhutbahUntil === 'string' && /^\d{2}:\d{2}$/.test(p.fridayKhutbahUntil)) {
+    if (typeof p.fridayKhutbahUntil === 'string' && /^([01]\d|2[0-3]):[0-5]\d$/.test(p.fridayKhutbahUntil)) {
       d.fridayKhutbahUntil = p.fridayKhutbahUntil;
     }
   }

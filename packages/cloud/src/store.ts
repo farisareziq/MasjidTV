@@ -8,7 +8,7 @@ import os from 'node:os';
 import path from 'node:path';
 import {
   tenants, users, superusers, cloudAnnouncements, cloudMedia,
-  pairingSessions, tvDevices, eq, and, type CloudDatabase
+  pairingSessions, tvDevices, eq, and, sql, type CloudDatabase
 } from '@masjidtv/db';
 import { DEFAULT_SETTINGS, applyPatch, type Settings, type Announcement } from '@masjidtv/shared';
 import { hashPassword } from './auth.js';
@@ -228,9 +228,16 @@ export class CloudStore {
     return rows[0] || null;
   }
 
-  async pairSession(code: string, tenantId: string): Promise<void> {
-    await this.db.update(pairingSessions).set({ status: 'paired', tenantId })
-      .where(eq(pairingSessions.code, code)).run();
+  async pairSession(code: string, tenantId: string): Promise<boolean> {
+    // Kemas kini bersyarat (Compare-And-Swap): hanya tuntut sesi masih
+    // 'pending'. 0 baris berubah = kod sudah dipasangkan oleh admin lain —
+    // pemanggil mesti anggap gagal dan gulung balik peranti yang dicipta.
+    const result = await this.db.run(
+      sql`UPDATE pairing_sessions SET status = 'paired', tenant_id = ${tenantId} WHERE code = ${code} AND status = 'pending'`
+    );
+    return Number((result as unknown as { rowsAffected?: number; changes?: number })?.rowsAffected
+      ?? (result as unknown as { changes?: number })?.changes
+      ?? 0) > 0;
   }
 
   async createDevice(tenantId: string, deviceId: string, name: string, token: string): Promise<void> {
@@ -269,6 +276,10 @@ export class CloudStore {
 
   async deleteDevice(tenantId: string, id: string): Promise<void> {
     await this.db.delete(tvDevices).where(and(eq(tvDevices.tenantId, tenantId), eq(tvDevices.id, id))).run();
+  }
+
+  async deleteDeviceByToken(tenantId: string, token: string): Promise<void> {
+    await this.db.delete(tvDevices).where(and(eq(tvDevices.tenantId, tenantId), eq(tvDevices.token, token))).run();
   }
 
   async deleteTenant(id: string): Promise<void> {

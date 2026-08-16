@@ -23,6 +23,13 @@ execFileSync(process.execPath, [tsc, '-p', path.join(monoRoot, 'packages', 'db',
 // types through an install-time snapshot that produces phantom errors.
 // esbuild below fails loudly on real breakage.)
 
+// 1b. Rebuild frontend TS -> public*/js (elak drift: embed sentiasa padan
+// dengan src/*.ts, bukan output lama yang ter-commit).
+execFileSync(process.execPath, [path.join(monoRoot, 'packages', 'frontend', 'build.mjs')], { stdio: 'inherit' });
+
+// 1c. Embed frontend assets (packages/frontend/public-cloud) into the bundle.
+execFileSync(process.execPath, [path.join(__dirname, 'gen-pages.mjs')], { stdio: 'inherit' });
+
 // 2. esbuild bundle the serverless entry.
 fs.rmSync(path.join(pkgRoot, 'dist'), { recursive: true, force: true });
 

@@ -160,8 +160,15 @@ try {
   });
   ok('password change (200)', pwChange.status === 200);
 
-  // Delete announcement.
-  const del = await req(`/api/admin/announcements/${annId}`, { method: 'DELETE', headers: auth });
+  // Password change must revoke the old session (stolen tokens die).
+  const oldAuthDel = await req(`/api/admin/announcements/${annId}`, { method: 'DELETE', headers: auth });
+  ok('old token revoked after password change (401)', oldAuthDel.status === 401);
+
+  // Re-login with the new password and delete the announcement.
+  const relogin = await req('/api/admin/login', { method: 'POST', body: { password: 'newpass123' } });
+  ok('re-login with new password (200)', relogin.status === 200 && !!relogin.json?.token);
+  const auth2 = { authorization: `Bearer ${relogin.json.token}` };
+  const del = await req(`/api/admin/announcements/${annId}`, { method: 'DELETE', headers: auth2 });
   ok('delete announcement (200)', del.status === 200);
 
   // Unknown route.
