@@ -59,27 +59,50 @@ laluan boleh diubah melalui `media.ffmpegPath`).
 
 ## Cloud (Vercel + Turso + Blob)
 
+Deploy dari akar repo (projek Vercel di-link ke `packages/cloud` sebagai
+rootDirectory; CLI bina sendiri bundle fungsi melalui `vercel-build` —
+esbuild CJS + perakitan Build Output API v3, tanpa tsc lintas-pakej):
+
 ```bash
-pnpm --filter @masjidtv/cloud build
-node scripts/deploy-cloud.mjs
+node scripts/deploy-cloud.mjs   # vercel deploy --prod dari akar repo
 ```
 
-Env wajib: `TURSO_URL`, `TURSO_AUTH_TOKEN`, `JWT_SECRET`,
-`LICENSE_PUBLIC_KEY`, `VERCEL_BLOB_READ_WRITE_TOKEN` (lihat
-`packages/cloud/.env.example`). Superuser `admin` menggunakan PIN bootstrap
-**rawak** yang dicetak pada log boot pertama (juga disimpan dalam fail
-`MASJIDTV_SUPERUSER_PIN.txt` dalam direktori sementara) — tukar serta-merta
-selepas login pertama.
+Deploy baharu diperlukan selepas menukar env (`vercel env ...`).
+
+Env wajib (Vercel → Settings → Environment Variables): `TURSO_URL`,
+`TURSO_AUTH_TOKEN`, `JWT_SECRET`, `LICENSE_PUBLIC_KEY`,
+`VERCEL_BLOB_READ_WRITE_TOKEN` (lihat `packages/cloud/.env.example`).
+
+### Bootstrap superuser & tenant pertama
+
+1. Boot pertama menjana PIN superuser `admin` rawak → log deploy (juga
+   disimpan dalam `%TEMP%\MASJIDTV_SUPERUSER_PIN.txt`). **Tukar serta-merta**:
+   `POST /api/auth/superuser/pin` (Bearer token, PIN ≥ 8 aksara) atau dari
+   konsol superuser `https://<host>/super`.
+2. Cipta tenant: `POST /api/super/tenants` `{name, username, password}` →
+   balas `id` + `apiKey` (percubaan 14 hari).
+3. Terbitkan lesen: `node tools/license-gen.mjs issue <tenantId>` (PEM di
+   mesin vendor), kemudian aktifkan:
+   `POST /api/super/tenants/<id>/license` `{code}` → status `licensed`.
+4. Paparan/TV guna header `X-Tenant-Key: <apiKey>` pada `/api/settings`,
+   `/api/today`, dsb. Admin tenant: `POST /api/auth/login` (username +
+   kata laluan tenant).
 
 ## Lesen
 
 Kod lesen Ed25519 perpetual; alat penjana berjalan OFFLINE di mesin vendor —
-kunci peribadi tidak masuk repo:
+kunci peribadi tidak masuk repo (contoh lokasi luar repo:
+`MasjidTV-Licence/masjidtv-license-ed25519.pem`):
 
 ```bash
 node tools/license-gen.mjs keygen                                   # sekali
-node tools/license-gen.mjs issue <tenantId>                         # sahkan di admin
+node tools/license-gen.mjs issue <tenantId> [path/to/pem]           # terbit
+node tools/license-gen.mjs verify <code> <LICENSE_PUBLIC_KEY>       # semak
 ```
+
+`LICENSE_PUBLIC_KEY` di cloud MESTI sepadan dengan kunci awam PEM yang
+menandatangani kod — jika tidak, pengaktifan gagal dengan
+`Kod lesen tidak sah`.
 
 ## Mod cloud-sync (mini PC)
 
