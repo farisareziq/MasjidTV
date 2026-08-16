@@ -10,6 +10,8 @@
 import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:media_kit/media_kit.dart';
+import 'package:media_kit_video/media_kit_video.dart';
 
 /// State stream emitted to any listening player widget (ExoPlayer/media_kit).
 class BridgeState {
@@ -25,9 +27,19 @@ class MasjidBridge {
   bool _muted = false;
   final _controller = StreamController<BridgeState>.broadcast();
 
+  Player? _player;
+  VideoController? _videoController;
+
   /// Subscribe to play/stop/slot/mute changes (drive media_kit player from here).
   Stream<BridgeState> get states => _controller.stream;
   BridgeState get current => BridgeState(url: _currentUrl, slot: _slot, muted: _muted);
+
+  /// Lazily create the native player (call MediaKit.ensureInitialized first).
+  VideoController ensurePlayer() {
+    _player ??= Player();
+    _videoController ??= VideoController(_player!);
+    return _videoController!;
+  }
 
   Future<void> handle(String message) async {
     // Message is JSON like {"method":"playStream","args":["url","name","id"]}
@@ -51,20 +63,27 @@ class MasjidBridge {
         case 'playStream':
           if (args.isNotEmpty) {
             _currentUrl = args[0];
+            await _player?.open(Media(_currentUrl!));
+            if (_player != null) {
+              await _player!.setVolume(_muted ? 0 : 100);
+            }
             _emit();
           }
           break;
         case 'stopStream':
+          await _player?.stop();
           _currentUrl = null;
           _emit();
           break;
         case 'setStreamMuted':
           if (args.isNotEmpty) {
             _muted = args[0] == 'true';
+            await _player?.setVolume(_muted ? 0 : 100);
             _emit();
           }
           break;
         case 'onSessionExpired':
+          await _player?.stop();
           _currentUrl = null;
           _emit();
           break;
@@ -76,17 +95,24 @@ class MasjidBridge {
 
   void _emit() => _controller.add(current);
 
+  /// Native video surface positioned at the slot rect reported by display.js.
   Widget streamSurface() {
+    if (_currentUrl == null || _slot == null) return const SizedBox.shrink();
+    final vc = _videoController;
+    if (vc == null) return const SizedBox.shrink();
     return Positioned(
-      left: _slot?.left ?? 0,
-      top: _slot?.top ?? 0,
-      width: _slot?.width ?? 0,
-      height: _slot?.height ?? 0,
-      child: Container(color: Colors.black),
+      left: _slot!.left,
+      top: _slot!.top,
+      width: _slot!.width,
+      height: _slot!.height,
+      child: Video(controller: vc),
     );
   }
 
   void dispose() {
+    _player?.dispose();
+    _player = null;
+    _videoController = null;
     _currentUrl = null;
     _controller.close();
   }

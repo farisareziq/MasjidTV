@@ -16,3 +16,7 @@ cloud-data/
 
 .vercel
 .env*
+
+apps/android-tv/build/
+apps/android-tv/.dart_tool/
+

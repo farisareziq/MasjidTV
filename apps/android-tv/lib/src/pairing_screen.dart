@@ -4,6 +4,7 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
+import 'package:qr_flutter/qr_flutter.dart';
 import 'dart:convert';
 import 'prefs.dart';
 import 'display_screen.dart';
@@ -76,6 +77,11 @@ class _PairingScreenState extends State<PairingScreen> {
 
   @override
   Widget build(BuildContext context) {
+    // QR encodes the display URL with the pairing code so an admin phone can
+    // open the admin dashboard and confirm the code directly.
+    final qrData = _code.isEmpty
+        ? widget.prefs.cloudUrl
+        : '${widget.prefs.cloudUrl}/admin?pair=$_code';
     return Scaffold(
       body: Center(
         child: Column(
@@ -84,6 +90,13 @@ class _PairingScreenState extends State<PairingScreen> {
             const Text('Pautkan TV / Pair TV', style: TextStyle(fontSize: 24)),
             const SizedBox(height: 24),
             Text(_code, style: const TextStyle(fontSize: 48, letterSpacing: 12)),
+            const SizedBox(height: 12),
+            QrImageView(
+              data: qrData,
+              version: QrVersions.auto,
+              size: 180,
+              backgroundColor: Colors.white,
+            ),
             const SizedBox(height: 12),
             Text(_status),
             const SizedBox(height: 32),

@@ -3,6 +3,7 @@
 
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:media_kit/media_kit.dart';
 import 'package:webview_flutter/webview_flutter.dart';
 import 'prefs.dart';
 import 'bridge.dart';
@@ -19,11 +20,18 @@ class _DisplayScreenState extends State<DisplayScreen> {
   late final WebViewController _controller;
   final _bridge = MasjidBridge();
   bool _offline = false;
+  bool _streamActive = false;
   Timer? _networkWaitTimer;
+  StreamSubscription<BridgeState>? _bridgeSub;
 
   @override
   void initState() {
     super.initState();
+    MediaKit.ensureInitialized();
+    _bridge.ensurePlayer();
+    _bridgeSub = _bridge.states.listen((s) {
+      setState(() => _streamActive = s.url != null);
+    });
     _controller = WebViewController()
       ..setJavaScriptMode(JavaScriptMode.unrestricted)
       ..setBackgroundColor(const Color(0xFF06101F))
@@ -49,6 +57,7 @@ class _DisplayScreenState extends State<DisplayScreen> {
   @override
   void dispose() {
     _networkWaitTimer?.cancel();
+    _bridgeSub?.cancel();
     _bridge.dispose();
     super.dispose();
   }
@@ -63,7 +72,7 @@ class _DisplayScreenState extends State<DisplayScreen> {
             const Center(
               child: Text('Connecting to server… / Menghubungi pelayan…'),
             ),
-          // Native stream surface (ExoPlayer) rendered behind/above WebView
+          // Native stream surface (ExoPlayer) rendered above the WebView
           // via the bridge slot rectangle.
           _bridge.streamSurface(),
         ],

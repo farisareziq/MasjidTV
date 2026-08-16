@@ -13,6 +13,10 @@ export default tseslint.config(
       'packages/frontend/public-cloud/**',
       'packages/cloud/src/pages.generated.ts',
       'packages/frontend/vendor/**',
+      // Flutter/Gradle build output (APK intermediates) — bukan kod sumber.
+      'apps/android-tv/build/**',
+      'apps/android-tv/.dart_tool/**',
+      'apps/android-tv/android/**',
       // Output kompilasi TypeScript (dikom semula daripada .ts — jangan lint).
       'packages/shared/src/*.js',
       'packages/shared/src/*.d.ts',
