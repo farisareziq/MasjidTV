@@ -15,6 +15,31 @@ $TaskName = 'MasjidTV Kiosk'
 $Root = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
 $Launcher = Join-Path $Root 'packages\server\scripts\start-kiosk.ps1'
 
+# ---------------------------------------------------------------------------
+# Pre-provision ffmpeg (optional but recommended): kalau ffmpeg tiada pada
+# sistem, muat turun binaan statik ke folder data MasjidTV supaya stream
+# RTSP/RTMP/ONVIF berfungsi tanpa winget/install manual. Pelayan juga buat
+# ini secara automatik semasa boot — langkah ini cuma mempercepatkan
+# pemasangan pertama.
+# ---------------------------------------------------------------------------
+$DataDir = Join-Path $env:APPDATA 'MasjidTV'
+$FfmpegBin = Join-Path $DataDir 'bin\ffmpeg.exe'
+$HasSystemFfmpeg = [bool](Get-Command ffmpeg -ErrorAction SilentlyContinue)
+if (-not $HasSystemFfmpeg -and -not (Test-Path $FfmpegBin)) {
+  Write-Output '[install] ffmpeg not found — downloading static build (~100MB, one time)...'
+  $NodeExe = (Get-Command node -ErrorAction SilentlyContinue).Source
+  if ($NodeExe) {
+    & $NodeExe -e "import('./packages/server/dist/ensure-ffmpeg.js').then(m => m.ensureFfmpeg(process.env.APPDATA + '/MasjidTV')).then(r => console.log('[install] ' + r.message))"
+  } else {
+    Write-Output '[install] node not found — server will auto-download ffmpeg on first boot.'
+  }
+} elseif ($HasSystemFfmpeg) {
+  Write-Output '[install] ffmpeg found on system PATH.'
+} else {
+  Write-Output '[install] ffmpeg already provisioned at data dir.'
+}
+
+
 $argLine = "-NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File `"$Launcher`" -Port $Port"
 if ($Screen) { $argLine += " -Screen `"$Screen`"" }
 

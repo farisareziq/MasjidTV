@@ -16,6 +16,7 @@ import { Store } from './store.js';
 import { AnnouncementService } from './announcements.js';
 import { StreamManager } from './streams.js';
 import { applyCloudSync, cloudSyncEnabled } from './cloudsync.js';
+import { ensureFfmpeg } from './ensure-ffmpeg.js';
 
 const SESSION_TTL_MS = 12 * 60 * 60 * 1000;
 const VERSION = '1.0.0';
@@ -427,9 +428,20 @@ export async function startServer(opts: AppOptions): Promise<FastifyInstance> {
   // Pariti rujukan: semak ffmpeg + sync relay, dan sync acara Islam pada
   // permulaan (plus ulang setiap 12 jam).
   if (!cloudSyncEnabled()) {
-    app.masjidStreams.checkFfmpeg().then((ok) => {
-      console.log(`  ffmpeg: ${ok ? 'available' : 'NOT FOUND — RTSP/RTMP/ONVIF streams need ffmpeg'}`);
-      app.masjidStreams.sync();
+    // Auto-provision ffmpeg: jika tiada pada sistem, muat turun binaan
+    // statik ke <dataDir>/bin dan simpan laluan ke settings.media.ffmpegPath
+    // supaya relay dan admin nampak sumbernya.
+    ensureFfmpeg(opts.dataDir).then(async (r) => {
+      console.log(`  ffmpeg: ${r.ok ? 'available' : 'NOT FOUND — RTSP/RTMP/ONVIF streams need ffmpeg'}${r.ok && r.path ? ` (${r.path})` : ''}`);
+      if (!r.ok) console.log(`  ffmpeg: ${r.message}`);
+      if (r.ok && r.path) {
+        const cur = app.masjidStore.getSettings().media.ffmpegPath;
+        if (!cur || cur === 'ffmpeg') {
+          app.masjidStore.updateSettings({ media: { ffmpegPath: r.path } });
+          app.masjidStreams.resetFfmpegCheck();
+        }
+      }
+      app.masjidStreams.checkFfmpeg().then(() => app.masjidStreams.sync());
     });
     syncEventsFor(app.masjidStore.getSettings(), (patch) => {
       app.masjidStore.updateSettings(patch as Record<string, unknown>);
