@@ -12,6 +12,11 @@ const JWT_SECRET: string = process.env.JWT_SECRET || (isProd ? '' : 'dev-secret-
 if (!JWT_SECRET) {
   throw new Error('JWT_SECRET diperlukan — tetapkan pemboleh ubah persekitaran JWT_SECRET sebelum deploy produksi');
 }
+// Rahsia lemah = JWT boleh dipalsukan. Di produksi mesti panjang (>= 32
+// aksara) dan bukan nilai contoh yang boleh dijangka.
+if (isProd && (JWT_SECRET.length < 32 || /^(change|dev|test|secret|password)/i.test(JWT_SECRET))) {
+  throw new Error('JWT_SECRET terlalu lemah — gunakan sekurang-kurangnya 32 aksara rawak (cth. `node -e "console.log(require(\'crypto\').randomBytes(32).toString(\'hex\'))"`)');
+}
 const MAX_ATTEMPTS = 5;
 const LOCK_MS = 15 * 60 * 1000;
 

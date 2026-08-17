@@ -65,6 +65,8 @@ const AndroidBridgeRef = (): AndroidBridge => {
     playStream: send('playStream'),
     stopStream: send('stopStream'),
     setStreamMuted: send('setStreamMuted'),
+    playAudio: send('playAudio'),
+    stopAudio: send('stopAudio'),
     onSessionExpired: send('onSessionExpired')
   };
 };
@@ -209,6 +211,17 @@ const t = (key: string): string => (I18N[lang()] as Record<string, any>)[key] ??
 const isAndroid = typeof window !== 'undefined' && typeof window.AndroidBridge !== 'undefined';
 let bridgeMuted = false;
 let sessionInvalidNotified = false;
+// Deteksi keupayaan playAudio native (APK baharu): hantar probe dan tunggu
+// jangka pendek — mod postMessage tidak kembali ralat walau APK lama tidak
+// mempunyai kaedah ini. Tanpa pengesahan, audio azan pada APK lama akan
+// hilang senyap (kunci ditanda "dimainkan" tetapi tiada bunyi).
+let nativeAudioCapable = false;
+if (isAndroid) {
+  try {
+    AndroidBridgeRef().playAudio('', 'probe:');
+    nativeAudioCapable = true;
+  } catch { /* APK lama tanpa playAudio — kekal fallback HTMLAudioElement */ }
+}
 
 // Hari Jumaat: Zohor dipaparkan sebagai "Jumaat" dan fasa jemaah menjadi
 // "Khutbah & Solat Jumaat". Countdown azan/iqamah kekal seperti biasa.
@@ -678,7 +691,12 @@ function nowMs(): number {
     const anchor = zonedMs(tm.date, tm.time, tz());
     if (fullTestActive()) {
       const delay = (Number(tm.startDelaySec) || 0) * 1000;
-      const elapsed = Math.max(0, Date.now() - tm.savedAtMs - delay);
+      // JANGAN jepit elapsed kepada 0: savedAtMs datang daripada jam pelayar
+      // admin — jika jam peranti paparan ketinggalan (kotak TV tanpa NTP),
+      // elapsed kekal negatif & diklip kepada 0, membekukan countdown
+      // selama-lamanya. Biarkan nilai negatif: simulasi bermula lebih awal
+      // sedikit (fasa "normal") dan countdown hidup sebaik jam mengejar.
+      const elapsed = Date.now() - tm.savedAtMs - delay;
       return anchor + elapsed;
     }
     return anchor;
@@ -715,6 +733,19 @@ function playOnce(key: string, url: string, targetMs: number): void {
   const diff = targetMs - now;
   // Terlalu awal — bukan masa lagi. Terlalu lewat (>10 min) — lupakan.
   if (diff > 1500 || diff < -600000) return;
+  const target = key.startsWith('iq:') ? state.playedIqamah : state.playedAdhan;
+  // Android TV dengan APK baharu: main melalui pemain NATIF (media_kit/
+  // ExoPlayer) — autoplay audio WebView kerap disekat pada kotak TV walaupun
+  // setMediaPlaybackRequiresUserGesture(false); jambatan native dijamin
+  // berbunyi. APK lama (nativeAudioCapable=false) kekal fallback WebView.
+  if (isAndroid && nativeAudioCapable) {
+    try {
+      AndroidBridgeRef().playAudio(url, key);
+      target.add(key);
+      if (state.pendingAudio?.key === key) state.pendingAudio = null;
+      return;
+    } catch { /* jatuh kembali ke HTMLAudioElement */ }
+  }
   const audio = audioFor(url);
   if (!audio) return;
   if (!audio.paused && !audio.ended) return; // sudah dimainkan - jangan ulang semula
@@ -733,7 +764,6 @@ function playOnce(key: string, url: string, targetMs: number): void {
   // simpan pending untuk cubaan semula setiap detik & bila tab aktif semula.
   // Satu pendengar sahaja per elemen — elak timbunan closure semasa autoplay
   // diblok (tickAudio mencuba semula setiap detik).
-  const target = key.startsWith('iq:') ? state.playedIqamah : state.playedAdhan;
   if (audio.dataset.pendingKey !== key) {
     audio.dataset.pendingKey = key;
     audio.addEventListener('playing', function onPlaying(this: HTMLAudioElement) {

@@ -1,0 +1,47 @@
+name: Cloud DB Backup
+
+on:
+  schedule:
+    - cron: '30 18 * * *' # 18:30 UTC daily = 02:30 MYT
+  workflow_dispatch:
+
+jobs:
+  backup:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build db package
+        run: pnpm --filter @masjidtv/db build
+
+      - name: Run backup
+        env:
+          TURSO_URL: ${{ secrets.TURSO_URL }}
+          TURSO_AUTH_TOKEN: ${{ secrets.TURSO_AUTH_TOKEN }}
+        run: node scripts/turso-backup.mjs --out turso-backup.json
+
+      - name: Fail on empty backup
+        run: |
+          # tenants table must be present — an empty/failed dump is a red flag
+          node -e "const b=require('./turso-backup.json'); if(!b.tables.tenants) { console.error('Backup missing tenants table — aborting'); process.exit(1) } console.log('tenants:', b.tables.tenants.length, 'rows')"
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: turso-backup-${{ github.run_id }}
+          path: turso-backup.json
+          retention-days: 90

@@ -9,6 +9,8 @@ declare global {
     playStream(url: string, name: string, id: string): void;
     stopStream(id: string): void;
     setStreamMuted(muted: boolean): void;
+    playAudio(url: string, key: string): void;
+    stopAudio(): void;
     onSessionExpired(): void;
   }
 

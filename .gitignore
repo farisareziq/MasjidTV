@@ -20,3 +20,11 @@ cloud-data/
 apps/android-tv/build/
 apps/android-tv/.dart_tool/
 
+# License tooling build artifacts + vendor private keys (NEVER commit)
+tools/license-gen-cli/masjidtv-license.exe
+tools/license-gen-cli/bundle.cjs
+tools/license-gen-cli/sea-prep.blob
+# Issued license codes are activatable credentials — keep local only
+tools/license-gen-cli/licenses/
+*.pem
+

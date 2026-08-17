@@ -1,0 +1,21 @@
+name: Prod Smoke Test
+
+on:
+  schedule:
+    - cron: '0 */6 * * *' # every 6 hours
+  workflow_dispatch:
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Run preflight against production
+        env:
+          PREFLIGHT_URL: ${{ vars.MASJIDTV_PROD_URL }}
+        run: node scripts/preflight.mjs --url "$PREFLIGHT_URL"

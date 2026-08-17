@@ -273,6 +273,11 @@ body::after {
     radial-gradient(900px 700px at 50% 110%, rgba(38, 96, 130, 0.35), transparent 60%),
     linear-gradient(160deg, var(--bg-0), var(--bg-1) 75%);
   animation: overlay-in 0.5s ease;
+  /* Kandungan (kicker+arabic+nama+countdown) mesti muat dalam satu skrin —
+     jika saiz fon Arabic terlalu besar untuk viewport pendek, flexbox akan
+     menolak baris bertindih. overflow tersembunyi + min-height:0 pada anak
+     memastikan tiada limpahan bertindih atas baris bawah. */
+  overflow: hidden;
 }
 
 @keyframes overlay-in {
@@ -284,57 +289,65 @@ body::after {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: clamp(22px, 4.2vh, 58px);
+  justify-content: center;
+  gap: clamp(14px, 2.8vh, 40px);
   max-width: 92vw;
-  padding: 0 clamp(20px, 4vw, 80px);
+  max-height: 100vh;
+  min-height: 0;
+  padding: clamp(16px, 3vh, 48px) clamp(20px, 4vw, 80px);
 }
 
 .ov-kicker {
-  font-size: clamp(16px, 3.2vh, 38px);
+  font-size: clamp(14px, 2.6vh, 30px);
   font-weight: 700;
   letter-spacing: 0.42em;
   text-transform: uppercase;
   color: var(--teal);
+  flex-shrink: 0;
 }
 
 .ov-arabic {
   font-family: "Amiri", "Scheherazade New", "Traditional Arabic", serif;
-  font-size: clamp(64px, 22vh, 240px);
-  /* Amiri ada metrik menegak dalam (ascender/descender panjang untuk
-     harakat). line-height besar (1.5) mencipta jurang besar atas & bawah
-     setiap perkataan — pada TV kelihatan "berterabur"/caca marba.
-     1.15 memadatkan baris tanpa memotong harakat. */
+  /* Metrik menegak dalam Amiri (ascender/descender panjang untuk harakat)
+     menyebabkan saiz terlalu besar bertindih baris di bawah pada TV.
+     Had atas dikurangkan (22vh->13vh, 240px->150px; big 30vh->17vh,
+     330px->200px) + line-height 1.15 memadatkan tanpa memotong harakat. */
+  font-size: clamp(44px, 13vh, 150px);
   line-height: 1.15;
   color: var(--gold-bright);
   direction: rtl;
-  text-shadow: 0 14px 60px rgba(0, 0, 0, 0.45);
+  text-shadow: 0 10px 40px rgba(0, 0, 0, 0.45);
+  flex-shrink: 0;
 }
 
 .ov-arabic.big {
-  font-size: clamp(90px, 30vh, 330px);
+  font-size: clamp(56px, 17vh, 200px);
   line-height: 1.1;
 }
 
 .ov-name {
   font-family: var(--font-head, inherit);
-  font-size: clamp(24px, 5vh, 64px);
+  font-size: clamp(20px, 4vh, 52px);
   font-weight: 700;
   color: var(--text);
+  flex-shrink: 0;
 }
 
 .ov-sub {
-  font-size: clamp(18px, 3.4vh, 42px);
+  font-size: clamp(15px, 2.8vh, 34px);
   color: var(--muted);
+  flex-shrink: 0;
 }
 
 .ov-countdown {
-  font-size: clamp(44px, 11vh, 150px);
+  font-size: clamp(36px, 9vh, 120px);
   font-weight: 200;
   letter-spacing: 0.05em;
   line-height: 1;
   color: var(--teal);
   font-family: "Segoe UI", "Segoe UI Variable Display", system-ui, sans-serif;
   text-shadow: 0 10px 44px rgba(0, 0, 0, 0.4);
+  flex-shrink: 0;
 }
 
 /* Mod skrin hitam selepas iqamah - jam sahaja di bucu kanan atas */

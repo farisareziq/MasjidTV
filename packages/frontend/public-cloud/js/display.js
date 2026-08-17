@@ -11,6 +11,8 @@ const AndroidBridgeRef = () => {
     playStream: send("playStream"),
     stopStream: send("stopStream"),
     setStreamMuted: send("setStreamMuted"),
+    playAudio: send("playAudio"),
+    stopAudio: send("stopAudio"),
     onSessionExpired: send("onSessionExpired")
   };
 };
@@ -209,6 +211,14 @@ const t = (key) => I18N[lang()][key] ?? key;
 const isAndroid = typeof window !== "undefined" && typeof window.AndroidBridge !== "undefined";
 let bridgeMuted = false;
 let sessionInvalidNotified = false;
+let nativeAudioCapable = false;
+if (isAndroid) {
+  try {
+    AndroidBridgeRef().playAudio("", "probe:");
+    nativeAudioCapable = true;
+  } catch {
+  }
+}
 const isFriday = () => {
   const tm = testMode();
   const dk = tm.enabled && tm.date ? tm.date : state.today?.today;
@@ -635,7 +645,7 @@ function nowMs() {
     const anchor = zonedMs(tm.date, tm.time, tz());
     if (fullTestActive()) {
       const delay = (Number(tm.startDelaySec) || 0) * 1e3;
-      const elapsed = Math.max(0, Date.now() - tm.savedAtMs - delay);
+      const elapsed = Date.now() - tm.savedAtMs - delay;
       return anchor + elapsed;
     }
     return anchor;
@@ -667,6 +677,16 @@ function playOnce(key, url, targetMs) {
   const now = nowMs();
   const diff = targetMs - now;
   if (diff > 1500 || diff < -6e5) return;
+  const target = key.startsWith("iq:") ? state.playedIqamah : state.playedAdhan;
+  if (isAndroid && nativeAudioCapable) {
+    try {
+      AndroidBridgeRef().playAudio(url, key);
+      target.add(key);
+      if (state.pendingAudio?.key === key) state.pendingAudio = null;
+      return;
+    } catch {
+    }
+  }
   const audio = audioFor(url);
   if (!audio) return;
   if (!audio.paused && !audio.ended) return;
@@ -681,7 +701,6 @@ function playOnce(key, url, targetMs) {
     }
   }
   audio.currentTime = 0;
-  const target = key.startsWith("iq:") ? state.playedIqamah : state.playedAdhan;
   if (audio.dataset.pendingKey !== key) {
     audio.dataset.pendingKey = key;
     audio.addEventListener("playing", function onPlaying() {

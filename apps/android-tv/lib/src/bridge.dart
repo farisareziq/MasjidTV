@@ -32,6 +32,13 @@ class MasjidBridge {
   Player? _player;
   VideoController? _videoController;
 
+  // Pemain audio azan/iqamah berasingan daripada pemain strim — ExoPlayer
+  // langsung (bukan autoplay WebView yang kerap disekat pada kotak TV).
+  // _audioKey ialah kunci dedup daripada display.js (cth "adhan:maghrib:t123")
+  // supaya panggilan semula setiap detik tidak memulakan semula audio.
+  Player? _audioPlayer;
+  String? _audioKey;
+
   /// Subscribe to play/stop/slot/mute changes (drive media_kit player from here).
   Stream<BridgeState> get states => _controller.stream;
   BridgeState get current => BridgeState(url: _currentUrl, slot: _slot, muted: _muted, sessionExpired: _sessionExpired);
@@ -84,9 +91,33 @@ class MasjidBridge {
         case 'setStreamMuted':
           if (args.isNotEmpty) {
             _muted = args[0] == 'true';
+            // Hanya pemain STRIM disenyapkan — flag ini ditetapkan semasa
+            // fasa azan/iqamah supaya kamera senyap. Pemain audio azan
+            // mesti KEKAL BERBUNYI (jika tidak, azan dimainkan pada volum 0).
             await _player?.setVolume(_muted ? 0 : 100);
             _emit();
           }
+          break;
+        case 'playAudio':
+          // args: [url, dedupKey]. Dedup ikut KUNCI (bukan URL) — fail audio
+          // sama untuk azan & iqamah mesti boleh dimainkan dua kali. Kunci
+          // sama diabaikan; kunci baharu menghentikan audio sedia ada.
+          if (args.isNotEmpty && args[0].isNotEmpty) {
+            final k = args.length > 1 ? args[1] : args[0];
+            if (k != _audioKey) {
+              _audioKey = k;
+              _audioPlayer ??= Player();
+              await _audioPlayer!.open(Media(args[0]));
+              // Sentiasa volum penuh — azan/iqamah tidak tertakluk kepada
+              // mute strim (rujuk setStreamMuted di atas).
+              await _audioPlayer!.setVolume(100);
+              debugPrint('[bridge] playAudio: ${args[0]} (key=$k)');
+            }
+          }
+          break;
+        case 'stopAudio':
+          await _audioPlayer?.stop();
+          _audioKey = null;
           break;
         case 'onSessionExpired':
           debugPrint('[bridge] onSessionExpired — session invalid');
@@ -121,6 +152,9 @@ class MasjidBridge {
     _player?.dispose();
     _player = null;
     _videoController = null;
+    _audioPlayer?.dispose();
+    _audioPlayer = null;
+    _audioKey = null;
     _currentUrl = null;
     _controller.close();
   }

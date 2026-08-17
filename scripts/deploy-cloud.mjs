@@ -19,3 +19,18 @@ if (!fs.existsSync(path.join(cloudDir, 'dist'))) {
 // (running inside packages/cloud makes Vercel double the path).
 console.log('[deploy] Deploying packages/cloud to Vercel...');
 execSync('vercel deploy --prod --yes', { cwd: repoRoot, stdio: 'inherit' });
+
+// Post-deploy: fail loudly if production is misconfigured (missing env,
+// broken health endpoint) instead of shipping a silently broken release.
+const url = process.env.MASJIDTV_PUBLIC_URL || process.env.PREFLIGHT_URL;
+if (url) {
+  console.log(`[deploy] Running preflight against ${url}...`);
+  try {
+    execSync(`node "${path.join(__dirname, 'preflight.mjs')}" --url "${url.replace(/\/+$/, '')}"`, { cwd: repoRoot, stdio: 'inherit' });
+  } catch {
+    console.error('[deploy] PREFLIGHT FAILED after deploy — production may be misconfigured. Fix and redeploy.');
+    process.exit(1);
+  }
+} else {
+  console.log('[deploy] Skipped post-deploy preflight (set MASJIDTV_PUBLIC_URL or PREFLIGHT_URL to enable).');
+}

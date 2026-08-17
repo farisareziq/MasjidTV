@@ -48,6 +48,31 @@ pnpm test               # unit + integration (vitest)
 node scripts/dry-run.mjs  # E2E: API, JAKIM, keselamatan, CRUD, muat naik
 ```
 
+## Senarai semak go-live (deployment)
+
+1. **Env cloud (Vercel)** — tetapkan `TURSO_URL`, `TURSO_AUTH_TOKEN`,
+   `JWT_SECRET` (≥ 32 aksara rawak), `LICENSE_PUBLIC_KEY`,
+   `VERCEL_BLOB_READ_WRITE_TOKEN`, dan (disyorkan) `MASJIDTV_PUBLIC_URL`.
+2. **Deploy** — `node scripts/deploy-cloud.mjs` (preflight automatik selepas
+   deploy jika `MASJIDTV_PUBLIC_URL` ditetapkan).
+3. **Preflight** — `node scripts/preflight.mjs --url https://<app>.vercel.app
+   --pem masjidtv-license-ed25519.pem` — sahkan env, kekuatan JWT, padanan
+   kunci lesen, health, header keselamatan, auth 401.
+4. **Tukar PIN superuser serta-merta** — PIN bootstrap dicetak dalam log
+   deploy; tukar melalui `POST /api/auth/superuser/pin` atau konsol
+   `https://<host>/super`.
+5. **Sandaran berkala** — workflow `Cloud DB Backup` (harian 02:30 MYT,
+   retensi 90 hari) memerlukan secrets `TURSO_URL` + `TURSO_AUTH_TOKEN` di
+   GitHub. Pulih: `node scripts/turso-restore.mjs <backup.json> --yes`
+   (destruktif — truncate + reinsert).
+6. **Smoke berkala** — workflow `Prod Smoke Test` (setiap 6 jam) memerlukan
+   variable `MASJIDTV_PROD_URL` di GitHub.
+7. **Kiosk mini PC** — `install-kiosk.ps1` → sahkan Edge kiosk, display key,
+   akses LAN, dan tahan-reboot pada peranti sebenar. `winget install ffmpeg`
+   untuk stream RTSP/RTMP/ONVIF.
+8. **Android TV** — sahkan ExoPlayer/UVC/auto-start pada TV sebenar sebelum
+   bergantung padanya.
+
 ## Kiosk (Windows mini PC)
 
 ```powershell
@@ -104,6 +129,28 @@ node tools/license-gen.mjs verify <code> <LICENSE_PUBLIC_KEY>       # semak
 `LICENSE_PUBLIC_KEY` di cloud MESTI sepadan dengan kunci awam PEM yang
 menandatangani kod — jika tidak, pengaktifan gagal dengan
 `Kod lesen tidak sah`.
+
+### Penjana lesen mudah alih (.exe)
+
+Bina sekali pada mesin pembangunan (perlu Node + esbuild + postject):
+
+```bash
+node tools/license-gen-cli/build.mjs   # -> tools/license-gen-cli/masjidtv-license.exe
+```
+
+`masjidtv-license.exe` adalah fail tunggal (~90MB, SEA Node) — tiada Node
+diperlukan pada mesin vendor. Arahan sama seperti alat repo:
+
+```
+masjidtv-license.exe keygen [pem]
+masjidtv-license.exe issue <tenantId> [pem]
+masjidtv-license.exe verify <code> <publicKeyBase64>
+masjidtv-license.exe                  (menu interaktif)
+```
+
+PEM lalai disimpan di sebelah exe. Jangan sekali-kali hantar .pem atau
+exe+blob sumber kepada pelanggan. Kod yang dijana serasi 100% dengan
+verifier cloud (Ed25519, format TVM-).
 
 ## Mod cloud-sync (mini PC)
 
