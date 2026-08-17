@@ -188,7 +188,7 @@ const I18N = {
     photoOpacity: "Photo opacity",
     saveDisplay: "Save display settings",
     testModeTitle: "Test mode \u2014 azan & iqamah countdown",
-    testModeSub: "Simulate the clock and date to preview the full-screen azan/iqamah flow. The display follows the simulated time; audio is muted during simulation.",
+    testModeSub: 'Simulate the clock and date to preview the full-screen azan/iqamah flow. "Run full test" plays the whole flow live \u2014 every phase 1 minute \u2014 including the adhan & iqamah audio.',
     testEnabled: "Enable test mode",
     testDate: "Simulated date",
     testTime: "Simulated time",
@@ -197,6 +197,8 @@ const I18N = {
     testAzan: "Adhan time",
     testIqamah: "Iqamah time",
     saveTestMode: "Save test mode",
+    testRunFull: "\u25B6 Run full test (1 min/phase, with sound)",
+    testFullStarted: "Full test started \u2014 watch the display screen",
     presetCustom: "\u2014 Custom \u2014",
     presetNavy: "Navy & Gold (default)",
     presetEmerald: "Emerald & Gold",
@@ -458,7 +460,7 @@ const I18N = {
     photoOpacity: "Kelegapan foto",
     saveDisplay: "Simpan tetapan paparan",
     testModeTitle: "Mod ujian \u2014 countdown azan & iqamah",
-    testModeSub: "Simulasikan jam dan tarikh untuk melihat aliran azan/iqamah skrin penuh. Paparan mengikut masa simulasi; audio dibisukan semasa simulasi.",
+    testModeSub: 'Simulasikan jam dan tarikh untuk melihat aliran azan/iqamah skrin penuh. "Jalankan ujian penuh" memainkan seluruh aliran secara langsung \u2014 setiap fasa 1 minit \u2014 termasuk audio azan & iqamah.',
     testEnabled: "Aktifkan mod ujian",
     testDate: "Tarikh simulasi",
     testTime: "Jam simulasi",
@@ -467,6 +469,8 @@ const I18N = {
     testAzan: "Waktu azan",
     testIqamah: "Waktu iqamah",
     saveTestMode: "Simpan mod ujian",
+    testRunFull: "\u25B6 Jalankan ujian penuh (1 minit/fasa, dengan bunyi)",
+    testFullStarted: "Ujian penuh bermula \u2014 perhatikan skrin paparan",
     presetCustom: "\u2014 Tersuai \u2014",
     presetNavy: "Navy & Emas (lalai)",
     presetEmerald: "Emerald & Emas",
@@ -1248,12 +1252,45 @@ $("stTestSave").addEventListener("click", async () => {
           testMode: {
             enabled: $("stTestEnabled").checked,
             date: $("stTestDate").value,
-            time: $("stTestTime").value
+            time: $("stTestTime").value,
+            runFullTest: false
           }
         }
       }
     });
     toast(t("settingsSaved"));
+  } catch (err) {
+    toast(err.message, "err");
+  }
+});
+$("stTestRunFull").addEventListener("click", async () => {
+  const key = $("stTestPrayer").value || "maghrib";
+  const p = state.today?.prayers?.[key];
+  if (!p) return toast(t("requestFailed", { s: 404 }), "err");
+  const phaseMin = 1;
+  const azanTime = shiftTime(p.time, -phaseMin);
+  try {
+    await api("/api/admin/settings", {
+      method: "PUT",
+      body: {
+        display: {
+          testMode: {
+            enabled: true,
+            date: state.today?.today || (/* @__PURE__ */ new Date()).toISOString().slice(0, 10),
+            time: azanTime,
+            runFullTest: true,
+            startDelaySec: 10,
+            prayerKey: key,
+            savedAtMs: Date.now(),
+            phaseMs: phaseMin * 6e4
+          }
+        }
+      }
+    });
+    $("stTestEnabled").checked = true;
+    $("stTestDate").value = state.today?.today || "";
+    $("stTestTime").value = azanTime;
+    toast(t("testFullStarted"));
   } catch (err) {
     toast(err.message, "err");
   }

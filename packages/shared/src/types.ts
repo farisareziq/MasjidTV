@@ -64,6 +64,16 @@ export interface TestModeSettings {
   enabled: boolean;
   date: string;
   time: string;
+  /** Ujian penuh: fasa dipendekkan & audio dimainkan semasa simulasi. */
+  runFullTest: boolean;
+  /** Saat sedang berjalan sebelum permulaan simulasi (lalai 10s). */
+  startDelaySec: number;
+  /** Templat nama solat yang diuji (lalai: maghrib). */
+  prayerKey: string;
+  /** Masa sebenar (epoch ms) mod ujian diaktifkan — digunakan untuk mengekang jam simulasi. */
+  savedAtMs: number;
+  /** Kitaran setiap fasa semasa ujian penuh (lalai 60_000 = 1 minit). */
+  phaseMs: number;
 }
 
 export interface StaticBannerSettings {

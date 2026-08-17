@@ -5,6 +5,9 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:media_kit/media_kit.dart';
 import 'package:webview_flutter/webview_flutter.dart';
+// Pelaksana Android — untuk setMediaPlaybackRequiresUserGesture (autoplay
+// audio azan/iqamah tanpa gerak isyarat) & debugging WebView jauh.
+import 'package:webview_flutter_android/webview_flutter_android.dart';
 import 'prefs.dart';
 import 'bridge.dart';
 import 'pairing_screen.dart';
@@ -63,6 +66,16 @@ class _DisplayScreenState extends State<DisplayScreen> {
       ))
       ..enableZoom(false)
       ..loadRequest(Uri.parse(widget.prefs.displayUrl));
+
+    // Autoplay audio (azan/iqamah) tanpa gerak isyarat pengguna — kaedah
+    // Android-spesifik, dipanggil pada pelaksana platform seperti contoh
+    // rasmi webview_flutter. Tanpa ini WebView menyekat .play() automomatik
+    // dan bunyi tidak keluar pada kiosk TV.
+    if (_controller.platform is AndroidWebViewController) {
+      AndroidWebViewController.enableDebugging(true);
+      (_controller.platform as AndroidWebViewController)
+          .setMediaPlaybackRequiresUserGesture(false);
+    }
 
     // Network-wait fallback: retry only if the main page never finished
     // loading (e.g. Wi-Fi still connecting at boot). Never reload a page

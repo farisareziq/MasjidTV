@@ -335,7 +335,9 @@ function tickDebug() {
       boxes.push(`${id}:${Math.round(r.left)},${Math.round(r.top)} ${Math.round(r.width)}x${Math.round(r.height)}`);
     }
   }
-  el.textContent = `${innerWidth}\xD7${innerHeight} dpr${devicePixelRatio} | ${boxes.join(" | ")}`;
+  const st = computePrayerPhase();
+  const phaseInfo = st.phase === "normal" ? "normal" : `${st.phase} ${Math.ceil((st.remaining || 0) / 1e3)}s`;
+  el.textContent = `${innerWidth}\xD7${innerHeight} dpr${devicePixelRatio} | ${phaseInfo} | ${boxes.join(" | ")}`;
   el.hidden = false;
 }
 function renderPrayerStrip() {
@@ -437,15 +439,16 @@ const IQAMAH_LEAD_MS = 3e4;
 function getActivePrayerEvent(now) {
   const s = state.settings?.prayer;
   if (!s || !state.today) return null;
-  const lead = (Number(s.azanLeadMinutes) || 5) * 6e4;
-  const off = (Number(s.iqamahOffsetMinutes) || 10) * 6e4;
-  const jDur = (Number(s.jemaahDurationMinutes) || 15) * 6e4;
+  const fullTest = fullTestActive();
+  const lead = (fullTest ? (Number(testMode().phaseMs) || 6e4) / 6e4 : Number(s.azanLeadMinutes) || 5) * 6e4;
+  const off = fullTest ? Number(testMode().phaseMs) || 6e4 : (Number(s.iqamahOffsetMinutes) || 10) * 6e4;
+  const jDur = fullTest ? Number(testMode().phaseMs) || 6e4 : (Number(s.jemaahDurationMinutes) || 15) * 6e4;
   const tm = testMode();
   const simulate = tm.enabled && tm.date && tm.time;
   const anchor = (timeStr, iqStr) => {
     if (!simulate) return { azanMs: 0, iqMs: 0, anchorDate: null };
     const azanMs = zonedMs(tm.date, timeStr, tz());
-    const iqMs = iqStr ? zonedMs(tm.date, iqStr, tz()) : azanMs + off;
+    const iqMs = fullTest ? azanMs + off : iqStr ? zonedMs(tm.date, iqStr, tz()) : azanMs + off;
     return { azanMs, iqMs, anchorDate: tm.date };
   };
   const list = [];
@@ -577,6 +580,10 @@ function fmtPrayerTime(hhmm) {
 function testMode() {
   return state.settings?.display?.testMode || {};
 }
+const fullTestActive = () => {
+  const tm = testMode();
+  return !!(tm.enabled && tm.runFullTest && tm.date && tm.time && tm.savedAtMs);
+};
 function tzOffsetMinutes(epochMs, timeZone) {
   const fmt = new Intl.DateTimeFormat("en-CA", {
     timeZone,
@@ -604,7 +611,15 @@ function zonedMs(dateKey, hhmm, timeZone) {
 }
 function nowMs() {
   const tm = testMode();
-  if (tm.enabled && tm.date && tm.time) return zonedMs(tm.date, tm.time, tz());
+  if (tm.enabled && tm.date && tm.time) {
+    const anchor = zonedMs(tm.date, tm.time, tz());
+    if (fullTestActive()) {
+      const delay = (Number(tm.startDelaySec) || 0) * 1e3;
+      const elapsed = Math.max(0, Date.now() - tm.savedAtMs - delay);
+      return anchor + elapsed;
+    }
+    return anchor;
+  }
   return Date.now();
 }
 function audioFor(url) {
@@ -629,12 +644,22 @@ function preloadAudio(url) {
 function playOnce(key, url, targetMs) {
   if (!url) return;
   if (state.playedAdhan.has(key) || state.playedIqamah.has(key)) return;
-  const now = Date.now();
+  const now = nowMs();
   const diff = targetMs - now;
   if (diff > 1500 || diff < -6e5) return;
   const audio = audioFor(url);
   if (!audio) return;
   if (!audio.paused && !audio.ended) return;
+  if (fullTestActive()) {
+    for (const other of state.audioCache.values()) {
+      if (other !== audio && !other.paused && !other.ended) {
+        try {
+          other.pause();
+        } catch {
+        }
+      }
+    }
+  }
   audio.currentTime = 0;
   const target = key.startsWith("iq:") ? state.playedIqamah : state.playedAdhan;
   if (audio.dataset.pendingKey !== key) {
@@ -664,17 +689,19 @@ function playAudioWithUnlock(audio) {
   });
 }
 function tickAudio() {
-  if (testMode().enabled) return;
+  if (testMode().enabled && !fullTestActive()) return;
   const audio = state.settings?.audio;
   if (!audio?.enabled) return;
-  const now = Date.now();
+  const now = nowMs();
   const ev = getActivePrayerEvent(now);
   if (!ev || ev.tomorrow) return;
-  const dateKey = state.today.today;
+  const tm = testMode();
+  const dateKey = fullTestActive() ? `t${tm.savedAtMs}` : state.today.today;
   if (now >= ev.azan - ev.lead && now < ev.azan) preloadAudio(audio.adhanUrl);
   if (now < ev.iqamah) preloadAudio(audio.iqamahUrl);
   playOnce(`adhan:${ev.key}:${dateKey}`, audio.adhanUrl, ev.azan);
-  playOnce(`iq:${ev.key}:${dateKey}`, audio.iqamahUrl, ev.iqamah - IQAMAH_LEAD_MS);
+  const iqLead = fullTestActive() ? Math.min(IQAMAH_LEAD_MS, (Number(tm.phaseMs) || 6e4) / 3) : IQAMAH_LEAD_MS;
+  playOnce(`iq:${ev.key}:${dateKey}`, audio.iqamahUrl, ev.iqamah - iqLead);
 }
 function unlockAudio() {
   const silent = new Audio();
@@ -684,7 +711,7 @@ function unlockAudio() {
   const pending = state.pendingAudio;
   if (pending) {
     state.pendingAudio = null;
-    playOnce(pending.key, pending.url, Date.now());
+    playOnce(pending.key, pending.url, nowMs());
   }
 }
 document.addEventListener("pointerdown", unlockAudio, { once: true });
@@ -694,7 +721,7 @@ function retryPendingAudio() {
   const pending = state.pendingAudio;
   if (!pending) return;
   if (state.playedAdhan.has(pending.key) || state.playedIqamah.has(pending.key)) return;
-  playOnce(pending.key, pending.url, Date.now());
+  playOnce(pending.key, pending.url, nowMs());
 }
 document.addEventListener("visibilitychange", () => {
   if (!document.hidden) retryPendingAudio();

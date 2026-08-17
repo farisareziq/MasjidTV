@@ -8,7 +8,7 @@
 import type {
   Settings, Stream, Announcement, TodayPayload, PrayerTimePayload,
   EventPayload, Language, TickerSpeed, HeadingFont, MediaFit, DisplayColors,
-  StaticBannerSettings
+  StaticBannerSettings, TestModeSettings
 } from '@masjidtv/shared';
 import type { BuiltinContentItem } from '@masjidtv/shared';
 
@@ -349,7 +349,10 @@ function tickDebug(): void {
       boxes.push(`${id}:${Math.round(r.left)},${Math.round(r.top)} ${Math.round(r.width)}x${Math.round(r.height)}`);
     }
   }
-  el.textContent = `${innerWidth}×${innerHeight} dpr${devicePixelRatio} | ${boxes.join(' | ')}`;
+  // Fasa semasa + baki masa — memudahkan pengesahan aliran ujian azan/iqamah.
+  const st = computePrayerPhase();
+  const phaseInfo = st.phase === 'normal' ? 'normal' : `${st.phase} ${Math.ceil((st.remaining || 0) / 1000)}s`;
+  el.textContent = `${innerWidth}×${innerHeight} dpr${devicePixelRatio} | ${phaseInfo} | ${boxes.join(' | ')}`;
   el.hidden = false;
 }
 
@@ -453,15 +456,20 @@ const IQAMAH_LEAD_MS = 30000; // bunyi iqamah 30 saat sebelum waktu iqamah
 function getActivePrayerEvent(now: number): ActivePrayerEvent | null {
   const s = state.settings?.prayer;
   if (!s || !state.today) return null;
-  const lead = (Number(s.azanLeadMinutes) || 5) * 60000;
-  const off = (Number(s.iqamahOffsetMinutes) || 10) * 60000;
-  const jDur = (Number(s.jemaahDurationMinutes) || 15) * 60000;
+  // Ujian penuh: setiap fasa dipendekkan kepada 1 minit (boleh laras) supaya
+  // keseluruhan aliran boleh disahkan dengan cepat.
+  const fullTest = fullTestActive();
+  const lead = (fullTest ? (Number(testMode().phaseMs) || 60000) / 60000 : (Number(s.azanLeadMinutes) || 5)) * 60000;
+  const off = (fullTest ? (Number(testMode().phaseMs) || 60000) : (Number(s.iqamahOffsetMinutes) || 10) * 60000);
+  const jDur = (fullTest ? (Number(testMode().phaseMs) || 60000) : (Number(s.jemaahDurationMinutes) || 15) * 60000);
   const tm = testMode();
   const simulate = tm.enabled && tm.date && tm.time;
   const anchor = (timeStr: string, iqStr: string | undefined): { azanMs: number; iqMs: number; anchorDate: string | null } => {
     if (!simulate) return { azanMs: 0, iqMs: 0, anchorDate: null };
     const azanMs = zonedMs(tm.date, timeStr, tz());
-    const iqMs = iqStr ? zonedMs(tm.date, iqStr, tz()) : azanMs + off;
+    // Ujian penuh: paksa iqamah = azan + 1 fasa (abaikan masa tetap) supaya
+    // tempoh setiap fasa tepat seperti dikonfigurasi.
+    const iqMs = fullTest ? azanMs + off : (iqStr ? zonedMs(tm.date, iqStr, tz()) : azanMs + off);
     return { azanMs, iqMs, anchorDate: tm.date };
   };
   const list: PrayerEventEntry[] = [];
@@ -598,9 +606,17 @@ function fmtPrayerTime(hhmm: string): string {
 
 // ------------------------------------------- simulasi jam & tarikh (ujian)
 
-function testMode(): { enabled?: boolean; date?: string; time?: string } {
-  return state.settings?.display?.testMode || {};
+function testMode(): TestModeSettings {
+  return state.settings?.display?.testMode || ({} as TestModeSettings);
 }
+
+// Mod ujian penuh: anchor masa simulasi bergerak mengikut masa sebenar
+// sejak testMode.savedAtMs (jam simulasi "hidup", bukan beku), dengan jeda
+// permulaan startDelaySec sebelum fasa countdown azan bermula.
+const fullTestActive = (): boolean => {
+  const tm = testMode();
+  return !!(tm.enabled && tm.runFullTest && tm.date && tm.time && tm.savedAtMs);
+};
 
 function tzOffsetMinutes(epochMs: number, timeZone: string): number {
   const fmt = new Intl.DateTimeFormat('en-CA', {
@@ -625,9 +641,20 @@ function zonedMs(dateKey: string, hhmm: string, timeZone: string): number {
 }
 
 // "Sekarang" — masa sebenar atau simulasi (mod ujian).
+// Simulasi biasa: masa beku pada (date, time) untuk pratonton statik.
+// Ujian penuh: masa simulasi BERJALAN dari titik anchor (masa azan − 1 fasa)
+// supaya seluruh aliran azan→iqamah→jemaah berkembang secara langsung.
 function nowMs(): number {
   const tm = testMode();
-  if (tm.enabled && tm.date && tm.time) return zonedMs(tm.date, tm.time, tz());
+  if (tm.enabled && tm.date && tm.time) {
+    const anchor = zonedMs(tm.date, tm.time, tz());
+    if (fullTestActive()) {
+      const delay = (Number(tm.startDelaySec) || 0) * 1000;
+      const elapsed = Math.max(0, Date.now() - tm.savedAtMs - delay);
+      return anchor + elapsed;
+    }
+    return anchor;
+  }
   return Date.now();
 }
 
@@ -656,13 +683,22 @@ function preloadAudio(url: string): void {
 function playOnce(key: string, url: string, targetMs: number): void {
   if (!url) return;
   if (state.playedAdhan.has(key) || state.playedIqamah.has(key)) return;
-  const now = Date.now();
+  const now = nowMs(); // masa simulasi — konsisten dengan sasaran fasa
   const diff = targetMs - now;
   // Terlalu awal — bukan masa lagi. Terlalu lewat (>10 min) — lupakan.
   if (diff > 1500 || diff < -600000) return;
   const audio = audioFor(url);
   if (!audio) return;
   if (!audio.paused && !audio.ended) return; // sudah dimainkan - jangan ulang semula
+  // Ujian penuh: fasa dipendekkan — hentikan audio lain yang masih berbunyi
+  // supaya azan & iqamah tidak bertindih dalam masa yang dimampatkan.
+  if (fullTestActive()) {
+    for (const other of state.audioCache.values()) {
+      if (other !== audio && !other.paused && !other.ended) {
+        try { other.pause(); } catch { /* abaikan */ }
+      }
+    }
+  }
   audio.currentTime = 0;
   // Tandakan "sudah dimainkan" hanya apabila audio benar-benar mula berbunyi
   // (bukan semasa fallback mute). Autoplay pelayar web mungkin disekat -
@@ -699,20 +735,26 @@ function playAudioWithUnlock(audio: HTMLAudioElement): void {
 }
 
 function tickAudio(): void {
-  if (testMode().enabled) return; // tiada audio semasa simulasi
+  // Simulasi statik (bukan ujian penuh) — tiada audio.
+  if (testMode().enabled && !fullTestActive()) return;
   const audio = state.settings?.audio;
   if (!audio?.enabled) return;
-  const now = Date.now();
+  const now = nowMs();
   const ev = getActivePrayerEvent(now);
   if (!ev || ev.tomorrow) return;
-  const dateKey = state.today.today;
+  // Kunci unik per kitaran: semasa ujian penuh ikut ID simulasi supaya
+  // setiap "Run" boleh berbunyi semula; biasa ikut tarikh sebenar.
+  const tm = testMode();
+  const dateKey = fullTestActive() ? `t${tm.savedAtMs}` : state.today.today;
   // Preload audio awal semasa countdown azan supaya tiada kelewatan mula.
   if (now >= ev.azan - ev.lead && now < ev.azan) preloadAudio(audio.adhanUrl);
   if (now < ev.iqamah) preloadAudio(audio.iqamahUrl);
   // Azan — main pada waktu azan.
   playOnce(`adhan:${ev.key}:${dateKey}`, audio.adhanUrl, ev.azan);
-  // Iqamah — main 30 saat sebelum waktu iqamah.
-  playOnce(`iq:${ev.key}:${dateKey}`, audio.iqamahUrl, ev.iqamah - IQAMAH_LEAD_MS);
+  // Iqamah — bunyi bermula 30 saat sebelum waktu iqamah (atau 1/3 fasa
+  // semasa ujian penuh, agar muat dalam fasa yang dipendekkan).
+  const iqLead = fullTestActive() ? Math.min(IQAMAH_LEAD_MS, (Number(tm.phaseMs) || 60000) / 3) : IQAMAH_LEAD_MS;
+  playOnce(`iq:${ev.key}:${dateKey}`, audio.iqamahUrl, ev.iqamah - iqLead);
 }
 
 function unlockAudio(): void {
@@ -724,7 +766,7 @@ function unlockAudio(): void {
   const pending = state.pendingAudio;
   if (pending) {
     state.pendingAudio = null;
-    playOnce(pending.key, pending.url, Date.now());
+    playOnce(pending.key, pending.url, nowMs());
   }
 }
 document.addEventListener('pointerdown', unlockAudio, { once: true });
@@ -736,7 +778,7 @@ function retryPendingAudio(): void {
   const pending = state.pendingAudio;
   if (!pending) return;
   if (state.playedAdhan.has(pending.key) || state.playedIqamah.has(pending.key)) return;
-  playOnce(pending.key, pending.url, Date.now());
+  playOnce(pending.key, pending.url, nowMs());
 }
 document.addEventListener('visibilitychange', () => { if (!document.hidden) retryPendingAudio(); });
 window.addEventListener('focus', retryPendingAudio);

@@ -443,7 +443,7 @@
 
         <div class="card">
           <h3 data-i18n="testModeTitle">Test mode — azan &amp; iqamah countdown</h3>
-          <p class="sub" data-i18n="testModeSub">Simulate the clock and date to preview the full-screen azan/iqamah flow. The display follows the simulated time; audio is muted during simulation.</p>
+          <p class="sub" data-i18n="testModeSub">Simulate the clock and date to preview the full-screen azan/iqamah flow. "Run full test" plays the whole flow live — every phase 1 minute — including the adhan &amp; iqamah audio.</p>
           <div class="form-grid">
             <label class="checkbox-label"><input type="checkbox" id="stTestEnabled"> <span data-i18n="testEnabled">Enable test mode</span></label>
             <label><span data-i18n="testDate">Simulated date</span>
@@ -464,10 +464,11 @@
             <span class="sub" id="stTestRef" style="padding-top:8px"></span>
           </div>
           <div class="btn-row">
+            <button type="button" id="stTestRunFull" class="btn primary sm" data-i18n="testRunFull">▶ Run full test (1 min/phase, with sound)</button>
             <button type="button" id="stTestMinus5" class="btn ghost sm" data-i18n="testMinus5">T − 5 min</button>
             <button type="button" id="stTestAzan" class="btn ghost sm" data-i18n="testAzan">Adhan time</button>
             <button type="button" id="stTestIqamah" class="btn ghost sm" data-i18n="testIqamah">Iqamah time</button>
-            <button id="stTestSave" class="btn primary sm" data-i18n="saveTestMode">Save test mode</button>
+            <button id="stTestSave" class="btn ghost sm" data-i18n="saveTestMode">Save test mode</button>
           </div>
         </div>
 

@@ -227,7 +227,7 @@ const I18N: Record<string, Record<string, string>> = {
     photoOpacity: 'Photo opacity',
     saveDisplay: 'Save display settings',
     testModeTitle: 'Test mode — azan & iqamah countdown',
-    testModeSub: 'Simulate the clock and date to preview the full-screen azan/iqamah flow. The display follows the simulated time; audio is muted during simulation.',
+    testModeSub: 'Simulate the clock and date to preview the full-screen azan/iqamah flow. "Run full test" plays the whole flow live — every phase 1 minute — including the adhan & iqamah audio.',
     testEnabled: 'Enable test mode',
     testDate: 'Simulated date',
     testTime: 'Simulated time',
@@ -236,6 +236,8 @@ const I18N: Record<string, Record<string, string>> = {
     testAzan: 'Adhan time',
     testIqamah: 'Iqamah time',
     saveTestMode: 'Save test mode',
+    testRunFull: '▶ Run full test (1 min/phase, with sound)',
+    testFullStarted: 'Full test started — watch the display screen',
     presetCustom: '— Custom —',
     presetNavy: 'Navy & Gold (default)',
     presetEmerald: 'Emerald & Gold',
@@ -492,7 +494,7 @@ const I18N: Record<string, Record<string, string>> = {
     photoOpacity: 'Kelegapan foto',
     saveDisplay: 'Simpan tetapan paparan',
     testModeTitle: 'Mod ujian — countdown azan & iqamah',
-    testModeSub: 'Simulasikan jam dan tarikh untuk melihat aliran azan/iqamah skrin penuh. Paparan mengikut masa simulasi; audio dibisukan semasa simulasi.',
+    testModeSub: 'Simulasikan jam dan tarikh untuk melihat aliran azan/iqamah skrin penuh. "Jalankan ujian penuh" memainkan seluruh aliran secara langsung — setiap fasa 1 minit — termasuk audio azan & iqamah.',
     testEnabled: 'Aktifkan mod ujian',
     testDate: 'Tarikh simulasi',
     testTime: 'Jam simulasi',
@@ -501,6 +503,8 @@ const I18N: Record<string, Record<string, string>> = {
     testAzan: 'Waktu azan',
     testIqamah: 'Waktu iqamah',
     saveTestMode: 'Simpan mod ujian',
+    testRunFull: '▶ Jalankan ujian penuh (1 minit/fasa, dengan bunyi)',
+    testFullStarted: 'Ujian penuh bermula — perhatikan skrin paparan',
     presetCustom: '— Tersuai —',
     presetNavy: 'Navy & Emas (lalai)',
     presetEmerald: 'Emerald & Emas',
@@ -1338,12 +1342,49 @@ $('stTestSave').addEventListener('click', async () => {
           testMode: {
             enabled: $('stTestEnabled').checked,
             date: $('stTestDate').value,
-            time: $('stTestTime').value
+            time: $('stTestTime').value,
+            runFullTest: false
           }
         }
       }
     });
     toast(t('settingsSaved'));
+  } catch (err) {
+    toast((err as Error).message, 'err');
+  }
+});
+
+// Ujian penuh: jalankan seluruh aliran azan→iqamah→jemaah secara LANGSUNG
+// dengan setiap fasa 1 minit — termasuk bunyi azan & iqamah. Jam simulasi
+// bermula pada (waktu azan − 1 minit) selepas jeda permulaan.
+$('stTestRunFull').addEventListener('click', async () => {
+  const key = $('stTestPrayer').value || 'maghrib';
+  const p = (state.today?.prayers as Record<string, PrayerTimePayload | undefined> | undefined)?.[key];
+  if (!p) return toast(t('requestFailed', { s: 404 }), 'err');
+  const phaseMin = 1;
+  const azanTime = shiftTime(p.time, -phaseMin); // mula 1 minit sebelum azan
+  try {
+    await api('/api/admin/settings', {
+      method: 'PUT',
+      body: {
+        display: {
+          testMode: {
+            enabled: true,
+            date: state.today?.today || new Date().toISOString().slice(0, 10),
+            time: azanTime,
+            runFullTest: true,
+            startDelaySec: 10,
+            prayerKey: key,
+            savedAtMs: Date.now(),
+            phaseMs: phaseMin * 60000
+          }
+        }
+      }
+    });
+    $('stTestEnabled').checked = true;
+    $('stTestDate').value = state.today?.today || '';
+    $('stTestTime').value = azanTime;
+    toast(t('testFullStarted'));
   } catch (err) {
     toast((err as Error).message, 'err');
   }

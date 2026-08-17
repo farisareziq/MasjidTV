@@ -300,7 +300,11 @@ body::after {
 .ov-arabic {
   font-family: "Amiri", "Scheherazade New", "Traditional Arabic", serif;
   font-size: clamp(64px, 22vh, 240px);
-  line-height: 1.5;
+  /* Amiri ada metrik menegak dalam (ascender/descender panjang untuk
+     harakat). line-height besar (1.5) mencipta jurang besar atas & bawah
+     setiap perkataan — pada TV kelihatan "berterabur"/caca marba.
+     1.15 memadatkan baris tanpa memotong harakat. */
+  line-height: 1.15;
   color: var(--gold-bright);
   direction: rtl;
   text-shadow: 0 14px 60px rgba(0, 0, 0, 0.45);
@@ -308,6 +312,7 @@ body::after {
 
 .ov-arabic.big {
   font-size: clamp(90px, 30vh, 330px);
+  line-height: 1.1;
 }
 
 .ov-name {
@@ -607,7 +612,8 @@ body::after {
   font-family: "Amiri", "Scheherazade New", "Traditional Arabic", serif;
   font-size: clamp(24px, 4.4vh, 52px);
   color: var(--gold-bright);
-  line-height: 1.9;
+  /* 1.6 cukup untuk ayat berbilang baris dgn harakat — 1.9 terlalu renggang */
+  line-height: 1.6;
   margin-bottom: clamp(8px, 1.4vh, 16px);
   direction: rtl;
 }

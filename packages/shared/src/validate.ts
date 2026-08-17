@@ -161,6 +161,14 @@ export function applyPatch(current: Settings, patch: AnyPatch): Settings {
   const settings = JSON.parse(JSON.stringify(current)) as Settings;
   if (!patch || typeof patch !== 'object') return settings;
 
+  // Isi medan baharu yang tiada pada tetapan lama (tenant sedia ada) — elak
+  // crash capaian `.testMode.runFullTest` pada objek bentuk lama.
+  settings.display = settings.display || ({} as Settings['display']);
+  settings.display.testMode = {
+    ...DEFAULT_SETTINGS.display.testMode,
+    ...(settings.display.testMode || {})
+  };
+
   if (patch.mosque && typeof patch.mosque === 'object') {
     const m = settings.mosque;
     const p = patch.mosque as Record<string, unknown>;
@@ -251,6 +259,11 @@ export function applyPatch(current: Settings, patch: AnyPatch): Settings {
       if (typeof tm.enabled === 'boolean') d.testMode.enabled = tm.enabled;
       if (typeof tm.date === 'string') d.testMode.date = /^\d{4}-\d{2}-\d{2}$/.test(tm.date) ? tm.date : '';
       if (typeof tm.time === 'string') d.testMode.time = /^([01]\d|2[0-3]):[0-5]\d$/.test(tm.time) ? tm.time : '';
+      if (typeof tm.runFullTest === 'boolean') d.testMode.runFullTest = tm.runFullTest;
+      if (tm.startDelaySec !== undefined) d.testMode.startDelaySec = clampNum(tm.startDelaySec, 0, 300, d.testMode.startDelaySec);
+      if (typeof tm.prayerKey === 'string' && ['fajr', 'dhuhr', 'asr', 'maghrib', 'isha'].includes(tm.prayerKey)) d.testMode.prayerKey = tm.prayerKey;
+      if (tm.savedAtMs !== undefined) d.testMode.savedAtMs = clampNum(tm.savedAtMs, 0, Number.MAX_SAFE_INTEGER, d.testMode.savedAtMs);
+      if (tm.phaseMs !== undefined) d.testMode.phaseMs = clampNum(tm.phaseMs, 5000, 900000, d.testMode.phaseMs);
     }
     if (p.staticBanner && typeof p.staticBanner === 'object') {
       const sb = d.staticBanner || (d.staticBanner = { enabled: false, title: '', message: '', image: '' });
@@ -363,7 +376,7 @@ export const DEFAULT_SETTINGS: Settings = {
     tickerSpeed: 'normal', safeMargin: 2, mediaFit: 'stretch', tickerCustom: '',
     colors: { bgTop: '#06101f', bgBottom: '#0a1a2f', text: '#f3f6fb', muted: '#8fa4bd', gold: '#e0bc6a', teal: '#62d9c6' },
     backgroundImage: '', backgroundOpacity: 0,
-    testMode: { enabled: false, date: '', time: '' },
+    testMode: { enabled: false, date: '', time: '', runFullTest: false, startDelaySec: 10, prayerKey: 'maghrib', savedAtMs: 0, phaseMs: 60000 },
     staticBanner: { enabled: false, title: '', message: '', image: '' },
     fridayKhutbahUntil: '13:55'
   },
