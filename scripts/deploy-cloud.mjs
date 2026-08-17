@@ -6,7 +6,8 @@ import { fileURLToPath } from 'node:url';
 import fs from 'node:fs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const cloudDir = path.join(__dirname, '..', 'packages', 'cloud');
+const repoRoot = path.resolve(__dirname, '..');
+const cloudDir = path.join(repoRoot, 'packages', 'cloud');
 
 // Vercel deploys from the package dir with the compiled api entry.
 if (!fs.existsSync(path.join(cloudDir, 'dist'))) {
@@ -14,5 +15,7 @@ if (!fs.existsSync(path.join(cloudDir, 'dist'))) {
   process.exit(1);
 }
 
+// Project linked with rootDirectory=packages/cloud → deploy from repo root
+// (running inside packages/cloud makes Vercel double the path).
 console.log('[deploy] Deploying packages/cloud to Vercel...');
-execSync('vercel deploy --prod --yes', { cwd: cloudDir, stdio: 'inherit' });
+execSync('vercel deploy --prod --yes', { cwd: repoRoot, stdio: 'inherit' });
