@@ -47,6 +47,9 @@ const I18N = {
     tvPairBtn: "Pair TV",
     tvDevices: "Paired devices",
     tvUnpair: "Unpair",
+    tvRename: "Rename",
+    tvRenamePrompt: "Device name (e.g. Mi TV Prayer Hall):",
+    tvRenameEmpty: "Name cannot be empty",
     tvEmpty: "No devices paired yet.",
     settings: "Settings",
     signOut: "Sign out",
@@ -374,6 +377,9 @@ const I18N = {
     tvPairBtn: "Pair TV",
     tvDevices: "Peranti terpaut",
     tvUnpair: "Nyah-paut",
+    tvRename: "Nama semula",
+    tvRenamePrompt: "Nama peranti (cth. Mi TV Ruang Solat):",
+    tvRenameEmpty: "Nama tidak boleh kosong",
     tvEmpty: "Tiada peranti terpaut lagi.",
     settings: "Tetapan",
     signOut: "Log Keluar",
@@ -2135,7 +2141,10 @@ async function renderTv() {
           <strong>${escapeHtml(d.name || d.device_id)}</strong>
           <p class="sub" style="font-size:11px;word-break:break-all">${escapeHtml(d.device_id)} \u2022 ${d.last_seen ? new Date(Number(d.last_seen) || d.last_seen).toLocaleString() : "\u2014"}</p>
         </div>
-        <button class="btn ghost sm" data-unpair="${escapeHtml(d.id)}">${escapeHtml(t("tvUnpair"))}</button>
+        <div style="display:flex;gap:8px;flex-shrink:0">
+          <button class="btn ghost sm" data-rename="${escapeHtml(d.id)}" data-name="${escapeHtml(d.name || "")}">\u270F\uFE0F ${escapeHtml(t("tvRename"))}</button>
+          <button class="btn ghost sm" data-unpair="${escapeHtml(d.id)}">${escapeHtml(t("tvUnpair"))}</button>
+        </div>
       </div>`).join("");
   } catch (err) {
     list.innerHTML = `<p class="sub">${escapeHtml(err.message)}</p>`;
@@ -2154,6 +2163,22 @@ $("tvPairBtn").addEventListener("click", async () => {
   }
 });
 $("tvDeviceList").addEventListener("click", async (e) => {
+  const renameBtn = e.target.closest("[data-rename]");
+  if (renameBtn) {
+    const current = renameBtn.dataset.name || "";
+    const name = prompt(t("tvRenamePrompt"), current);
+    if (name === null) return;
+    const clean = name.trim().slice(0, 60);
+    if (!clean) return toast(t("tvRenameEmpty"), "err");
+    try {
+      await api(`/api/admin/devices/${renameBtn.dataset.rename}`, { method: "PATCH", body: { name: clean } });
+      toast(t("tvRename") + " \u2713");
+      renderTv();
+    } catch (err) {
+      toast(err.message, "err");
+    }
+    return;
+  }
   const btn = e.target.closest("[data-unpair]");
   if (!btn) return;
   try {

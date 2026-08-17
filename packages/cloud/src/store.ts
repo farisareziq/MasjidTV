@@ -278,6 +278,10 @@ export class CloudStore {
     await this.db.delete(tvDevices).where(and(eq(tvDevices.tenantId, tenantId), eq(tvDevices.id, id))).run();
   }
 
+  async renameDevice(tenantId: string, id: string, name: string): Promise<void> {
+    await this.db.update(tvDevices).set({ name }).where(and(eq(tvDevices.tenantId, tenantId), eq(tvDevices.id, id))).run();
+  }
+
   async deleteDeviceByToken(tenantId: string, token: string): Promise<void> {
     await this.db.delete(tvDevices).where(and(eq(tvDevices.tenantId, tenantId), eq(tvDevices.token, token))).run();
   }

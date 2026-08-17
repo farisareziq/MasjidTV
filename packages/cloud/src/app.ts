@@ -845,6 +845,18 @@ export async function createCloudApp(): Promise<FastifyInstance> {
     reply.send({ devices: await store.listDevices(tenant.id) });
   });
 
+  // Namakan semula peranti TV (paparan senarai & rujukan admin).
+  app.patch('/api/admin/devices/:id', async (req, reply) => {
+    const tenant = await requireAdmin(req, reply);
+    if (!tenant) return;
+    const { id } = req.params as { id: string };
+    const { name } = (req.body || {}) as { name?: string };
+    const clean = String(name || '').trim().slice(0, 60);
+    if (!clean) return jsonError(reply, 400, 'Nama diperlukan');
+    await store.renameDevice(tenant.id, id, clean);
+    reply.send({ ok: true });
+  });
+
   app.delete('/api/admin/devices/:id', async (req, reply) => {
     const tenant = await requireAdmin(req, reply);
     if (!tenant) return;
