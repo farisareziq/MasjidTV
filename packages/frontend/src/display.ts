@@ -505,7 +505,11 @@ function getActivePrayerEvent(now: number): ActivePrayerEvent | null {
     list.push({ key: 'fajr', azan: tomorrow, iqamah: tomorrow + off, tomorrow: true });
   }
   for (const e of list) {
-    const fEnd = e.key === 'dhuhr' && isFriday() ? fridayJemaahEndMs() : null;
+    // Ujian penuh: fasa khutbah Jumaat turut dimampatkan kepada 1 fasa
+    // (masa tetap sebenar 13:55 tidak boleh dicapai dalam simulasi 1 minit).
+    const fEnd = e.key === 'dhuhr' && isFriday()
+      ? (fullTest ? e.iqamah + jDur : fridayJemaahEndMs())
+      : null;
     const end = fEnd ? Math.max(fEnd, e.iqamah + jDur) : e.iqamah + jDur;
     if (now >= e.azan - lead && now < end) return { ...e, lead, off, jDur, end };
   }

@@ -261,7 +261,7 @@ export function applyPatch(current: Settings, patch: AnyPatch): Settings {
       if (typeof tm.time === 'string') d.testMode.time = /^([01]\d|2[0-3]):[0-5]\d$/.test(tm.time) ? tm.time : '';
       if (typeof tm.runFullTest === 'boolean') d.testMode.runFullTest = tm.runFullTest;
       if (tm.startDelaySec !== undefined) d.testMode.startDelaySec = clampNum(tm.startDelaySec, 0, 300, d.testMode.startDelaySec);
-      if (typeof tm.prayerKey === 'string' && ['fajr', 'dhuhr', 'asr', 'maghrib', 'isha'].includes(tm.prayerKey)) d.testMode.prayerKey = tm.prayerKey;
+      if (typeof tm.prayerKey === 'string' && ['fajr', 'dhuhr', 'asr', 'maghrib', 'isha', 'jumaah'].includes(tm.prayerKey)) d.testMode.prayerKey = tm.prayerKey;
       if (tm.savedAtMs !== undefined) d.testMode.savedAtMs = clampNum(tm.savedAtMs, 0, Number.MAX_SAFE_INTEGER, d.testMode.savedAtMs);
       if (tm.phaseMs !== undefined) d.testMode.phaseMs = clampNum(tm.phaseMs, 5000, 900000, d.testMode.phaseMs);
     }

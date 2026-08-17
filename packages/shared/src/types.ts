@@ -68,7 +68,7 @@ export interface TestModeSettings {
   runFullTest: boolean;
   /** Saat sedang berjalan sebelum permulaan simulasi (lalai 10s). */
   startDelaySec: number;
-  /** Templat nama solat yang diuji (lalai: maghrib). */
+  /** Templat nama solat yang diuji (lalai: maghrib). "jumaah" = aliran khutbah Jumaat (guna waktu Zohor). */
   prayerKey: string;
   /** Masa sebenar (epoch ms) mod ujian diaktifkan — digunakan untuk mengekang jam simulasi. */
   savedAtMs: number;

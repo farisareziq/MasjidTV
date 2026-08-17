@@ -86,6 +86,7 @@ const I18N: Record<string, Record<string, string>> = {
     prayerAsr: 'Asr',
     prayerMaghrib: 'Maghrib',
     prayerIsha: 'Isha',
+    prayerJumaah: 'Jumu\'ah (khutbah)',
     announcementsTitle: 'Announcements',
     nextIslamicEvent: 'Next Islamic event',
     signageScreen: 'Signage screen',
@@ -353,6 +354,7 @@ const I18N: Record<string, Record<string, string>> = {
     prayerAsr: 'Asar',
     prayerMaghrib: 'Maghrib',
     prayerIsha: 'Isyak',
+    prayerJumaah: 'Jumaat (khutbah)',
     announcementsTitle: 'Pengumuman',
     nextIslamicEvent: 'Hari Kebesaran Seterusnya',
     signageScreen: 'Skrin Paparan',
@@ -1302,22 +1304,44 @@ function shiftTime(hhmm: string, mins: number): string {
   return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
 }
 
+// Kunci solat untuk rujukan waktu — "jumaah" menggunakan waktu Zohor
+// (aliran khutbah Jumaat menggantikan fasa jemaah Zohor pada hari Jumaat).
+const testPrayerKey = (): string => {
+  const v = $('stTestPrayer').value;
+  return v === 'jumaah' ? 'dhuhr' : v;
+};
+
+// Tarikh simulasi untuk ujian — "jumaah" memerlukan hari Jumaat sebenar,
+// jadi gunakan Jumaat terdekat (hari ini jika hari ini Jumaat).
+const nextFridayKey = (): string => {
+  const d = new Date(`${state.today?.today || new Date().toISOString().slice(0, 10)}T00:00:00`);
+  const add = (5 - d.getDay() + 7) % 7;
+  d.setDate(d.getDate() + add);
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const dd = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${dd}`;
+};
+const testSimDate = (): string => ($('stTestPrayer').value === 'jumaah' ? nextFridayKey() : (state.today?.today || new Date().toISOString().slice(0, 10)));
+
 function updateTestRef() {
-  const key = $('stTestPrayer')?.value || 'fajr';
+  const sel = $('stTestPrayer').value;
+  const key = testPrayerKey();
   const p = (state.today?.prayers as Record<string, PrayerTimePayload | undefined> | undefined)?.[key];
   if (!p) {
     $('stTestRef').textContent = '';
     return;
   }
   const iq = (state.today?.iqamah as Record<string, { time: string; ms: number } | undefined> | undefined)?.[key]?.time;
-  const name = t(`prayer${key.charAt(0).toUpperCase()}${key.slice(1)}`);
-  $('stTestRef').textContent = `${name} • azan ${p.time}${iq ? ` → iqamah ${iq}` : ''}`;
+  const name = sel === 'jumaah' ? t('prayerJumaah') : t(`prayer${key.charAt(0).toUpperCase()}${key.slice(1)}`);
+  const dayNote = sel === 'jumaah' ? ` • ${t('fridayJumaah')} → ${String((state.settings as Record<string, any> | null)?.display?.fridayKhutbahUntil || '13:55')}` : '';
+  $('stTestRef').textContent = `${name} • azan ${p.time}${iq ? ` → iqamah ${iq}` : ''}${dayNote}`;
 }
 
 $('stTestPrayer').addEventListener('change', updateTestRef);
 
 function setTestTimeFromPrayer(shiftMins: number | 'iqamah') {
-  const key = $('stTestPrayer').value;
+  const key = testPrayerKey();
   const p = (state.today?.prayers as Record<string, PrayerTimePayload | undefined> | undefined)?.[key];
   if (!p) return toast(t('requestFailed', { s: 404 }), 'err');
   let time = p.time;
@@ -1327,6 +1351,8 @@ function setTestTimeFromPrayer(shiftMins: number | 'iqamah') {
     time = (state.today?.iqamah as Record<string, { time: string; ms: number } | undefined> | undefined)?.[key]?.time || shiftTime(p.time, Number($('stIqamahOffset').value) || 10);
   }
   $('stTestTime').value = time;
+  // Jumaat memerlukan tarikh simulasi hari Jumaat supaya fasa khutbah aktif.
+  if ($('stTestPrayer').value === 'jumaah') $('stTestDate').value = nextFridayKey();
 }
 
 $('stTestMinus5').addEventListener('click', () => setTestTimeFromPrayer(-5));
@@ -1358,11 +1384,13 @@ $('stTestSave').addEventListener('click', async () => {
 // dengan setiap fasa 1 minit — termasuk bunyi azan & iqamah. Jam simulasi
 // bermula pada (waktu azan − 1 minit) selepas jeda permulaan.
 $('stTestRunFull').addEventListener('click', async () => {
-  const key = $('stTestPrayer').value || 'maghrib';
+  const sel = $('stTestPrayer').value || 'maghrib';
+  const key = testPrayerKey();
   const p = (state.today?.prayers as Record<string, PrayerTimePayload | undefined> | undefined)?.[key];
   if (!p) return toast(t('requestFailed', { s: 404 }), 'err');
   const phaseMin = 1;
   const azanTime = shiftTime(p.time, -phaseMin); // mula 1 minit sebelum azan
+  const simDate = testSimDate(); // jumaah -> tarikh Jumaat terdekat
   try {
     await api('/api/admin/settings', {
       method: 'PUT',
@@ -1370,11 +1398,11 @@ $('stTestRunFull').addEventListener('click', async () => {
         display: {
           testMode: {
             enabled: true,
-            date: state.today?.today || new Date().toISOString().slice(0, 10),
+            date: simDate,
             time: azanTime,
             runFullTest: true,
             startDelaySec: 10,
-            prayerKey: key,
+            prayerKey: sel,
             savedAtMs: Date.now(),
             phaseMs: phaseMin * 60000
           }
@@ -1382,7 +1410,7 @@ $('stTestRunFull').addEventListener('click', async () => {
       }
     });
     $('stTestEnabled').checked = true;
-    $('stTestDate').value = state.today?.today || '';
+    $('stTestDate').value = simDate;
     $('stTestTime').value = azanTime;
     toast(t('testFullStarted'));
   } catch (err) {

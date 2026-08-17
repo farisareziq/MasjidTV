@@ -501,7 +501,7 @@ function getActivePrayerEvent(now) {
     list.push({ key: "fajr", azan: tomorrow, iqamah: tomorrow + off, tomorrow: true });
   }
   for (const e of list) {
-    const fEnd = e.key === "dhuhr" && isFriday() ? fridayJemaahEndMs() : null;
+    const fEnd = e.key === "dhuhr" && isFriday() ? fullTest ? e.iqamah + jDur : fridayJemaahEndMs() : null;
     const end = fEnd ? Math.max(fEnd, e.iqamah + jDur) : e.iqamah + jDur;
     if (now >= e.azan - lead && now < end) return { ...e, lead, off, jDur, end };
   }

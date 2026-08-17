@@ -61,6 +61,7 @@ const I18N = {
     prayerAsr: "Asr",
     prayerMaghrib: "Maghrib",
     prayerIsha: "Isha",
+    prayerJumaah: "Jumu'ah (khutbah)",
     announcementsTitle: "Announcements",
     nextIslamicEvent: "Next Islamic event",
     signageScreen: "Signage screen",
@@ -393,6 +394,7 @@ const I18N = {
     prayerAsr: "Asar",
     prayerMaghrib: "Maghrib",
     prayerIsha: "Isyak",
+    prayerJumaah: "Jumaat (khutbah)",
     announcementsTitle: "Pengumuman",
     nextIslamicEvent: "Hari Kebesaran Seterusnya",
     signageScreen: "Skrin Paparan",
@@ -1551,20 +1553,36 @@ function shiftTime(hhmm, mins) {
   const d = new Date(2e3, 0, 1, h, m + mins);
   return `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
 }
+const testPrayerKey = () => {
+  const v = $("stTestPrayer").value;
+  return v === "jumaah" ? "dhuhr" : v;
+};
+const nextFridayKey = () => {
+  const d = /* @__PURE__ */ new Date(`${state.today?.today || (/* @__PURE__ */ new Date()).toISOString().slice(0, 10)}T00:00:00`);
+  const add = (5 - d.getDay() + 7) % 7;
+  d.setDate(d.getDate() + add);
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const dd = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${dd}`;
+};
+const testSimDate = () => $("stTestPrayer").value === "jumaah" ? nextFridayKey() : state.today?.today || (/* @__PURE__ */ new Date()).toISOString().slice(0, 10);
 function updateTestRef() {
-  const key = $("stTestPrayer")?.value || "fajr";
+  const sel = $("stTestPrayer").value;
+  const key = testPrayerKey();
   const p = state.today?.prayers?.[key];
   if (!p) {
     $("stTestRef").textContent = "";
     return;
   }
   const iq = state.today?.iqamah?.[key]?.time;
-  const name = t(`prayer${key.charAt(0).toUpperCase()}${key.slice(1)}`);
-  $("stTestRef").textContent = `${name} \u2022 azan ${p.time}${iq ? ` \u2192 iqamah ${iq}` : ""}`;
+  const name = sel === "jumaah" ? t("prayerJumaah") : t(`prayer${key.charAt(0).toUpperCase()}${key.slice(1)}`);
+  const dayNote = sel === "jumaah" ? ` \u2022 ${t("fridayJumaah")} \u2192 ${String(state.settings?.display?.fridayKhutbahUntil || "13:55")}` : "";
+  $("stTestRef").textContent = `${name} \u2022 azan ${p.time}${iq ? ` \u2192 iqamah ${iq}` : ""}${dayNote}`;
 }
 $("stTestPrayer").addEventListener("change", updateTestRef);
 function setTestTimeFromPrayer(shiftMins) {
-  const key = $("stTestPrayer").value;
+  const key = testPrayerKey();
   const p = state.today?.prayers?.[key];
   if (!p) return toast(t("requestFailed", { s: 404 }), "err");
   let time = p.time;
@@ -1574,6 +1592,7 @@ function setTestTimeFromPrayer(shiftMins) {
     time = state.today?.iqamah?.[key]?.time || shiftTime(p.time, Number($("stIqamahOffset").value) || 10);
   }
   $("stTestTime").value = time;
+  if ($("stTestPrayer").value === "jumaah") $("stTestDate").value = nextFridayKey();
 }
 $("stTestMinus5").addEventListener("click", () => setTestTimeFromPrayer(-5));
 $("stTestAzan").addEventListener("click", () => setTestTimeFromPrayer(0));
@@ -1599,11 +1618,13 @@ $("stTestSave").addEventListener("click", async () => {
   }
 });
 $("stTestRunFull").addEventListener("click", async () => {
-  const key = $("stTestPrayer").value || "maghrib";
+  const sel = $("stTestPrayer").value || "maghrib";
+  const key = testPrayerKey();
   const p = state.today?.prayers?.[key];
   if (!p) return toast(t("requestFailed", { s: 404 }), "err");
   const phaseMin = 1;
   const azanTime = shiftTime(p.time, -phaseMin);
+  const simDate = testSimDate();
   try {
     await api("/api/admin/settings", {
       method: "PUT",
@@ -1611,11 +1632,11 @@ $("stTestRunFull").addEventListener("click", async () => {
         display: {
           testMode: {
             enabled: true,
-            date: state.today?.today || (/* @__PURE__ */ new Date()).toISOString().slice(0, 10),
+            date: simDate,
             time: azanTime,
             runFullTest: true,
             startDelaySec: 10,
-            prayerKey: key,
+            prayerKey: sel,
             savedAtMs: Date.now(),
             phaseMs: phaseMin * 6e4
           }
@@ -1623,7 +1644,7 @@ $("stTestRunFull").addEventListener("click", async () => {
       }
     });
     $("stTestEnabled").checked = true;
-    $("stTestDate").value = state.today?.today || "";
+    $("stTestDate").value = simDate;
     $("stTestTime").value = azanTime;
     toast(t("testFullStarted"));
   } catch (err) {
