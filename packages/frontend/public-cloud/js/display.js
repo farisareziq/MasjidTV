@@ -818,7 +818,7 @@ function scheduleVideoGuard(slide) {
     showSlide(nextIndex, false);
   }, Math.max(slideDuration(slide) * 3, 6e4));
 }
-function showSlide(index, instant) {
+function showSlide(index, _instant) {
   const slide = state.slides[index];
   if (!slide) return;
   if (isAndroid) {

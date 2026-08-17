@@ -791,7 +791,7 @@ function scheduleNextSlide(slide) {
     showSlide(nextIndex, false);
   }, slideDuration(slide));
 }
-function showSlide(index, instant) {
+function showSlide(index, _instant) {
   const slide = state.slides[index];
   if (!slide) return;
   if (isAndroid) {
