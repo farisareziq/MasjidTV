@@ -466,7 +466,7 @@ export async function createCloudApp(): Promise<FastifyInstance> {
         }, false).catch(() => {});
       }
       reply.send(updated);
-    } catch (err) {
+    } catch {
       jsonError(reply, 500, 'Gagal menyimpan tetapan');
     }
   });
@@ -547,7 +547,7 @@ export async function createCloudApp(): Promise<FastifyInstance> {
         const { url } = await put(filename, buffer, { access: 'public', token: blobToken });
         await store.addMedia(tenant.id, { filename, kind: type.kind });
         return reply.send({ url, kind: type.kind });
-      } catch (err) {
+      } catch {
         return jsonError(reply, 500, 'Gagal muat naik ke Blob');
       }
     }
@@ -572,7 +572,7 @@ export async function createCloudApp(): Promise<FastifyInstance> {
         operation: 'put', pathname, access: 'public', allowedContentTypes: [contentType!], addRandomSuffix: false
       });
       reply.send({ presignedUrl, pathname, kind: type.kind });
-    } catch (err) {
+    } catch {
       jsonError(reply, 500, 'Gagal sediakan muat naik');
     }
   });
@@ -592,7 +592,7 @@ export async function createCloudApp(): Promise<FastifyInstance> {
       const mediaKind = ['image', 'video', 'audio'].includes(kind || '') ? kind : 'video';
       await store.addMedia(tenant.id, { filename: String(pathname), kind: mediaKind! });
       reply.send({ url: blob.url, kind: mediaKind });
-    } catch (err) {
+    } catch {
       jsonError(reply, 500, 'Gagal sahkan muat naik');
     }
   });

@@ -889,7 +889,7 @@ function scheduleVideoGuard(slide: Slide): void {
   }, Math.max(slideDuration(slide) * 3, 60000));
 }
 
-function showSlide(index: number, instant: boolean): void {
+function showSlide(index: number, _instant: boolean): void {
   const slide = state.slides[index];
   // Indeks tidak sah (senarai berubah di antara tick) — jangan crash.
   if (!slide) return;

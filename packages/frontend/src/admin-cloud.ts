@@ -2154,7 +2154,7 @@ async function syncAdminData() {
       state.settings = settings;
       populateSettings(settings);
     }
-  } catch (err) {
+  } catch {
     // Senyap semasa sync latar (cth. sesi tamat)
   }
 }
