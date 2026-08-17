@@ -308,12 +308,15 @@ body::after {
 
 .ov-arabic {
   font-family: "Amiri", "Scheherazade New", "Traditional Arabic", serif;
-  /* Metrik menegak dalam Amiri (ascender/descender panjang untuk harakat)
-     menyebabkan saiz terlalu besar bertindih baris di bawah pada TV.
-     Had atas dikurangkan (22vh->13vh, 240px->150px; big 30vh->17vh,
-     330px->200px) + line-height 1.15 memadatkan tanpa memotong harakat. */
-  font-size: clamp(44px, 13vh, 150px);
-  line-height: 1.15;
+  /* PUNCA bertindih: metrik Amiri (winAscent 1.25em / winDescent 0.69em)
+     menjadikan ink huruf + harakat melimpah ~0.4em atas & bawah kotak baris
+     apabila line-height dimampatkan (1.15) — glyph Arab masuk ke baris
+     Melayu di atas/bawah walaupun saiz fon dikecilkan. line-height ~1.9
+     menempatkan keseluruhan ink DALAM kotak baris sendiri, jadi tiada
+     pertindihan; saiz fon pula dikurangkan supaya jumlah timbunan
+     (kicker+arabic+nama+sub+countdown) masih muat satu skrin. */
+  font-size: clamp(40px, 12vh, 140px);
+  line-height: 1.9;
   color: var(--gold-bright);
   direction: rtl;
   text-shadow: 0 10px 40px rgba(0, 0, 0, 0.45);
@@ -321,8 +324,8 @@ body::after {
 }
 
 .ov-arabic.big {
-  font-size: clamp(56px, 17vh, 200px);
-  line-height: 1.1;
+  font-size: clamp(52px, 16vh, 180px);
+  line-height: 1.8;
 }
 
 .ov-name {
