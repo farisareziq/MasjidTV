@@ -124,10 +124,20 @@ try {
   }
   // Spawn dengan fallback: Windows Smart App Control menyekat exe tidak
   // ditandatangani (spawn UNKNOWN) — jatuh kepada electron dev binary.
+  // FFMPEG_PATH dari resources kiosk supaya relay ujian tidak memuat turun.
+  const kioskStamp = (() => {
+    const base = path.join(process.cwd(), 'apps', 'kiosk', 'dist-kiosk');
+    if (!fs.existsSync(base)) return null;
+    const stamps = fs.readdirSync(base).filter((d) => /^\d{12}$/.test(d)).sort();
+    return stamps.length ? stamps[stamps.length - 1] : null;
+  })();
+  const bundledFfmpeg = kioskStamp
+    ? path.join(process.cwd(), 'apps', 'kiosk', 'dist-kiosk', kioskStamp, 'win-unpacked', 'resources', 'bin', 'ffmpeg.exe')
+    : null;
   const spawnKiosk = () => {
     if (kioskExe) {
       try {
-        return spawn(kioskExe, ['--no-kiosk', '--port', String(TV_PORT)], {
+        return spawn(kioskExe, ['--no-kiosk', '--no-autostart', '--port', String(TV_PORT)], {
           env: { ...process.env, MASJIDTV_DATA_DIR: tvDir },
           stdio: ['ignore', 'pipe', 'pipe']
         });
@@ -135,12 +145,13 @@ try {
         console.error('[e2e] packaged exe disekat (Smart App Control) — guna electron dev');
       }
     }
-    return spawn(path.join(process.cwd(), 'apps', 'kiosk', 'node_modules', 'electron', 'dist', 'electron.exe'), ['.', '--no-kiosk', '--port', String(TV_PORT)], {
+    return spawn(path.join(process.cwd(), 'apps', 'kiosk', 'node_modules', 'electron', 'dist', 'electron.exe'), ['.', '--no-kiosk', '--no-autostart', '--port', String(TV_PORT)], {
       cwd: path.join(process.cwd(), 'apps', 'kiosk'),
       env: {
         ...process.env,
         MASJIDTV_DATA_DIR: tvDir,
-        MASJIDTV_PUBLIC_DIR: path.join(process.cwd(), 'packages', 'frontend', 'public')
+        MASJIDTV_PUBLIC_DIR: path.join(process.cwd(), 'packages', 'frontend', 'public'),
+        ...(bundledFfmpeg && fs.existsSync(bundledFfmpeg) ? { FFMPEG_PATH: bundledFfmpeg } : {})
       },
       stdio: ['ignore', 'pipe', 'pipe']
     });

@@ -116,7 +116,7 @@ async function main() {
   let tv;
   if (fs.existsSync(kioskExe)) {
     try {
-      tv = spawn(kioskExe, ['--no-kiosk', '--port', String(TV_PORT)], {
+      tv = spawn(kioskExe, ['--no-kiosk', '--no-autostart', '--port', String(TV_PORT)], {
         env: { ...process.env, MASJIDTV_DATA_DIR: tvDir },
         stdio: ['ignore', 'pipe', 'pipe']
       });
@@ -130,7 +130,7 @@ async function main() {
     }
   }
   if (!tv) {
-    tv = spawn(path.join(process.cwd(), 'apps', 'kiosk', 'node_modules', 'electron', 'dist', 'electron.exe'), ['.', '--no-kiosk', '--port', String(TV_PORT)], {
+    tv = spawn(path.join(process.cwd(), 'apps', 'kiosk', 'node_modules', 'electron', 'dist', 'electron.exe'), ['.', '--no-kiosk', '--no-autostart', '--port', String(TV_PORT)], {
       cwd: path.join(process.cwd(), 'apps', 'kiosk'),
       env: { ...process.env, MASJIDTV_DATA_DIR: tvDir, MASJIDTV_PUBLIC_DIR: path.join(process.cwd(), 'packages', 'frontend', 'public') },
       stdio: ['ignore', 'pipe', 'pipe']
@@ -274,13 +274,22 @@ async function main() {
   r = await fetch(CLOUD + '/api/admin/devices', { headers: { authorization: 'Bearer ' + reAdmin.token } });
   const devices = (await r.json()).devices || [];
   if (devices.length) {
-    await fetch(CLOUD + '/api/admin/devices/' + devices[0].id, { method: 'DELETE', headers: { authorization: 'Bearer ' + reAdmin.token } });
+    log('peranti cloud: ' + devices.map((d) => String(d.device_id || d.id || '?').slice(0, 20) + ' (' + (d.name || '-') + ')').join(', '));
+    // Padam SEMUA peranti tenant (uji dry-run — pastikan unpair yang betul
+    // walaupun baris lama terkumpul dari larian sebelumnya).
+    for (const d of devices) {
+      const del = await fetch(CLOUD + '/api/admin/devices/' + d.id, { method: 'DELETE', headers: { authorization: 'Bearer ' + reAdmin.token } });
+      log('buang peranti ' + d.id.slice(0, 8) + ': http ' + del.status);
+    }
     let reset = false;
-    const dl2 = Date.now() + 10000;
+    const dl2 = Date.now() + 15000;
     while (Date.now() < dl2 && !reset) {
+      // Paparan sebenar poll /api/settings setiap 10sa — 401 dari cloud
+      // (token peranti dipadam) memicu auto-reset. Simulasi poll paparan.
+      try { await fetch(TV + '/api/settings'); } catch { /* 503 dijangka */ }
       const cfg = await (await fetch(TV + '/api/pair/config')).json();
       if (!cfg.paired) reset = true;
-      else await sleep(500);
+      else await sleep(800);
     }
     if (!reset) throw new Error('auto-reset unpair gagal');
     const page = await (await fetch(TV + '/display')).text();

@@ -91,12 +91,14 @@ export class StreamManager {
     }
     // Input: OBS Virtual Camera / kamera USB Windows (DirectShow).
     // url format: "video=OBS Virtual Camera" (nama peranti).
+    // JANGAN paksa framerate/video_size — OBS Virtual Camera hanya
+    // menyokong format tertentu ("Could not set video options") ; biar
+    // ffmpeg guna format native peranti, kemudian scale ke 720p.
     if (stream.type === 'dshow') {
       args.push('-f', 'dshow');
       args.push('-rtbufsize', '100M');
-      args.push('-framerate', '30');
-      args.push('-video_size', '1280x720');
       args.push('-i', `video=${String(stream.url).replace(/^video=/, '')}`);
+      args.push('-vf', 'scale=trunc(iw/2)*2:trunc(ih/2)*2'); // dimensi genap untuk yuv420p
     } else {
       args.push('-i', stream.url);
     }
