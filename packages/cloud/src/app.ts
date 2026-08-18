@@ -889,6 +889,19 @@ export async function createCloudApp(): Promise<FastifyInstance> {
     reply.send({ ok: true });
   });
 
+  // Streams PENUH untuk kiosk mini PC (termasuk mirrorUrl stream-key FB dan
+  // nama peranti dshow) — relay ffmpeg lokal memerlukan nilai sebenar yang
+  // tidak didedahkan dalam /api/settings awam. Auth device-token.
+  app.get('/api/device/streams', async (req, reply) => {
+    const devToken = String(req.headers['x-device-token'] || '');
+    if (!devToken) return jsonError(reply, 401, 'Token peranti diperlukan');
+    const t = await store.getTenantByDeviceToken(devToken);
+    if (!t) return jsonError(reply, 401, 'Token peranti tidak sah');
+    const lic = licenseStatus(t);
+    if (!lic.unlocked) return jsonError(reply, 403, lic.message || 'Lesen diperlukan', 'LICENSE_REQUIRED');
+    reply.send({ streams: t.settings.streams || [] });
+  });
+
   // Namakan semula peranti TV (paparan senarai & rujukan admin).
   app.patch('/api/admin/devices/:id', async (req, reply) => {
     const tenant = await requireAdmin(req, reply);

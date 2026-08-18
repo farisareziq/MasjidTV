@@ -211,27 +211,46 @@ try {
   log('TV /display: ' + r.status + (r.status === 302 ? ' -> ' + r.headers.get('location') : ' (paparan lokal)'));
   if (r.status !== 200) throw new Error('/display sepatutnya dilayan lokal selepas pairing');
 
-  // 10b) STREAMS CLOUD→RELAY LOKAL: admin menambah stream relay → SSE/fecth
-  // tulis streams ke store lokal → /relay/<id>/index.m3u8 mula dijana
-  // (ffmpeg gagal pada sumber dummy tetapi mekanisme tulis-sinkron boleh
-  // disahkan melalui settings lokal + hlsUrl tidak di-rewrite ke cloud).
+  // 10b) STREAMS CLOUD→RELAY LOKAL: admin menambah stream relay → SSE/fetch
+  // tulis streams ke store lokal → /relay/<id>/index.m3u8 dijana ffmpeg.
+  // STREAMS PENUH datang melalui /api/device/streams (device-token) —
+  // termasuk URL dshow + mirrorUrl yang TIDAK ada dalam settings awam.
   await fetch(CLOUD + '/api/admin/streams', {
     method: 'PUT',
     headers: { 'content-type': 'application/json', authorization: 'Bearer ' + admin.token },
-    body: JSON.stringify({ streams: [{ id: 'cam1', name: 'Cam', type: 'dshow', url: 'video=OBS Virtual Camera', duration: 30, enabled: true }] })
+    body: JSON.stringify({
+      streams: [
+        { id: 'cam1', name: 'Cam', type: 'dshow', url: 'video=OBS Virtual Camera', duration: 30, enabled: true, mirrorUrl: 'rtmps://live-api-s.facebook.com:443/rtmp/FB-KEY-TEST' },
+        { id: 'ipcam', name: 'IP', type: 'rtsp', url: 'rtsp://192.168.1.50/s', duration: 30, enabled: false }
+      ]
+    })
   });
-  // Beri masa SSE sync → settings fetch → store tulis.
+  // Beri masa SSE sync → device/streams fetch → store tulis.
   await sleep(2500);
-  // Paparan settings mesti mengekalkan hlsUrl RELATIF (relay lokal).
+  // Settings awam: url dshow mesti kelihatan (nama peranti, bukan rahsia),
+  // mirrorUrl TIDAK didedahkan (stream key).
   r = await fetch(TV + '/api/settings');
   const sSettings = await r.json();
-  const stream = (sSettings.streams || []).find((x) => x.id === 'cam1');
-  log('stream dshow dalam settings TV: ' + JSON.stringify(stream));
-  if (!stream) throw new Error('stream dshow tidak sampai ke TV');
-  if (String(stream.hlsUrl || '') !== '/relay/cam1/index.m3u8') {
-    throw new Error('hlsUrl mesti /relay/cam1/index.m3u8 (lokal), dapat: ' + stream.hlsUrl);
+  const pubStream = (sSettings.streams || []).find((x) => x.id === 'cam1');
+  log('stream dshow (awam): ' + JSON.stringify(pubStream));
+  if (!pubStream) throw new Error('stream dshow tidak sampai ke TV');
+  if (String(pubStream.hlsUrl || '') !== '/relay/cam1/index.m3u8') {
+    throw new Error('hlsUrl mesti /relay/cam1/index.m3u8 (lokal), dapat: ' + pubStream.hlsUrl);
   }
-  log('hlsUrl relay lokal ✓ (bukan URL cloud)');
+  if (pubStream.mirrorUrl) throw new Error('mirrorUrl TIDAK boleh didedahkan dalam settings awam');
+  log('hlsUrl relay lokal ✓ (mirrorUrl kekal rahsia ✓)');
+  // Store LOKAL (relay ffmpeg): mesti ada URL dshow penuh + mirrorUrl.
+  const db2 = new DatabaseSync(path.join(tvDir, 'masjidtv.db'));
+  const row2 = db2.prepare('SELECT data FROM settings WHERE id = 1').get();
+  db2.close();
+  const localStreams = JSON.parse(row2.data).streams || [];
+  const localDshow = localStreams.find((x) => x.id === 'cam1');
+  log('store lokal cam1: url=' + localDshow?.url + ' mirror=' + (localDshow?.mirrorUrl ? 'ada' : 'tiada'));
+  if (localDshow?.url !== 'video=OBS Virtual Camera') throw new Error('URL dshow tidak sampai ke store lokal: ' + localDshow?.url);
+  if (localDshow?.mirrorUrl !== 'rtmps://live-api-s.facebook.com:443/rtmp/FB-KEY-TEST') {
+    throw new Error('mirrorUrl tidak sampai ke store lokal');
+  }
+  log('relay lokal menerima URL dshow + mirrorUrl penuh ✓');
 
   r = await fetch(TV + '/admin', { redirect: 'manual' });
   const aloc = r.headers.get('location') || '';

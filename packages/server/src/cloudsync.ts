@@ -169,8 +169,9 @@ export async function handleCloudSync(reply: FastifyReply, dataDir: string, p: s
     const cloud = await cloudFetch(cfg, p);
     if (cloud.ok) {
       saveCache(cacheDir, p, cloud.json);
-      // Streams cloud → relay ffmpeg lokal (kamera/OBS ialah peranti mini PC).
-      if (p === '/api/settings') notifyCloudSettings(cloud.json);
+      // Streams cloud → relay ffmpeg lokal. Settings awam TIDAK mengandungi
+      // nama peranti dshow/mirrorUrl — guna endpoint peranti khusus.
+      if (p === '/api/settings') fetchDeviceStreams(dataDir).catch(() => {});
       reply.send(rewrite ? rewriteUrls(cfg.cloudUrl, cloud.json) : cloud.json);
       return true;
     }
@@ -246,6 +247,20 @@ function notifyCloudSettings(data: unknown): void {
 }
 
 /**
+ * Fetch streams PENUH daripada cloud (endpoint peranti — termasuk nama
+ * peranti dshow + mirrorUrl stream-key) dan notifikasi handler relay.
+ * Dipanggil oleh jambatan SSE pada setiap sync/hello.
+ */
+async function fetchDeviceStreams(dataDir: string): Promise<void> {
+  const cfg = activeCloudConfig(dataDir);
+  if (!cfg) return;
+  const res = await cloudFetch(cfg, '/api/device/streams');
+  if (res.ok && res.json && Array.isArray((res.json as Record<string, unknown>).streams)) {
+    notifyCloudSettings(res.json);
+  }
+}
+
+/**
  * Mulakan jambatan SSE (sekali sahaja sejak proses): pelanggan SSE kepada
  * cloud dengan device-token. Event 'sync' → buang cache (paparan refetch)
  * + broadcast lokal. Reconnect dengan backoff; setiap sambungan semula
@@ -313,11 +328,10 @@ export async function startCloudSseBridge(dataDir: string): Promise<void> {
             // mendapat data baharu; paparan lokal dinotifikasi via SSE.
             fs.rmSync(path.join(dataDir, 'cloud-cache'), { recursive: true, force: true });
             broadcastLocal('sync', { rev: safeRev(evData) });
-            // Streams relay mesti bertindak segera (admin boleh ubah kamera
-            // / mirror live) — fetch settings sekarang, bukan menunggu poll.
-            cloudFetch(activeCloudConfig(dataDir)!, '/api/settings').then((r) => {
-              if (r.ok) notifyCloudSettings(r.json);
-            }).catch(() => { /* cloud offline — cache digunakan */ });
+            // Streams relay mesti bertindak segera — fetch streams PENUH
+            // (endpoint peranti: termasuk nama peranti dshow + mirrorUrl
+            // yang tidak didedahkan dalam settings awam).
+            fetchDeviceStreams(dataDir).catch(() => { /* offline — cache kekal */ });
           }
         }
       }
