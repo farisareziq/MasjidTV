@@ -229,6 +229,20 @@ export async function buildApp(opts: AppOptions): Promise<FastifyInstance> {
   // luar mod cloud tiada event sync, hanya hello/heartbeat).
   addLocalSseRoute(app);
 
+  // Status ringkas stream relay untuk menu tersembunyi kiosk — tanpa auth
+  // (mod cloud tiada login admin lokal) tetapi HANYA nama/status/lastError;
+  // URL (kredensial kamera) tidak didedahkan.
+  app.get('/api/streams-status', async (_req, reply) => {
+    reply.send({
+      streams: streams.allStatus().map((s: Record<string, unknown>) => ({
+        name: s.name,
+        type: s.type,
+        status: s.status,
+        lastError: s.lastError || undefined
+      }))
+    });
+  });
+
   // --- Public (display) endpoints ------------------------------------------
 
   app.get('/api/health', async (_req, reply) => {

@@ -254,15 +254,19 @@ export function applyPairing(app: FastifyInstance, dataDir: string): void {
   // Status perkakasan mini PC (kamera USB dsb.) — ditulis oleh app kiosk
   // melalui devices.json (lihat apps/kiosk/main/devices.ts). Endpoint lokal
   // untuk menu tersembunyi; cloud membaca salinan ini melalui jambatan SSE.
+  // cameras = PnP (kelas Camera/Image); dshow = peranti video DirectShow
+  // ffmpeg (OBS Virtual Camera ialah peranti virtual — TIDAK muncul dalam
+  // PnP Camera, hanya dalam senarai dshow).
   app.get('/api/devices-hw', async (_req, reply) => {
     try {
       const raw = JSON.parse(fs.readFileSync(path.join(dataDir, 'devices.json'), 'utf8'));
       reply.send({
         cameras: Array.isArray(raw.cameras) ? raw.cameras : [],
+        dshow: Array.isArray(raw.dshow) ? raw.dshow : [],
         checkedAt: Number(raw.checkedAt) || 0
       });
     } catch {
-      reply.send({ cameras: [], checkedAt: 0 });
+      reply.send({ cameras: [], dshow: [], checkedAt: 0 });
     }
   });
 

@@ -127,10 +127,20 @@ const HIDDEN_MENU_JS = `(async function () {
     var cfg = await (await fetch('/api/pair/config')).json();
     var hw = await (await fetch('/api/devices-hw')).json();
     var cams = (hw.cameras || []).map(function (c) { return c.name + (c.status === 'OK' ? '' : ' (' + c.status + ')'); });
+    var dshow = (hw.dshow || []).map(function (c) { return 'video=' + c.name; });
+    var streamRow = '';
+    try {
+      var st = await (await fetch('/api/streams-status')).json();
+      streamRow = (st.streams || []).map(function (s) {
+        return '<div><b>Stream:</b> ' + s.name + ' — ' + s.status + (s.lastError ? ' <span style="color:#ff9d9d">(' + s.lastError + ')</span>' : '') + '</div>';
+      }).join('');
+    } catch (e) { /* tidak kritikal */ }
     body.innerHTML =
       '<div><b>Status:</b> ' + (cfg.paired ? 'Dipaut' : 'Belum dipaut') + '</div>'
       + (cfg.paired ? '<div><b>Masjid:</b> ' + (cfg.tenantName || '-') + '<br><b>Cloud:</b> ' + cfg.cloudUrl + '</div>' : '')
-      + '<div style="margin-top:10px"><b>Kamera:</b> ' + (cams.length ? cams.join(' • ') : 'tiada dikesan') + '</div>'
+      + '<div style="margin-top:10px"><b>Kamera (PnP):</b> ' + (cams.length ? cams.join(' • ') : 'tiada dikesan') + '</div>'
+      + '<div><b>Peranti DSHOW (ffmpeg):</b> ' + (dshow.length ? dshow.join(' • ') : 'tiada — OBS: tekan Start Virtual Camera') + '</div>'
+      + streamRow
       + '<div style="color:#86a99a;font-size:12px;margin-top:8px">Semakan: ' + (hw.checkedAt ? new Date(hw.checkedAt).toLocaleString() : '-') + '</div>';
   } catch (e) {
     body.innerHTML = 'Gagal memuat status: ' + e.message;
