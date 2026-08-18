@@ -334,6 +334,7 @@ const I18N = {
     newPin: "New PIN",
     confirmPin: "Confirm PIN",
     changePin: "Change PIN",
+    changePinOk: "PIN updated",
     pinMismatch: "PINs do not match",
     pinTooShort: "PIN must be at least 8 characters",
     masjid: "Masjid",
@@ -667,6 +668,7 @@ const I18N = {
     newPin: "PIN baharu",
     confirmPin: "Sahkan PIN",
     changePin: "Tukar PIN",
+    changePinOk: "PIN dikemaskini",
     pinMismatch: "PIN tidak sepadan",
     pinTooShort: "PIN mesti sekurang-kurangnya 8 aksara",
     masjid: "Masjid",
@@ -944,6 +946,11 @@ function showPinChange() {
   $("pinChangeView").hidden = false;
   $("pinNew").focus();
 }
+let pinChangeFromApp = false;
+$("changePinBtn").addEventListener("click", () => {
+  pinChangeFromApp = true;
+  showPinChange();
+});
 function switchView(name) {
   document.querySelectorAll(".nav-btn").forEach((b) => b.classList.toggle("active", b.dataset.view === name));
   document.querySelectorAll(".view").forEach((v) => v.classList.toggle("active", v.id === `view-${name}`));
@@ -1028,6 +1035,10 @@ $("pinChangeForm").addEventListener("submit", async (e) => {
     }
     $("pinNew").value = "";
     $("pinConfirm").value = "";
+    if (pinChangeFromApp) {
+      pinChangeFromApp = false;
+      toast(t("changePinOk"));
+    }
     await loadApp();
     resetIdleTimer();
   } catch (err) {
@@ -1041,6 +1052,7 @@ async function loadApp() {
   $("masjidNavBtn").hidden = !isSuper;
   $("tvNavBtn").hidden = isSuper;
   $("licenseCard").hidden = isSuper;
+  $("changePinBtn").hidden = !isSuper;
   try {
     if (isSuper) {
       await refreshTenants();
