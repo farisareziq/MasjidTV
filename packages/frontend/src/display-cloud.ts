@@ -1087,15 +1087,51 @@ function initSlideMedia(slide: Slide): void {
     return;
   }
   if (typeof Hls !== 'undefined' && Hls.isSupported()) {
-    const hls = new Hls({ liveSyncDurationCount: 3 });
+    // LIVE low-latency (anti-stuck): rapat dengan edge, latensi maksimum
+    // dikuatkuasakan, stall sentinel melompat semula ke edge live.
+    const hls = new Hls({
+      liveSyncDurationCount: 1,
+      maxBufferLength: 6,
+      maxMaxBufferLength: 12,
+      liveMaxLatencyDurationCount: 4,
+      liveDurationInfinity: true,
+      enableWorker: true,
+      lowLatencyMode: true,
+      backBufferLength: 10
+    });
     state.hls = hls;
     hls.loadSource(url);
     hls.attachMedia(video);
-    hls.on(Hls.Events.ERROR, (evt: unknown, data: { fatal?: boolean }) => {
+    hls.on(Hls.Events.ERROR, (evt: unknown, data: { fatal?: boolean; details?: string }) => {
       if (data.fatal) {
-        video.outerHTML = `<p class="slide-error">${escapeHtml(t('streamOffline'))}</p>`;
+        switch (data.details) {
+          case 'bufferStalledError':
+          case 'bufferNudgeOnStall':
+          case 'bufferSeekOverHole':
+            hls.startLoad(-1);
+            return;
+          default:
+            video.outerHTML = `<p class="slide-error">${escapeHtml(t('streamOffline'))}</p>`;
+        }
       }
     });
+    const stallGuard = setInterval(() => {
+      if (!state.hls || video.readyState < 2) return;
+      const g = stallGuard as unknown as { lastT: number };
+      if (typeof g.lastT === 'number' && video.currentTime - g.lastT < 0.01) {
+        try {
+          const target = video.seekable.length ? video.seekable.end(video.seekable.length - 1) - 0.5 : 0;
+          video.currentTime = target;
+        } catch { /* seekable belum sedia */ }
+      }
+      g.lastT = video.currentTime;
+    }, 4000);
+    new MutationObserver((_m, obs) => {
+      if (!document.getElementById('slideVideo')) {
+        clearInterval(stallGuard);
+        obs.disconnect();
+      }
+    }).observe(document.body, { childList: true, subtree: true });
   } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
     video.src = url;
   } else {
@@ -1408,6 +1444,15 @@ setInterval(tickPrayerMode, 1000);
 setInterval(tickDebug, 2000);
 setInterval(sync, SYNC_INTERVAL_MS);
 setInterval(loadWeather, 900000);
+
+// SYNC SEGERA: SSE cloud /api/events — event 'sync' dari admin (melalui
+// hub SSE cloud) memicu sync() serta-merta (<1sa). Fallback: poll 10sa.
+try {
+  const es = new EventSource('/api/events');
+  es.addEventListener('sync', () => { sync().catch(() => {}); });
+} catch {
+  /* pelayar tanpa EventSource — poll sahaja */
+}
 
 
 const style = document.createElement('style');
