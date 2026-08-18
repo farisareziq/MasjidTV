@@ -1058,15 +1058,57 @@ function initSlideMedia(slide: Slide): void {
     return;
   }
   if (typeof Hls !== 'undefined' && Hls.isSupported()) {
-    const hls = new Hls({ liveSyncDurationCount: 3 });
+    // LIVE low-latency: kekal rapat dengan edge — segmen OBS dijana setiap
+    // 2sa; buffer besar menyebabkan "stuck" nampak beku jauh belakang.
+    // liveSyncDurationCount 1 (~2sa belakang edge), buffer kecil, dan
+    // auto-recover aktif (stall → seek ke edge semula).
+    const hls = new Hls({
+      liveSyncDurationCount: 1,
+      maxBufferLength: 6,
+      maxMaxBufferLength: 12,
+      liveMaxLatencyDurationCount: 4,
+      liveDurationInfinity: true,
+      enableWorker: true,
+      lowLatencyMode: true,
+      backBufferLength: 10
+    });
     state.hls = hls;
     hls.loadSource(url);
     hls.attachMedia(video);
-    hls.on(Hls.Events.ERROR, (evt: unknown, data: { fatal?: boolean }) => {
+    hls.on(Hls.Events.ERROR, (evt: unknown, data: { fatal?: boolean; details?: string }) => {
       if (data.fatal) {
-        video.outerHTML = `<p class="slide-error">${escapeHtml(t('streamOffline'))}</p>`;
+        switch (data.details) {
+          case 'bufferStalledError':
+          case 'bufferNudgeOnStall':
+          case 'bufferSeekOverHole':
+            // stall ringkas — seek semula ke edge live.
+            hls.startLoad(-1);
+            return;
+          default:
+            video.outerHTML = `<p class="slide-error">${escapeHtml(t('streamOffline'))}</p>`;
+        }
       }
     });
+    // Sentinel: jika currentTime tak bergerak >4sa, lompat ke edge live.
+    const stallGuard = setInterval(() => {
+      if (!state.hls || video.readyState < 2) return;
+      const stalled = video.currentTime - (stallGuard as unknown as { lastT: number }).lastT;
+      if (typeof (stallGuard as unknown as { lastT: number }).lastT === 'number' && stalled < 0.01) {
+        // beku — seek ke live edge
+        try {
+          const target = video.seekable.length ? video.seekable.end(video.seekable.length - 1) - 0.5 : 0;
+          video.currentTime = target;
+        } catch { /* seekable belum sedia */ }
+      }
+      (stallGuard as unknown as { lastT: number }).lastT = video.currentTime;
+    }, 4000);
+    // Berhenti sentinel bila elemen video dibuang (slaid bertukar).
+    new MutationObserver((_m, obs) => {
+      if (!document.getElementById('slideVideo')) {
+        clearInterval(stallGuard);
+        obs.disconnect();
+      }
+    }).observe(document.body, { childList: true, subtree: true });
   } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
     video.src = url;
   } else {

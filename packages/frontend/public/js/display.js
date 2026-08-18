@@ -954,15 +954,50 @@ function initSlideMedia(slide) {
     return;
   }
   if (typeof Hls !== "undefined" && Hls.isSupported()) {
-    const hls = new Hls({ liveSyncDurationCount: 3 });
+    const hls = new Hls({
+      liveSyncDurationCount: 1,
+      maxBufferLength: 6,
+      maxMaxBufferLength: 12,
+      liveMaxLatencyDurationCount: 4,
+      liveDurationInfinity: true,
+      enableWorker: true,
+      lowLatencyMode: true,
+      backBufferLength: 10
+    });
     state.hls = hls;
     hls.loadSource(url);
     hls.attachMedia(video);
     hls.on(Hls.Events.ERROR, (evt, data) => {
       if (data.fatal) {
-        video.outerHTML = `<p class="slide-error">${escapeHtml(t("streamOffline"))}</p>`;
+        switch (data.details) {
+          case "bufferStalledError":
+          case "bufferNudgeOnStall":
+          case "bufferSeekOverHole":
+            hls.startLoad(-1);
+            return;
+          default:
+            video.outerHTML = `<p class="slide-error">${escapeHtml(t("streamOffline"))}</p>`;
+        }
       }
     });
+    const stallGuard = setInterval(() => {
+      if (!state.hls || video.readyState < 2) return;
+      const stalled = video.currentTime - stallGuard.lastT;
+      if (typeof stallGuard.lastT === "number" && stalled < 0.01) {
+        try {
+          const target = video.seekable.length ? video.seekable.end(video.seekable.length - 1) - 0.5 : 0;
+          video.currentTime = target;
+        } catch {
+        }
+      }
+      stallGuard.lastT = video.currentTime;
+    }, 4e3);
+    new MutationObserver((_m, obs) => {
+      if (!document.getElementById("slideVideo")) {
+        clearInterval(stallGuard);
+        obs.disconnect();
+      }
+    }).observe(document.body, { childList: true, subtree: true });
   } else if (video.canPlayType("application/vnd.apple.mpegurl")) {
     video.src = url;
   } else {

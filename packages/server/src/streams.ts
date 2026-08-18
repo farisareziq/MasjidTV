@@ -120,14 +120,18 @@ export class StreamManager {
       args.push(
         '-f', 'tee',
         '-map', '0',
-        `[f=hls:hls_time=2:hls_list_size=6:hls_flags=delete_segments+append_list:hls_segment_filename=${path.join(outDir, 'seg_%05d.ts').replace(/\\/g, '/')}]${path.join(outDir, 'index.m3u8').replace(/\\/g, '/')}|[f=flv:flvflags=no_duration_filesize:flush_data=1]${mirror}`
+        `[f=hls:hls_time=2:hls_list_size=6:hls_flags=delete_segments+append_list+omit_endlist+independent_segments:hls_segment_filename=${path.join(outDir, 'seg_%05d.ts').replace(/\\/g, '/')}]${path.join(outDir, 'index.m3u8').replace(/\\/g, '/')}|[f=flv:flvflags=no_duration_filesize:flush_data=1]${mirror}`
       );
     } else {
       args.push(
         '-f', 'hls',
         '-hls_time', '2',
         '-hls_list_size', '6',
-        '-hls_flags', 'delete_segments+append_list',
+        // omit_endlist: stream sentiasa LIVE (tanpa ENDLIST paparan main
+        // berhenti di penghujung tingkap). independent_segments: tiap segmen
+        // boleh dimasuk sendiri (seek/live-edge lebih pantas).
+        '-hls_flags', 'delete_segments+append_list+omit_endlist+independent_segments',
+        '-hls_segment_type', 'mpegts',
         '-hls_segment_filename', path.join(outDir, 'seg_%05d.ts'),
         path.join(outDir, 'index.m3u8')
       );
