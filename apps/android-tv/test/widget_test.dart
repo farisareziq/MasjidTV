@@ -1,4 +1,4 @@
-// Smoke test: build PairingScreen & DisplayScreen without crashing.
+// Smoke acceptance test: build PairingScreen & DisplayScreen without crashing.
 import 'package:flutter_test/flutter_test.dart';
 import 'package:masjidtv_tv/src/pairing_screen.dart';
 import 'package:masjidtv_tv/src/display_screen.dart';

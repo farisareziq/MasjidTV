@@ -44,13 +44,14 @@ export function isSafeStreamUrl(url: unknown, type: StreamType): boolean {
   return true;
 }
 
-// Parse hostname kepada IPv4/IPv6; menyokong semua encoding inet_aton:
+// Parse hostname kepada bait IPv4/IPv6; menyokong semua encoding inet_aton:
 // perpuluhan/heks/oktal bertitik, bentuk ringkas 1-3 bahagian, satu-integer,
-// dan IPv6 (termasuk ::, ::ffff: mapped).
+// dan IPv6 (termasuk ::, ::ffff: mapped). Sentiasa memulangkan BAIT supaya
+// isBlockedIp mengaji susunan bait yang konsisten.
 function parseIpLiteral(host: string): number[] | null {
   // IPv6 murni/mapped (contoh ::1, ::ffff:127.0.0.1)
   if (host.includes(':')) {
-    return parseIpv6(host);
+    return parseIpv6Bytes(host);
   }
   // IPv4 bertitik (termasuk heks/oktal setiap bahagian) dan bentuk ringkas
   // a / a.b / a.b.c / a.b.c.d (semantik inet_aton).
@@ -87,18 +88,15 @@ function parseIpLiteral(host: string): number[] | null {
   return null;
 }
 
-// Parse IPv6 (termasuk ::, bentuk ringkas, zon diabaikan) kepada 16 bait.
-function parseIpv6(host: string): number[] | null {
-  let h = host;
-  const zone = h.indexOf('%');
-  if (zone >= 0) h = h.slice(0, zone);
-  if (!h.includes(':')) return null;
-  const mapped = h.match(/^::ffff:(\d{1,3}(?:\.\d{1,3}){3})$/i);
-  if (mapped) {
-    const v4 = parseIpLiteral(mapped[1]);
-    return v4 ? [0, 0, 0, 0, 0, 0, ...v4] : null;
-  }
-  const halves = h.split('::');
+// Parse IPv6 (termasuk ::, bentuk ringkas, zon diabaikan) kepada 8 kumpulan
+// 16-bit. Sufiks IPv4 (cth ::ffff:127.0.0.1) dikira sebagai 2 kumpulan
+// terakhir oleh parseGroup — tiada kes khas diperlukan.
+function parseIpv6Groups(h: string): number[] | null {
+  let host = h;
+  const zone = host.indexOf('%');
+  if (zone >= 0) host = host.slice(0, zone);
+  if (!host.includes(':')) return null;
+  const halves = host.split('::');
   if (halves.length > 2) return null;
   const head = halves[0] ? halves[0].split(':').filter(Boolean) : [];
   const tail = halves.length === 2 && halves[1] ? halves[1].split(':').filter(Boolean) : [];
@@ -131,6 +129,17 @@ function parseIpv6(host: string): number[] | null {
   return [...headGroups, ...new Array(halves.length === 2 ? fill : 0).fill(0), ...tailGroups];
 }
 
+// Ratakan kumpulan 16-bit kepada 16 bait — isBlockedIp mengjangka bait
+// (pemformatan kumpulan lama membuat ::1 dilihat sebagai [0,1] dan terlepas
+// sekatan loopback).
+function parseIpv6Bytes(h: string): number[] | null {
+  const groups = parseIpv6Groups(h);
+  if (!groups) return null;
+  const out: number[] = [];
+  for (const g of groups) out.push((g >> 8) & 0xff, g & 0xff);
+  return out;
+}
+
 function isBlockedIp(bytes: number[]): boolean {
   // Loopback IPv4/IPv6 (0.0.0.0/8 dan 127.0.0.0/8, ::, ::1)
   if (bytes.length === 4) {
@@ -146,6 +155,12 @@ function isBlockedIp(bytes: number[]): boolean {
     if (bytes.slice(0, 15).every((b) => b === 0) && bytes[15] === 1) return true; // ::1
     // IPv4-mapped ::ffff:a.b.c.d -> semak sebagai IPv4
     if (bytes.slice(0, 10).every((b) => b === 0) && bytes[10] === 0xff && bytes[11] === 0xff) {
+      return isBlockedIp(bytes.slice(12));
+    }
+    // NAT64 well-known prefix 64:ff9b::/96 — IPv4 sesiri di hujung; host
+    // seperti ini dihala semula ke IPv4 sebenar, jadi semak seperti IPv4.
+    if (bytes[0] === 0 && bytes[1] === 0x64 && bytes[2] === 0xff && bytes[3] === 0x9b
+      && bytes.slice(4, 12).every((b) => b === 0)) {
       return isBlockedIp(bytes.slice(12));
     }
     // Link-local fe80::/10

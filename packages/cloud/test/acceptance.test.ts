@@ -1,0 +1,135 @@
+// ACCEPTANCE TESTING — objective: confirm the deployed system meets real user
+// needs by walking complete mosque-operator journeys on the running cloud app.
+
+import { describe, it, expect, beforeAll, afterAll } from 'vitest';
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
+import { createCloudApp } from '../src/app.js';
+import type { FastifyInstance } from 'fastify';
+
+const TRIAL_MS = 14 * 24 * 60 * 60 * 1000;
+
+describe('Acceptance Testing / cloud user journeys', () => {
+  let app: FastifyInstance;
+  let superPin: string;
+  let tenantApiKey: string;
+  const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'masjidtv-acceptance-'));
+  // PIN file terisolasi per-run (env override) — JANGAN sentuh laluan
+  // mesin-global os.tmpdir()/MASJIDTV_SUPERUSER_PIN.txt yang mungkin milik
+  // deployment sebenar pada host yang sama.
+  const pinFile = path.join(tmpDir, 'MASJIDTV_SUPERUSER_PIN.txt');
+
+  beforeAll(async () => {
+    process.env.TURSO_URL = `file:${path.join(tmpDir, 'cloud.db')}`;
+    process.env.JWT_SECRET = 'acceptance-secret';
+    process.env.MASJIDTV_SUPERUSER_PIN_FILE = pinFile;
+    app = await createCloudApp();
+    await app.ready();
+    const raw = fs.readFileSync(pinFile, 'utf8');
+    superPin = raw.split('\n').map((l) => l.trim()).find((l) => l.startsWith('admin /'))!.slice('admin / '.length);
+  }, 120000);
+
+  afterAll(async () => {
+    await app.close();
+    delete process.env.MASJIDTV_SUPERUSER_PIN_FILE;
+    for (let i = 0; i < 5; i++) {
+      try {
+        fs.rmSync(tmpDir, { recursive: true, force: true });
+        break;
+      } catch {
+        await new Promise((r) => setTimeout(r, 200));
+      }
+    }
+  });
+
+  it('rejects the well-known default PIN 00000000 (takeover-race regression)', async () => {
+    const res = await app.inject({
+      method: 'POST',
+      url: '/api/auth/superuser/login',
+      payload: { username: 'admin', pin: '00000000' }
+    });
+    expect(res.statusCode).toBe(401);
+  });
+
+  it('AC1 — superuser onboards a new mosque and receives its pairing key', async () => {
+    const login = await app.inject({
+      method: 'POST',
+      url: '/api/auth/superuser/login',
+      payload: { username: 'admin', pin: superPin }
+    });
+    expect(login.statusCode).toBe(200);
+
+    let token: string = login.json().token;
+    if (login.json().mustChangePin) {
+      const changed = await app.inject({
+        method: 'POST',
+        url: '/api/auth/superuser/pin',
+        headers: { authorization: `Bearer ${token}` },
+        payload: { pin: 'pin-baru-12345' }
+      });
+      expect(changed.statusCode).toBe(200);
+      token = changed.json().token;
+    }
+
+    const create = await app.inject({
+      method: 'POST',
+      url: '/api/super/tenants',
+      headers: { authorization: `Bearer ${token}` },
+      payload: { name: 'Masjid Pelanggan Uji', username: 'ustaz', password: 'rahsia123' }
+    });
+    expect(create.statusCode).toBe(201);
+    tenantApiKey = create.json().apiKey;
+    expect(tenantApiKey.length).toBeGreaterThanOrEqual(32);
+    expect(create.json().trialUntil).toBeGreaterThan(Date.now());
+    expect(create.json().trialUntil).toBeLessThanOrEqual(Date.now() + TRIAL_MS);
+  });
+
+  it('AC2 — mosque admin logs in and personalizes settings', async () => {
+    const login = await app.inject({
+      method: 'POST',
+      url: '/api/auth/login',
+      payload: { username: 'ustaz', password: 'rahsia123' }
+    });
+    expect(login.statusCode).toBe(200);
+    const token = login.json().token;
+
+    const put = await app.inject({
+      method: 'PUT',
+      url: '/api/admin/settings',
+      headers: { authorization: `Bearer ${token}` },
+      payload: { mosque: { name: 'Masjid Pelanggan Uji' }, prayer: { zone: 'SGR01' } }
+    });
+    expect(put.statusCode).toBe(200);
+    expect(put.json().prayer.zone).toBe('SGR01');
+  });
+
+  it('AC3 — TV display gets a full day of prayer times with just the tenant key', async () => {
+    const today = await app.inject({
+      method: 'GET',
+      url: '/api/today',
+      headers: { 'x-tenant-key': tenantApiKey }
+    });
+    expect(today.statusCode).toBe(200);
+    const body = today.json();
+    for (const key of ['fajr', 'dhuhr', 'asr', 'maghrib', 'isha']) {
+      expect(body.prayers[key].time).toMatch(/^\d{2}:\d{2}$/);
+      expect(body.iqamah[key].time).toMatch(/^\d{2}:\d{2}$/);
+    }
+    expect(body.next).not.toBeNull();
+  });
+
+  it('AC4 — anonymous visitors cannot read mosque data without a key', async () => {
+    const settings = await app.inject({ method: 'GET', url: '/api/settings' });
+    expect(settings.statusCode).toBe(401);
+    const today = await app.inject({ method: 'GET', url: '/api/today' });
+    expect(today.statusCode).toBe(401);
+  });
+
+  it('AC5 — health endpoint reports the deployed service identity', async () => {
+    const res = await app.inject({ method: 'GET', url: '/api/health' });
+    expect(res.statusCode).toBe(200);
+    expect(res.json().service).toBe('masjidtv-cloud');
+    expect(res.json().ok).toBe(true);
+  });
+});

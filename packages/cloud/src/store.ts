@@ -66,7 +66,10 @@ export class CloudStore {
         .onConflictDoNothing({ target: superusers.username })
         .run();
       try {
-        const file = path.join(os.tmpdir(), 'MASJIDTV_SUPERUSER_PIN.txt');
+        // Laluan boleh diatasi env (ujian/terisolasi) — lalai tetap tempatan
+        // mesin supaya pemasang boleh membacanya selepas deploy awal.
+        const file = process.env.MASJIDTV_SUPERUSER_PIN_FILE
+          || path.join(os.tmpdir(), 'MASJIDTV_SUPERUSER_PIN.txt');
         fs.writeFileSync(file, `MasjidTV superuser PIN\n=====================\n\nadmin / ${pin}\n\nChange it immediately after first login.\n`, 'utf8');
         console.log(`[cloud] Superuser 'admin' dicipta. PIN bootstrap: ${pin} (also in ${file}) — tukar selepas login pertama.`);
       } catch {
