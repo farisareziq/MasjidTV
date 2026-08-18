@@ -25,6 +25,11 @@ function check(name, { required = true, ok, detail = '' }) {
 
 // --- 1. Cloud env vars (TURSO_URL, TURSO_AUTH_TOKEN, JWT_SECRET,
 //        LICENSE_PUBLIC_KEY, VERCEL_BLOB_READ_WRITE_TOKEN) ---------------
+// Skip with PREFLIGHT_SKIP_ENV=1 (e.g. CI smoke runs: env lives in Vercel,
+// not on the runner — live checks below still validate production).
+if (process.env.PREFLIGHT_SKIP_ENV === '1') {
+  check('env checks skipped (PREFLIGHT_SKIP_ENV=1)', { required: false, ok: true });
+} else {
 const requiredEnv = ['TURSO_URL', 'TURSO_AUTH_TOKEN', 'JWT_SECRET', 'LICENSE_PUBLIC_KEY', 'VERCEL_BLOB_READ_WRITE_TOKEN'];
 for (const key of requiredEnv) {
   const v = env[key];
@@ -35,6 +40,7 @@ check('TURSO_URL is remote libsql', {
   ok: !env.TURSO_URL || env.TURSO_URL.startsWith('libsql://'),
   detail: env.TURSO_URL?.startsWith('libsql://') ? undefined : 'production should use libsql:// (Turso), not a local file'
 });
+}
 
 // --- 2. JWT secret strength ----------------------------------------------
 if (env.JWT_SECRET) {
