@@ -99,9 +99,8 @@ function saveCache(cacheDir: string, p: string, data: unknown): void {
 function rewriteUrls(cloudUrl: string, value: unknown): unknown {
   if (typeof value === 'string') {
     if (value.startsWith('/uploads/')) return `${cloudUrl}${value}`;
-    // Relay HLS adalah tidak sah di pelayan lokal (tiada ffmpeg dalam mod
-    // cloud) — arahkan terus ke hos cloud. URL mutlak tidak disentuh.
-    if (value.startsWith('/relay/')) return `${cloudUrl}${value}`;
+    // Relay HLS kekal LOKAL — ffmpeg berjalan di mini PC (kamera/OBS ialah
+    // peranti lokal; cloud tidak menjanakan HLS untuk streams ini).
     return value;
   }
   if (Array.isArray(value)) return value.map((v) => rewriteUrls(cloudUrl, v));
@@ -170,6 +169,8 @@ export async function handleCloudSync(reply: FastifyReply, dataDir: string, p: s
     const cloud = await cloudFetch(cfg, p);
     if (cloud.ok) {
       saveCache(cacheDir, p, cloud.json);
+      // Streams cloud → relay ffmpeg lokal (kamera/OBS ialah peranti mini PC).
+      if (p === '/api/settings') notifyCloudSettings(cloud.json);
       reply.send(rewrite ? rewriteUrls(cfg.cloudUrl, cloud.json) : cloud.json);
       return true;
     }
@@ -214,6 +215,34 @@ export function cloudPageRedirect(reply: FastifyReply, dataDir: string, page: '/
     return true;
   }
   return false;
+}
+
+// --- Streams cloud → relay lokal ----------------------------------------------
+//
+// Dalam mod cloud-sync, tetapan (termasuk senarai streams) datang dari cloud
+// tetapi RELAY ffmpeg mesti berjalan DI MINI PC (kamera/OBS adalah peranti
+// lokal; cloud tidak boleh menariknya). Pendekatan: setiap kali settings
+// cloud dikemas kini (fetch/cache/SSE sync), tulis semula senarai streams
+// ke dalam store lokal dan minta StreamManager.sync() — paparan lokal kemudian
+// membaca HLS dari /relay/<id>/index.m3u8 yang dijana ffmpeg lokal.
+
+type OnCloudSettings = (settings: Record<string, unknown>) => void;
+let onCloudSettingsHandler: OnCloudSettings | null = null;
+
+/** Daftar handler kemas kini settings cloud (stream relay lokal). */
+export function setOnCloudSettings(h: OnCloudSettings | null): void {
+  onCloudSettingsHandler = h;
+}
+
+function notifyCloudSettings(data: unknown): void {
+  if (!onCloudSettingsHandler) return;
+  try {
+    if (data && typeof data === 'object' && Array.isArray((data as Record<string, unknown>).streams)) {
+      onCloudSettingsHandler(data as Record<string, unknown>);
+    }
+  } catch {
+    /* handler tidak boleh menggagalkan respons paparan */
+  }
 }
 
 /**
@@ -284,6 +313,11 @@ export async function startCloudSseBridge(dataDir: string): Promise<void> {
             // mendapat data baharu; paparan lokal dinotifikasi via SSE.
             fs.rmSync(path.join(dataDir, 'cloud-cache'), { recursive: true, force: true });
             broadcastLocal('sync', { rev: safeRev(evData) });
+            // Streams relay mesti bertindak segera (admin boleh ubah kamera
+            // / mirror live) — fetch settings sekarang, bukan menunggu poll.
+            cloudFetch(activeCloudConfig(dataDir)!, '/api/settings').then((r) => {
+              if (r.ok) notifyCloudSettings(r.json);
+            }).catch(() => { /* cloud offline — cache digunakan */ });
           }
         }
       }

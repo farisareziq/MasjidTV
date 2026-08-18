@@ -15,7 +15,7 @@ import {
 import { Store } from './store.js';
 import { AnnouncementService } from './announcements.js';
 import { StreamManager } from './streams.js';
-import { cloudSyncEnabled, handleCloudSync, cloudPageRedirect, startCloudSseBridge, addLocalSseRoute } from './cloudsync.js';
+import { cloudSyncEnabled, handleCloudSync, cloudPageRedirect, startCloudSseBridge, addLocalSseRoute, setOnCloudSettings } from './cloudsync.js';
 import { applyPairing, PAIR_PAGE_HTML_SRC } from './pair.js';
 import { ensureFfmpeg } from './ensure-ffmpeg.js';
 
@@ -500,11 +500,27 @@ export async function startServer(opts: AppOptions): Promise<FastifyInstance> {
   // dipaut — ia akan menunggu config pairing muncul).
   startCloudSseBridge(opts.dataDir).catch(() => {});
 
+  // CLOUD-SYNC STREAMS: kamera/OBS ialah peranti mini PC — relay ffmpeg
+  // mesti berjalan LOKAL walaupun tetapan datang dari cloud. Setiap kemas
+  // kini settings cloud (fetch proksi / SSE sync) tulis semula streams ke
+  // store lokal dan StreamManager.sync() menguruskan proses ffmpeg.
+  setOnCloudSettings((cloudSettings) => {
+    const streams = cloudSettings.streams;
+    if (Array.isArray(streams)) {
+      const cur = app.masjidStore.getSettings().streams || [];
+      const same = JSON.stringify(cur) === JSON.stringify(streams);
+      if (!same) {
+        app.masjidStore.updateSettings({ streams });
+        app.masjidStreams.sync().catch(() => {});
+        console.log(`[cloud] streams dikemas kini (${(streams as unknown[]).length} entri) — relay lokal.`);
+      }
+    }
+  });
+
   // Pariti rujukan: semak ffmpeg + sync relay, dan sync acara Islam pada
-  // permulaan (plus ulang setiap 12 jam).
-  if (!cloudSyncEnabled(opts.dataDir)) {
-    // Laluan ffmpeg dari hos (kiosk bundel) diutamakan — terus guna tanpa
-    // muat turun. ensure-ffmpeg kekal sebagai fallback pemasangan lokal.
+  // permulaan (plus ulang setiap 12 jam). ffmpeg/relay sentiasa disediakan
+  // (dipautkan atau tidak) kerana relay ialah kerja lokal.
+  {
     const presetFfmpeg = opts.ffmpegPathOverride;
     if (presetFfmpeg) {
       const cur = app.masjidStore.getSettings().media.ffmpegPath;
@@ -528,6 +544,8 @@ export async function startServer(opts: AppOptions): Promise<FastifyInstance> {
         app.masjidStreams.checkFfmpeg().then(() => app.masjidStreams.sync());
       });
     }
+  }
+  if (!cloudSyncEnabled(opts.dataDir)) {
     syncEventsFor(app.masjidStore.getSettings(), (patch) => {
       app.masjidStore.updateSettings(patch as Record<string, unknown>);
       return Promise.resolve();

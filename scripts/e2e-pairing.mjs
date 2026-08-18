@@ -200,6 +200,28 @@ try {
   log('TV /display: ' + r.status + (r.status === 302 ? ' -> ' + r.headers.get('location') : ' (paparan lokal)'));
   if (r.status !== 200) throw new Error('/display sepatutnya dilayan lokal selepas pairing');
 
+  // 10b) STREAMS CLOUD→RELAY LOKAL: admin menambah stream relay → SSE/fecth
+  // tulis streams ke store lokal → /relay/<id>/index.m3u8 mula dijana
+  // (ffmpeg gagal pada sumber dummy tetapi mekanisme tulis-sinkron boleh
+  // disahkan melalui settings lokal + hlsUrl tidak di-rewrite ke cloud).
+  await fetch(CLOUD + '/api/admin/streams', {
+    method: 'PUT',
+    headers: { 'content-type': 'application/json', authorization: 'Bearer ' + admin.token },
+    body: JSON.stringify({ streams: [{ id: 'cam1', name: 'Cam', type: 'dshow', url: 'video=OBS Virtual Camera', duration: 30, enabled: true }] })
+  });
+  // Beri masa SSE sync → settings fetch → store tulis.
+  await sleep(2500);
+  // Paparan settings mesti mengekalkan hlsUrl RELATIF (relay lokal).
+  r = await fetch(TV + '/api/settings');
+  const sSettings = await r.json();
+  const stream = (sSettings.streams || []).find((x) => x.id === 'cam1');
+  log('stream dshow dalam settings TV: ' + JSON.stringify(stream));
+  if (!stream) throw new Error('stream dshow tidak sampai ke TV');
+  if (String(stream.hlsUrl || '') !== '/relay/cam1/index.m3u8') {
+    throw new Error('hlsUrl mesti /relay/cam1/index.m3u8 (lokal), dapat: ' + stream.hlsUrl);
+  }
+  log('hlsUrl relay lokal ✓ (bukan URL cloud)');
+
   r = await fetch(TV + '/admin', { redirect: 'manual' });
   const aloc = r.headers.get('location') || '';
   log('TV /admin: ' + r.status + ' -> ' + aloc);
