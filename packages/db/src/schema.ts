@@ -92,5 +92,7 @@ export const tvDevices = sqliteTable('tv_devices', {
   name: text('name').notNull().default(''),
   token: text('token').notNull(),
   createdAt: integer('created_at').notNull(),
-  lastSeen: integer('last_seen').notNull().default(0)
+  lastSeen: integer('last_seen').notNull().default(0),
+  // Laporan perkakasan terkini dari kiosk (kamera USB dsb.) — JSON string.
+  hwReport: text('hw_report').notNull().default('')
 });

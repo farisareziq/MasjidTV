@@ -251,6 +251,21 @@ export function applyPairing(app: FastifyInstance, dataDir: string): void {
     reply.send({ paired: Boolean(cfg), cloudUrl: cfg?.cloudUrl || '', tenantName: cfg?.tenantName || '' });
   });
 
+  // Status perkakasan mini PC (kamera USB dsb.) — ditulis oleh app kiosk
+  // melalui devices.json (lihat apps/kiosk/main/devices.ts). Endpoint lokal
+  // untuk menu tersembunyi; cloud membaca salinan ini melalui jambatan SSE.
+  app.get('/api/devices-hw', async (_req, reply) => {
+    try {
+      const raw = JSON.parse(fs.readFileSync(path.join(dataDir, 'devices.json'), 'utf8'));
+      reply.send({
+        cameras: Array.isArray(raw.cameras) ? raw.cameras : [],
+        checkedAt: Number(raw.checkedAt) || 0
+      });
+    } catch {
+      reply.send({ cameras: [], checkedAt: 0 });
+    }
+  });
+
   // Mulakan sesi pairing di cloud — IDEMPOTEN: jika sesi aktif untuk cloud
   // yang sama masih belum tamat tempoh, pulangkan semula kod sedia ada.
   // Ini mengelakkan setiap page-load/watchdog-restart menjana kod baharu

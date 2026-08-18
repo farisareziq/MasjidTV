@@ -10,9 +10,11 @@
 
 import { app, BrowserWindow, powerSaveBlocker, session } from 'electron';
 import path from 'node:path';
+import fs from 'node:fs';
 import { startServer } from './server-stub.js';
 import { resolveFfmpeg } from './ffmpeg.js';
 import { installAutostart, removeAutostart } from './autostart.js';
+import { startCameraWatch } from './devices.js';
 
 const args = process.argv.slice(2);
 const hasFlag = (n: string) => args.includes(n);
@@ -79,7 +81,83 @@ function createKioskWindow(): BrowserWindow {
   });
   win.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
 
+  // AUTOHIDE cursor: sembunyi 3sa selepas gerakan terakhir — kiosk TV tidak
+  // patut menunjukkan kursor tetikus rehat. CSS injection pada setiap
+  // navigasi (halaman pairing/paparan).
+  win.webContents.on('did-navigate', () => injectCursorHider(win));
+  win.webContents.once('did-finish-load', () => injectCursorHider(win));
+
+  // MENU TERSEMBUNYI (Ctrl+Shift+M): panel status kiosk — pairing, kamera,
+  // ffmpeg, autostart, unpair. Dilaksanakan sebagai overlay dalam renderer
+  // (berfungsi pada halaman pairing & paparan).
+  win.webContents.on('before-input-event', (_e, input) => {
+    if (input.type === 'keyDown' && input.control && input.shift && input.key.toLowerCase() === 'm') {
+      win.webContents.executeJavaScript(HIDDEN_MENU_JS).catch(() => {});
+    }
+  });
+
   return win;
+}
+
+// Overlay menu tersembunyi — dibina dari API lokal; tiada dialog Electron
+// (renderer sandbox kekal). Klik luar/tutup membuang overlay.
+const HIDDEN_MENU_JS = `(async function () {
+  var old = document.getElementById('__kioskMenu');
+  if (old) { old.remove(); return; }
+  var box = document.createElement('div');
+  box.id = '__kioskMenu';
+  box.style.cssText = 'position:fixed;inset:0;z-index:99999;background:rgba(0,20,12,.92);color:#eef7f2;font-family:Segoe UI,system-ui,sans-serif;display:flex;align-items:center;justify-content:center;padding:24px;';
+  box.innerHTML = '<div style="max-width:520px;width:100%;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.15);border-radius:16px;padding:28px 32px">'
+    + '<h2 style="margin:0 0 4px;font-size:20px">Menu Kiosk MasjidTV</h2>'
+    + '<p style="color:#9fc3b2;font-size:12px;margin:0 0 18px">Ctrl+Shift+M untuk tutup</p>'
+    + '<div id="__kmBody" style="font-size:14px;line-height:1.9">Memuat…</div>'
+    + '<div style="display:flex;gap:10px;margin-top:18px;flex-wrap:wrap">'
+    + '<button id="__kmUnpair" style="padding:10px 18px;border:0;border-radius:8px;background:#8a3b2f;color:#fff;cursor:pointer;font-size:13px">Nyahpaut & Pair Semula</button>'
+    + '<button id="__kmClose" style="padding:10px 18px;border:1px solid rgba(255,255,255,.25);border-radius:8px;background:transparent;color:#eef7f2;cursor:pointer;font-size:13px">Tutup</button>'
+    + '</div></div>';
+  document.body.appendChild(box);
+  box.addEventListener('click', function (e) { if (e.target === box) box.remove(); });
+  document.getElementById('__kmClose').onclick = function () { box.remove(); };
+  document.getElementById('__kmUnpair').onclick = async function () {
+    await fetch('/api/pair/unpair', { method: 'POST' });
+    location.replace('/display');
+  };
+  var body = document.getElementById('__kmBody');
+  try {
+    var cfg = await (await fetch('/api/pair/config')).json();
+    var hw = await (await fetch('/api/devices-hw')).json();
+    var cams = (hw.cameras || []).map(function (c) { return c.name + (c.status === 'OK' ? '' : ' (' + c.status + ')'); });
+    body.innerHTML =
+      '<div><b>Status:</b> ' + (cfg.paired ? 'Dipaut' : 'Belum dipaut') + '</div>'
+      + (cfg.paired ? '<div><b>Masjid:</b> ' + (cfg.tenantName || '-') + '<br><b>Cloud:</b> ' + cfg.cloudUrl + '</div>' : '')
+      + '<div style="margin-top:10px"><b>Kamera:</b> ' + (cams.length ? cams.join(' • ') : 'tiada dikesan') + '</div>'
+      + '<div style="color:#86a99a;font-size:12px;margin-top:8px">Semakan: ' + (hw.checkedAt ? new Date(hw.checkedAt).toLocaleString() : '-') + '</div>';
+  } catch (e) {
+    body.innerHTML = 'Gagal memuat status: ' + e.message;
+  }
+})()`;
+
+function injectCursorHider(win: BrowserWindow): void {
+  const css = `
+    html, body { cursor: default; }
+    html.cursor-idle, html.cursor-idle * { cursor: none !important; }
+  `;
+  win.webContents.insertCSS(css).catch(() => {});
+  win.webContents.executeJavaScript(`
+    (function () {
+      if (window.__cursorHider) return;
+      window.__cursorHider = true;
+      var t = null;
+      document.addEventListener('mousemove', function () {
+        document.documentElement.classList.remove('cursor-idle');
+        if (t) clearTimeout(t);
+        t = setTimeout(function () {
+          document.documentElement.classList.add('cursor-idle');
+        }, 3000);
+      }, { passive: true });
+      document.documentElement.classList.add('cursor-idle');
+    })();
+  `).catch(() => {});
 }
 
 async function bootstrap(): Promise<void> {
@@ -102,6 +180,20 @@ async function bootstrap(): Promise<void> {
   // Pelayan (kod sedia ada) — node:sqlite, pairing Android TV, cloud-sync SSE.
   await startServer({ dataDir: dataDir(), port: PORT, ffmpegPath: ffmpeg });
   console.log(`[server] http://localhost:${PORT}/display`);
+
+  // Deteksi peranti (kamera USB) — tulis devices.json, dibaca endpoint
+  // /api/devices-hw; laporan berkala ke cloud bila dipaut (web admin nampak
+  // status kamera setiap mini PC).
+  startCameraWatch(dataDir(), () => {
+    const cloudJsonPath = path.join(dataDir(), 'cloud.json');
+    try {
+      const raw = JSON.parse(fs.readFileSync(cloudJsonPath, 'utf8'));
+      if (raw?.cloudUrl && raw?.deviceToken) {
+        return { cloudUrl: String(raw.cloudUrl), deviceToken: String(raw.deviceToken) };
+      }
+    } catch { /* belum dipaut */ }
+    return null;
+  });
 
   if (hasFlag('--no-kiosk')) {
     console.log('[kiosk] mod --no-kiosk — tetingkap dilangkau.');

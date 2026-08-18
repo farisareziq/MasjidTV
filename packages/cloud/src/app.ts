@@ -43,7 +43,7 @@ export async function createCloudApp(): Promise<FastifyInstance> {
     process.env.TURSO_URL || 'file:./cloud-data/masjidtv.db',
     process.env.TURSO_AUTH_TOKEN || ''
   );
-  applySchema(db);
+  await applySchema(db);
   const store = new CloudStore(db.db);
   await store.seedSuperuser();
 
@@ -860,6 +860,30 @@ export async function createCloudApp(): Promise<FastifyInstance> {
     const tenant = await requireAdmin(req, reply);
     if (!tenant) return;
     reply.send({ devices: await store.listDevices(tenant.id) });
+  });
+
+  // Heartbeat + laporan perkakasan peranti kiosk (kamera USB dsb.).
+  // Auth: device-token peranti (sama seperti paparan).
+  app.post('/api/device/report', async (req, reply) => {
+    const devToken = String(req.headers['x-device-token'] || '');
+    if (!devToken) return jsonError(reply, 401, 'Token peranti diperlukan');
+    const t = await store.getTenantByDeviceToken(devToken);
+    if (!t) return jsonError(reply, 401, 'Token peranti tidak sah');
+    const lic = licenseStatus(t);
+    if (!lic.unlocked) return jsonError(reply, 403, lic.message || 'Lesen diperlukan', 'LICENSE_REQUIRED');
+    const body = (req.body || {}) as { cameras?: unknown };
+    const cameras = Array.isArray(body.cameras)
+      ? body.cameras.slice(0, 10).map((c) => {
+          const o = (c || {}) as { id?: string; name?: string; status?: string };
+          return {
+            id: String(o.id || '').slice(0, 120),
+            name: String(o.name || '').slice(0, 80),
+            status: o.status === 'OK' ? 'OK' : o.status === 'Error' ? 'Error' : 'Unknown'
+          };
+        })
+      : [];
+    await store.saveHwReport(devToken, { cameras, at: Date.now() });
+    reply.send({ ok: true });
   });
 
   // Namakan semula peranti TV (paparan senarai & rujukan admin).

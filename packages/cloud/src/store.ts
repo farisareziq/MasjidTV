@@ -17,6 +17,15 @@ function now(): number {
   return Date.now();
 }
 
+// Parse JSON hw_report dengan selamat (data rosak → null).
+function safeParse(s: string): unknown {
+  try {
+    return JSON.parse(s);
+  } catch {
+    return null;
+  }
+}
+
 function uid(): string {
   return crypto.randomUUID();
 }
@@ -271,10 +280,23 @@ export class CloudStore {
   }
 
   async listDevices(tenantId: string) {
-    return this.db.select({
+    const rows = await this.db.select({
       id: tvDevices.id, deviceId: tvDevices.deviceId, name: tvDevices.name,
-      createdAt: tvDevices.createdAt, lastSeen: tvDevices.lastSeen
+      createdAt: tvDevices.createdAt, lastSeen: tvDevices.lastSeen,
+      hwReport: tvDevices.hwReport
     }).from(tvDevices).where(eq(tvDevices.tenantId, tenantId)).all();
+    return rows.map((r) => ({
+      ...r,
+      hw: r.hwReport ? safeParse(r.hwReport) : null
+    }));
+  }
+
+  // Simpan laporan perkakasan peranti (kamera dsb.) — dipanggil oleh
+  // kiosk heartbeat /api/device/report.
+  async saveHwReport(token: string, report: unknown): Promise<void> {
+    const json = JSON.stringify(report).slice(0, 4000);
+    await this.db.update(tvDevices).set({ hwReport: json, lastSeen: now() })
+      .where(eq(tvDevices.token, token)).run();
   }
 
   async deleteDevice(tenantId: string, id: string): Promise<void> {

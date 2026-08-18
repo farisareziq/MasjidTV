@@ -19,7 +19,10 @@ type StreamRow = { id: string; name: string; type: string; url: string; duration
 type UploadResult = { url: string; kind: string };
 type LicenseInfo = { status: string; trialUntil?: number; apiKey?: string };
 type TenantInfo = { id: string; name: string; status: string; apiKey: string; license?: { status: string; trialUntil?: number } };
-type TvDevice = { id: string; device_id: string; name?: string; last_seen?: number | string };
+type TvDevice = {
+  id: string; device_id: string; name?: string; last_seen?: number | string;
+  hw?: { cameras?: { id?: string; name?: string; status?: string }[]; at?: number } | null;
+};
 
 interface AdminState {
   token: string;
@@ -2383,19 +2386,26 @@ async function renderTv() {
       list.innerHTML = `<p class="sub">${escapeHtml(t('tvEmpty'))}</p>`;
       return;
     }
-    list.innerHTML = devices.map((d) => `
+    list.innerHTML = devices.map((d) => {
+      const cams = d.hw?.cameras || [];
+      const camLine = cams.length
+        ? `📹 ${cams.map((c) => `${escapeHtml(c.name || 'Kamera')}${c.status === 'OK' ? '' : ' ⚠'}`).join(', ')}`
+        : '';
+      return `
       <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;padding:12px 0;border-bottom:1px solid rgba(196,220,248,0.12)">
         <div style="min-width:0">
           <strong>${escapeHtml(d.name || d.device_id)}</strong>
           <p class="sub" style="font-size:11px;word-break:break-all">${escapeHtml(d.device_id)} • ${
             d.last_seen ? new Date(Number(d.last_seen) || (d.last_seen as unknown as string)).toLocaleString() : '—'
           }</p>
+          ${camLine ? `<p class="sub" style="font-size:11px;margin-top:2px">${camLine}</p>` : ''}
         </div>
         <div style="display:flex;gap:8px;flex-shrink:0">
           <button class="btn ghost sm" data-rename="${escapeHtml(d.id)}" data-name="${escapeHtml(d.name || '')}">✏️ ${escapeHtml(t('tvRename'))}</button>
           <button class="btn ghost sm" data-unpair="${escapeHtml(d.id)}">${escapeHtml(t('tvUnpair'))}</button>
         </div>
-      </div>`).join('');
+      </div>`;
+    }).join('');
   } catch (err) {
     list.innerHTML = `<p class="sub">${escapeHtml((err as Error).message)}</p>`;
   }

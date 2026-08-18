@@ -1,0 +1,31 @@
+{
+  "appId": "app.masjidtv.kiosk",
+  "productName": "MasjidTV Kiosk",
+  "directories": {
+    "output": "dist-kiosk-stamp"
+  },
+  "files": [
+    "dist/**/*",
+    "package.json"
+  ],
+  "extraResources": [
+    { "from": "resources/frontend/public", "to": "frontend/public" },
+    { "from": "resources/bin", "to": "bin" }
+  ],
+  "win": {
+    "icon": "build/icon.png",
+    "target": [
+      { "target": "nsis", "arch": ["x64"] },
+      { "target": "portable", "arch": ["x64"] }
+    ]
+  },
+  "nsis": {
+    "oneClick": true,
+    "perMachine": false,
+    "allowToChangeInstallationDirectory": false,
+    "artifactName": "MasjidTV-Kiosk-Setup-${version}.${ext}"
+  },
+  "portable": {
+    "artifactName": "MasjidTV-Kiosk-Portable-${version}.${ext}"
+  }
+}

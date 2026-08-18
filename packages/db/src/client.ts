@@ -175,11 +175,22 @@ export async function createCloudClient(url: string, authToken?: string): Promis
 }
 
 // Apply the base schema (CREATE TABLE IF NOT EXISTS) for a given client.
-export function applySchema(client: AppClient): void {
+export async function applySchema(client: AppClient): Promise<void> {
   if (client.kind === 'local') {
     client.raw.exec(LOCAL_SCHEMA_SQL);
   } else {
-    client.raw.batch(CLOUD_SCHEMA_SQL);
+    await client.raw.batch(CLOUD_SCHEMA_SQL.filter((s) => !s.startsWith('--')));
+    // Migrasi hw_report untuk DB sedia ada (CREATE TABLE baharu sudah
+    // mengandunginya). ALTER hanya perlu pada DB lama; ralat "duplicate
+    // column" bermakna lajur sedia ada — selamat diabaikan. LibsqlError
+    // boleh lontar sync ATAU async — tangkap kedua-duanya.
+    try {
+      await Promise.resolve(client.raw.execute(`ALTER TABLE tv_devices ADD COLUMN hw_report TEXT NOT NULL DEFAULT ''`))
+        .catch((err: unknown) => { throw err; });
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      if (!/duplicate column/i.test(msg)) throw err;
+    }
   }
 }
 
@@ -270,6 +281,7 @@ const CLOUD_SCHEMA_SQL = [
     token TEXT NOT NULL,
     created_at INTEGER NOT NULL,
     last_seen INTEGER DEFAULT 0,
+    hw_report TEXT NOT NULL DEFAULT '',
     UNIQUE(tenant_id, device_id)
   )`,
   // Index auth peranti (x-device-token pada setiap permintaan paparan TV).

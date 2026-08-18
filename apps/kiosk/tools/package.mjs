@@ -86,19 +86,15 @@ await esbuild.build({
   external: ['electron']
 });
 
-// 5) electron-builder — hanya dist/ + package.json minimal (tiada deps npm:
-//    semuanya sudah dibundel).
+// 5) electron-builder — config dalam electron-builder.json (BERASINGAN;
+//    package.json TIDAK disentuh — pengajaran daripada build sebelum ini
+//    yang merosakkan package.json semasa proses).
 console.log('[pkg] electron-builder...');
-const pkgPath = path.join(kioskDir, 'package.json');
-const pkgJson = JSON.parse(fs.readFileSync(pkgPath, 'utf8'));
-const buildCfg = pkgJson.build;
 // Folder output: stamp masa — elak EBUSY dari fail build lama yang dikunci
-// (zombie proses / AV scan). Skrip memadam stamp lama >3 hari.
+// (zombie proses / AV scan). Skrip memadam stamp lama best-effort.
 const stamp = new Date().toISOString().replace(/[-:T]/g, '').slice(0, 12);
 const outDir = path.join(kioskDir, 'dist-kiosk', stamp);
 fs.mkdirSync(path.dirname(outDir), { recursive: true });
-// Stamp lama dibuang best-effort (kunci EPERM oleh AV/zombie proses tidak
-// boleh menggagalkan build — stamp baharu sentiasa dibina).
 for (const d of fs.readdirSync(path.dirname(outDir))) {
   if (/^\d{12}$/.test(d) && d !== stamp) {
     try {
@@ -106,21 +102,7 @@ for (const d of fs.readdirSync(path.dirname(outDir))) {
     } catch { /* dikunci — biarkan, dibuang kemudian */ }
   }
 }
-buildCfg.directories = { output: outDir };
-buildCfg.files = ['dist/**/*', 'package.json'];
-// pastikan electron-builder tidak cuba resolve workspace deps
-const minimalPkg = {
-  name: pkgJson.name, version: pkgJson.version, private: true,
-  main: 'dist/index.js', build: buildCfg
-};
-// Tulis ATOMIC: package.json kiosk SAHAJA (jalan mutlak), sandar + pulih.
-const backupPath = pkgPath + '.bak';
-fs.copyFileSync(pkgPath, backupPath);
-fs.writeFileSync(pkgPath, JSON.stringify(minimalPkg, null, 2));
-try {
-  run('npx electron-builder --win nsis portable', kioskDir);
-} finally {
-  fs.copyFileSync(backupPath, pkgPath);
-  fs.unlinkSync(backupPath);
-}
-console.log('[pkg] siap → apps/kiosk/dist-kiosk/');
+// electron-builder baca config daripada electron-builder.json; output di-
+// arahkan melalui flag CLI --config.directories.output.
+run(`npx electron-builder --win nsis portable --config.directories.output="${outDir}"`, kioskDir);
+console.log('[pkg] siap → ' + outDir);
