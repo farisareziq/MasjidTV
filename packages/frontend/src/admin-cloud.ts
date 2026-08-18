@@ -21,7 +21,7 @@ type LicenseInfo = { status: string; trialUntil?: number; apiKey?: string };
 type TenantInfo = { id: string; name: string; status: string; apiKey: string; license?: { status: string; trialUntil?: number } };
 type TvDevice = {
   id: string; device_id: string; name?: string; last_seen?: number | string;
-  hw?: { cameras?: { id?: string; name?: string; status?: string }[]; at?: number } | null;
+  hw?: { cameras?: { id?: string; name?: string; status?: string }[]; dshow?: { name?: string }[]; at?: number } | null;
 };
 
 interface AdminState {
@@ -2395,8 +2395,14 @@ async function renderTv() {
     }
     list.innerHTML = devices.map((d) => {
       const cams = d.hw?.cameras || [];
+      const dshow = d.hw?.dshow || [];
       const camLine = cams.length
         ? `📹 ${cams.map((c) => `${escapeHtml(c.name || 'Kamera')}${c.status === 'OK' ? '' : ' ⚠'}`).join(', ')}`
+        : '';
+      // Nama peranti DSHOW sebenar — boleh copy terus ke medan URL stream
+      // (video=<nama>). Dipapar bila kiosk melaporkan peranti.
+      const dshowLine = dshow.length
+        ? `🎥 DSHOW: ${dshow.map((c) => `video=${escapeHtml(c.name || '')}`).join(' • ')}`
         : '';
       return `
       <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;padding:12px 0;border-bottom:1px solid rgba(196,220,248,0.12)">
@@ -2406,6 +2412,7 @@ async function renderTv() {
             d.last_seen ? new Date(Number(d.last_seen) || (d.last_seen as unknown as string)).toLocaleString() : '—'
           }</p>
           ${camLine ? `<p class="sub" style="font-size:11px;margin-top:2px">${camLine}</p>` : ''}
+          ${dshowLine ? `<p class="sub" style="font-size:11px;margin-top:2px">${dshowLine}</p>` : ''}
         </div>
         <div style="display:flex;gap:8px;flex-shrink:0">
           <button class="btn ghost sm" data-rename="${escapeHtml(d.id)}" data-name="${escapeHtml(d.name || '')}">✏️ ${escapeHtml(t('tvRename'))}</button>

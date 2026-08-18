@@ -2214,13 +2214,16 @@ async function renderTv() {
     }
     list.innerHTML = devices.map((d) => {
       const cams = d.hw?.cameras || [];
+      const dshow = d.hw?.dshow || [];
       const camLine = cams.length ? `\u{1F4F9} ${cams.map((c) => `${escapeHtml(c.name || "Kamera")}${c.status === "OK" ? "" : " \u26A0"}`).join(", ")}` : "";
+      const dshowLine = dshow.length ? `\u{1F3A5} DSHOW: ${dshow.map((c) => `video=${escapeHtml(c.name || "")}`).join(" \u2022 ")}` : "";
       return `
       <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;padding:12px 0;border-bottom:1px solid rgba(196,220,248,0.12)">
         <div style="min-width:0">
           <strong>${escapeHtml(d.name || d.device_id)}</strong>
           <p class="sub" style="font-size:11px;word-break:break-all">${escapeHtml(d.device_id)} \u2022 ${d.last_seen ? new Date(Number(d.last_seen) || d.last_seen).toLocaleString() : "\u2014"}</p>
           ${camLine ? `<p class="sub" style="font-size:11px;margin-top:2px">${camLine}</p>` : ""}
+          ${dshowLine ? `<p class="sub" style="font-size:11px;margin-top:2px">${dshowLine}</p>` : ""}
         </div>
         <div style="display:flex;gap:8px;flex-shrink:0">
           <button class="btn ghost sm" data-rename="${escapeHtml(d.id)}" data-name="${escapeHtml(d.name || "")}">\u270F\uFE0F ${escapeHtml(t("tvRename"))}</button>

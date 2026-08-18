@@ -200,9 +200,9 @@ async function bootstrap(): Promise<void> {
   await startServer({ dataDir: dataDir(), port: PORT, ffmpegPath: ffmpeg });
   console.log(`[server] http://localhost:${PORT}/display`);
 
-  // Deteksi peranti (kamera USB) — tulis devices.json, dibaca endpoint
-  // /api/devices-hw; laporan berkala ke cloud bila dipaut (web admin nampak
-  // status kamera setiap mini PC).
+  // Deteksi peranti (kamera USB + peranti DSHOW ffmpeg) — tulis devices.json,
+  // dibaca endpoint /api/devices-hw; laporan berkala ke cloud bila dipaut
+  // (web admin nampak status kamera + senarai nama DSHOW setiap mini PC).
   startCameraWatch(dataDir(), () => {
     const cloudJsonPath = path.join(dataDir(), 'cloud.json');
     try {
@@ -212,7 +212,7 @@ async function bootstrap(): Promise<void> {
       }
     } catch { /* belum dipaut */ }
     return null;
-  });
+  }, () => (ffmpeg && ffmpeg !== 'ffmpeg' ? ffmpeg : null));
 
   if (hasFlag('--no-kiosk')) {
     console.log('[kiosk] mod --no-kiosk — tetingkap dilangkau.');

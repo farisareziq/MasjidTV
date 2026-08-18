@@ -316,6 +316,20 @@ export async function buildApp(opts: AppOptions): Promise<FastifyInstance> {
     reply.send({ streams: streams.allStatus(), ffmpegOk: ok });
   });
 
+  // Senarai peranti DirectShow (kamera USB / OBS Virtual Camera) — untuk
+  // pilihan stream DSHOW di admin. Laluan admin (token) — maklumat peranti
+  // tidak didedahkan kepada paparan umum.
+  app.get('/api/admin/dshow-devices', { preHandler: requireAuth }, async (_req, reply) => {
+    try {
+      const { listDshowDevices } = await import('./dshow.js');
+      const ff = settings().media.ffmpegPath || 'ffmpeg';
+      const devices = await listDshowDevices(ff);
+      reply.send({ devices: devices.filter((d) => d.kind === 'video') });
+    } catch (err) {
+      reply.status(500).send({ error: 'Gagal senaraikan peranti', detail: err instanceof Error ? err.message : String(err) });
+    }
+  });
+
   app.put('/api/admin/streams', { preHandler: requireAuth }, async (req, reply) => {
     const body = (req.body || {}) as { streams?: unknown };
     if (!Array.isArray(body.streams)) return jsonError(reply, 400, 'Expected { streams: [...] }');

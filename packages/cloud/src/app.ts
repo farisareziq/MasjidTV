@@ -871,7 +871,7 @@ export async function createCloudApp(): Promise<FastifyInstance> {
     if (!t) return jsonError(reply, 401, 'Token peranti tidak sah');
     const lic = licenseStatus(t);
     if (!lic.unlocked) return jsonError(reply, 403, lic.message || 'Lesen diperlukan', 'LICENSE_REQUIRED');
-    const body = (req.body || {}) as { cameras?: unknown };
+    const body = (req.body || {}) as { cameras?: unknown; dshow?: unknown };
     const cameras = Array.isArray(body.cameras)
       ? body.cameras.slice(0, 10).map((c) => {
           const o = (c || {}) as { id?: string; name?: string; status?: string };
@@ -882,7 +882,10 @@ export async function createCloudApp(): Promise<FastifyInstance> {
           };
         })
       : [];
-    await store.saveHwReport(devToken, { cameras, at: Date.now() });
+    const dshow = Array.isArray(body.dshow)
+      ? body.dshow.slice(0, 10).map((c) => String((c as { name?: string })?.name || '').slice(0, 100)).filter(Boolean)
+      : [];
+    await store.saveHwReport(devToken, { cameras, dshow, at: Date.now() });
     reply.send({ ok: true });
   });
 

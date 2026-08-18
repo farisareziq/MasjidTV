@@ -16,6 +16,8 @@ interface RelayEntry {
   startedAt: number;
   /** Ditandakan true oleh stopRelay — halang exit handler menjadualkan semula. */
   stopped?: boolean;
+  /** Mesej ralat terakhir daripada ffmpeg (peranti tidak wujud dsb.). */
+  lastError?: string;
 }
 
 export class StreamManager {
@@ -134,18 +136,24 @@ export class StreamManager {
 
     // stdio ignore: ffmpeg menulis log statistik berterusan ke stderr; paip
     // yang tidak dibaca akan penuh (~64KB) dan ffmpeg tersekat menulis —
-    // relay membeku tanpa keluar. Matikan log melalui flag + jangan paip.
+    // relay membeku tanpa keluar. -loglevel error kekal; stderr DIBACA dan
+    // baris ralat terakhir disimpan untuk diagnosis (peranti tidak wujud,
+    // kredensial salah dsb.).
     const proc = spawn(fp, args, { windowsHide: true, stdio: ['ignore', 'ignore', 'pipe'] });
     entry.proc = proc;
-    // Jangan biarkan paip stderr mengumpul — longgarkan walaupun -loglevel error.
-    proc.stderr?.on('data', () => {});
-    proc.on('error', () => {
+    let errTail = '';
+    proc.stderr?.on('data', (d: Buffer) => {
+      errTail = (errTail + String(d)).slice(-500);
+    });
+    proc.on('error', (err) => {
       entry.status = 'error';
+      entry.lastError = err.message;
       this.procs.delete(stream.id);
       if (!entry.stopped) this.scheduleRestart(stream);
     });
-    proc.on('exit', () => {
-      entry.status = 'stopped';
+    proc.on('exit', (code) => {
+      entry.status = code === 0 ? 'stopped' : 'error';
+      if (code !== 0 && errTail) entry.lastError = errTail.split(/\r?\n/).filter(Boolean).pop();
       this.procs.delete(stream.id);
       if (!entry.stopped) this.scheduleRestart(stream);
     });
@@ -239,6 +247,7 @@ export class StreamManager {
     }
     const entry = this.procs.get(stream.id);
     base.status = entry ? entry.status : 'stopped';
+    if (entry?.lastError) base.lastError = entry.lastError.slice(-200);
     return base;
   }
 
