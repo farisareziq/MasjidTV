@@ -80,17 +80,25 @@ export class StreamManager {
     }
 
     const fp = this.getFfmpegPath() || 'ffmpeg';
-    const args: string[] = [];
+    const args: string[] = ['-loglevel', 'error', '-nostats'];
     if (stream.type === 'rtsp' || stream.type === 'onvif') {
       args.push('-rtsp_transport', 'tcp');
     }
     if (['rtsp', 'rtmp', 'onvif', 'hls'].includes(stream.type)) {
       args.push('-rw_timeout', '10000000');
     }
+    // Input: OBS Virtual Camera / kamera USB Windows (DirectShow).
+    // url format: "video=OBS Virtual Camera" (nama peranti).
+    if (stream.type === 'dshow') {
+      args.push('-f', 'dshow');
+      args.push('-rtbufsize', '100M');
+      args.push('-framerate', '30');
+      args.push('-video_size', '1280x720');
+      args.push('-i', `video=${String(stream.url).replace(/^video=/, '')}`);
+    } else {
+      args.push('-i', stream.url);
+    }
     args.push(
-      '-loglevel', 'error',
-      '-nostats',
-      '-i', stream.url,
       '-c:v', 'libx264',
       '-preset', 'veryfast',
       '-tune', 'zerolatency',
@@ -98,14 +106,28 @@ export class StreamManager {
       '-g', '50',
       '-sc_threshold', '0',
       '-c:a', 'aac',
-      '-b:a', '64k',
-      '-f', 'hls',
-      '-hls_time', '2',
-      '-hls_list_size', '6',
-      '-hls_flags', 'delete_segments+append_list',
-      '-hls_segment_filename', path.join(outDir, 'seg_%05d.ts'),
-      path.join(outDir, 'index.m3u8')
+      '-b:a', '64k'
     );
+    // MIRROR KE LIVE (Facebook Live dsb.): ffmpeg tee muxer menyalin output
+    // kepada HLS lokal + RTMPS serentak. RTMPS perlu flush_data untuk
+    // mengelakkan latency menimbun.
+    const mirror = stream.mirrorUrl && /^rtmps?:\/\//.test(stream.mirrorUrl) ? stream.mirrorUrl : null;
+    if (mirror) {
+      args.push(
+        '-f', 'tee',
+        '-map', '0',
+        `[f=hls:hls_time=2:hls_list_size=6:hls_flags=delete_segments+append_list:hls_segment_filename=${path.join(outDir, 'seg_%05d.ts').replace(/\\/g, '/')}]${path.join(outDir, 'index.m3u8').replace(/\\/g, '/')}|[f=flv:flvflags=no_duration_filesize:flush_data=1]${mirror}`
+      );
+    } else {
+      args.push(
+        '-f', 'hls',
+        '-hls_time', '2',
+        '-hls_list_size', '6',
+        '-hls_flags', 'delete_segments+append_list',
+        '-hls_segment_filename', path.join(outDir, 'seg_%05d.ts'),
+        path.join(outDir, 'index.m3u8')
+      );
+    }
 
     const entry: RelayEntry = { proc: null, status: 'starting', startedAt: Date.now() };
     this.procs.set(stream.id, entry);

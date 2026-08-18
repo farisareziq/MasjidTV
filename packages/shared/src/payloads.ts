@@ -7,7 +7,7 @@ import { getDay, nextPrayer, dateKeyInZone, zonedDateTime, formatTime } from './
 import { hijriText } from './jakim.js';
 import type { PrayerDay } from './types.js';
 
-export const RELAY_TYPES: ReadonlySet<StreamType> = new Set<StreamType>(['rtsp', 'rtmp', 'onvif']);
+export const RELAY_TYPES: ReadonlySet<StreamType> = new Set<StreamType>(['rtsp', 'rtmp', 'onvif', 'dshow']);
 
 export function isRelayType(type: StreamType): boolean {
   return RELAY_TYPES.has(type);
@@ -27,7 +27,11 @@ export function publicStream(s: Stream): Record<string, unknown> {
   const safeUrl = String(s.url || '').replace(/\/\/[^/@:]+:[^/@]+@/, '//');
   if (isRelayType(s.type)) {
     // url diperlukan oleh app Android TV (ExoPlayer native RTSP/RTMP);
-    // paparan bukan-Android guna hlsUrl relay tempatan.
+    // paparan bukan-Android guna hlsUrl relay tempatan. dshow (kamera
+    // OBS/USB) hanya ada lokal — URL peranti tidak didedahkan awam.
+    if (s.type === 'dshow') {
+      return { ...base, kind: 'relay', url: '', hlsUrl: `/relay/${s.id}/index.m3u8` };
+    }
     return { ...base, kind: 'relay', url: safeUrl, hlsUrl: `/relay/${s.id}/index.m3u8` };
   }
   if (s.type === 'hls') return { ...base, kind: 'hls', url: safeUrl };

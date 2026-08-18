@@ -23,6 +23,7 @@
     "oneClick": true,
     "perMachine": false,
     "allowToChangeInstallationDirectory": false,
+    "runAfterFinish": true,
     "artifactName": "MasjidTV-Kiosk-Setup-${version}.${ext}"
   },
   "portable": {

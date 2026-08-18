@@ -172,6 +172,25 @@ async function bootstrap(): Promise<void> {
     return;
   }
 
+  // AUTOSTART FIRST-RUN: pemasangan (NSIS) & portable — semasa pelancaran
+  // GUI pertama, daftar autostart secara automatik supaya reboot tidak
+  // memerlukan langkah manual. Marker fail elak ulang; --no-autostart
+  // melangkau (pemasangan debug/kedai demo). --remove-autostart membuang
+  // marker bersama pendaftaran.
+  if (!hasFlag('--no-autostart') && !hasFlag('--autostart')) {
+    const marker = path.join(dataDir(), '.autostart-done');
+    if (!fs.existsSync(marker)) {
+      try {
+        installAutostart();
+        fs.mkdirSync(dataDir(), { recursive: true });
+        fs.writeFileSync(marker, new Date().toISOString(), 'utf8');
+        console.log('[kiosk] autostart didaftarkan secara automatik (first-run).');
+      } catch (err) {
+        console.error('[kiosk] autostart automatik gagal:', err instanceof Error ? err.message : err);
+      }
+    }
+  }
+
   // ffmpeg: selesaikan sebelum pelayan (settings.media.ffmpegPath).
   const ffmpeg = await resolveFfmpeg(dataDir());
   if (ffmpeg) console.log(`[ffmpeg] ${ffmpeg}`);

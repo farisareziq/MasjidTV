@@ -2,6 +2,7 @@
 
 import crypto from 'node:crypto';
 import { METHODS } from './prayers.js';
+import { isRelayType } from './payloads.js';
 import type { Settings, StreamType, Weekday } from './types.js';
 
 const WEEKDAYS: Weekday[] = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
@@ -18,6 +19,8 @@ function clampNum(value: unknown, min: number, max: number, fallback: number): n
 export function isSafeStreamUrl(url: unknown, type: StreamType): boolean {
   const s = String(url || '').trim();
   if (!s) return true; // URL kosong dibenarkan (belum diisi)
+  // dshow: nama peranti DirectShow ("video=OBS Virtual Camera") — bukan URL.
+  if (type === 'dshow') return /^video=[\w .\-()]{1,100}$/.test(s);
   let parsed: URL;
   try {
     parsed = new URL(s);
@@ -27,7 +30,8 @@ export function isSafeStreamUrl(url: unknown, type: StreamType): boolean {
   const scheme = parsed.protocol.replace(':', '');
   const allowed: Record<StreamType, string[]> = {
     rtsp: ['rtsp'], rtmp: ['rtmp'], onvif: ['rtsp', 'http', 'https'],
-    hls: ['http', 'https'], youtube: ['http', 'https'], webrtc: ['http', 'https']
+    hls: ['http', 'https'], youtube: ['http', 'https'], webrtc: ['http', 'https'],
+    dshow: []
   };
   if (!allowed[type] || !allowed[type].includes(scheme)) return false;
   const host = parsed.hostname.toLowerCase().replace(/^\[|\]$/g, '');
@@ -349,7 +353,7 @@ export function applyPatch(current: Settings, patch: AnyPatch): Settings {
   }
 
   if (Array.isArray(patch.streams)) {
-    const validTypes: StreamType[] = ['rtsp', 'rtmp', 'onvif', 'hls', 'youtube', 'webrtc'];
+    const validTypes: StreamType[] = ['rtsp', 'rtmp', 'onvif', 'hls', 'youtube', 'webrtc', 'dshow'];
     settings.streams = patch.streams
       .filter((s) => s && typeof s.name === 'string' && validTypes.includes(s.type as StreamType) && isSafeStreamUrl(s.url, s.type as StreamType))
       .map((s) => ({
@@ -360,7 +364,13 @@ export function applyPatch(current: Settings, patch: AnyPatch): Settings {
         type: s.type as StreamType,
         url: String(s.url || '').trim().slice(0, 1000),
         duration: clampNum(s.duration, 10, 600, 30),
-        enabled: s.enabled !== false
+        enabled: s.enabled !== false,
+        // Mirror ke live RTMPS (Facebook Live dsb.) — hanya untuk jenis
+        // relay; disahkan sebagai URL rtmps/rtmp sah.
+        mirrorUrl: (typeof s.mirrorUrl === 'string' && isRelayType(s.type as StreamType)
+          && /^rtmps?:\/\//.test(s.mirrorUrl.trim()) && s.mirrorUrl.length <= 1000)
+          ? s.mirrorUrl.trim()
+          : undefined
       }));
   }
 
