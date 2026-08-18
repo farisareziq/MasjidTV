@@ -22,7 +22,7 @@ const WEEKDAYS = [
   ["friday", "Friday"],
   ["saturday", "Saturday"]
 ];
-const STREAM_TYPES = ["rtsp", "rtmp", "onvif", "hls", "youtube", "webrtc"];
+const STREAM_TYPES = ["rtsp", "rtmp", "onvif", "hls", "youtube", "webrtc", "dshow"];
 const COLOR_PRESETS = {
   navy: { bgTop: "#06101f", bgBottom: "#0a1a2f", text: "#f3f6fb", muted: "#8fa4bd", gold: "#e0bc6a", teal: "#62d9c6" },
   emerald: { bgTop: "#03130f", bgBottom: "#08271c", text: "#f0faf5", muted: "#8fb5a4", gold: "#e6c976", teal: "#5ee6b0" },
@@ -247,6 +247,7 @@ const I18N = {
     streamType: "Type",
     seconds: "Seconds",
     streamUrl: "URL",
+    mirrorUrl: "Mirror (Facebook Live)",
     enabled: "Enabled",
     eventsSub: "Auto-synced from the official JAKIM takwim \u2014 dates are updated according to the selected zone.",
     eventsAuto: "Auto-sync from JAKIM",
@@ -581,6 +582,7 @@ const I18N = {
     streamType: "Jenis",
     seconds: "Saat",
     streamUrl: "URL",
+    mirrorUrl: "Mirror (Facebook Live)",
     enabled: "Aktif",
     eventsSub: "Auto-sync dari takwim rasmi JAKIM \u2014 tarikh dikemas kini mengikut zon yang dipilih.",
     eventsAuto: "Auto-sync dari JAKIM",
@@ -1693,7 +1695,8 @@ function renderStreams() {
     type: s.type,
     url: s.url,
     duration: s.duration,
-    enabled: s.enabled
+    enabled: s.enabled,
+    mirrorUrl: s.mirrorUrl || ""
   }));
   const list = $("streamList");
   if (!current.length) {
@@ -1703,6 +1706,7 @@ function renderStreams() {
   list.innerHTML = current.map((s) => {
     const st = statusMap.get(s.id);
     const chip = streamStatusChip(st?.status);
+    const isRelay = ["rtsp", "rtmp", "onvif", "dshow"].includes(s.type);
     return `
       <div class="stream-row" data-id="${s.id}">
         <label><span data-i18n="streamName">Name</span><input type="text" class="st-name" value="${escapeHtml(s.name)}" placeholder="Camera 1"></label>
@@ -1710,7 +1714,8 @@ function renderStreams() {
           ${STREAM_TYPES.map((ty) => `<option value="${ty}" ${ty === s.type ? "selected" : ""}>${ty.toUpperCase()}</option>`).join("")}
         </select></label>
         <label><span data-i18n="seconds">Seconds</span><input type="number" class="st-duration" min="10" max="600" value="${s.duration || 30}"></label>
-        <label class="st-url-wrap"><span data-i18n="streamUrl">URL</span><input type="text" class="st-url" value="${escapeHtml(s.url)}" placeholder="rtsp://\u2026 / https://youtu.be/\u2026 / https://\u2026"></label>
+        <label class="st-url-wrap"><span data-i18n="streamUrl">URL</span><input type="text" class="st-url" value="${escapeHtml(s.url)}" placeholder="rtsp://\u2026 / video=OBS Virtual Camera / https://\u2026"></label>
+        ${isRelay ? `<label class="st-url-wrap"><span data-i18n="mirrorUrl">Mirror (Facebook Live)</span><input type="text" class="st-mirror" value="${escapeHtml(s.mirrorUrl || "")}" placeholder="rtmps://live-api-s.facebook.com:443/rtmp/\u2026"></label>` : ""}
         <label class="checkbox-label"><input type="checkbox" class="st-enabled" ${s.enabled ? "checked" : ""}> <span data-i18n="enabled">Enabled</span></label>
         <span class="status-chip ${chip.cls}">${chip.text}</span>
         <button class="row-del" data-del>\u2715</button>
@@ -1750,13 +1755,15 @@ function collectStreams() {
   return [...rows].map((rowEl) => {
     const row = rowEl;
     const q = (sel) => row.querySelector(sel);
+    const mirrorEl = q(".st-mirror");
     return {
       id: row.dataset.id,
       name: q(".st-name").value,
       type: q(".st-type").value,
       url: q(".st-url").value,
       duration: Number(q(".st-duration").value) || 30,
-      enabled: q(".st-enabled").checked
+      enabled: q(".st-enabled").checked,
+      mirrorUrl: mirrorEl ? mirrorEl.value.trim() : void 0
     };
   });
 }

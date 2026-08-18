@@ -15,7 +15,7 @@ type AdminStatus = {
   nextEvent: { name: string; next: string; daysLeft: number; today: boolean } | null;
   adminPasswordFile: boolean;
 };
-type StreamRow = { id: string; name: string; type: string; url: string; duration: number; enabled: boolean; status?: string };
+type StreamRow = { id: string; name: string; type: string; url: string; duration: number; enabled: boolean; mirrorUrl?: string; status?: string };
 type UploadResult = { url: string; kind: string };
 type LicenseInfo = { status: string; trialUntil?: number; apiKey?: string };
 type TenantInfo = { id: string; name: string; status: string; apiKey: string; license?: { status: string; trialUntil?: number } };
@@ -67,7 +67,7 @@ const WEEKDAYS: Array<[string, string]> = [
   ['saturday', 'Saturday']
 ];
 
-const STREAM_TYPES: string[] = ['rtsp', 'rtmp', 'onvif', 'hls', 'youtube', 'webrtc'];
+const STREAM_TYPES: string[] = ['rtsp', 'rtmp', 'onvif', 'hls', 'youtube', 'webrtc', 'dshow'];
 
 const COLOR_PRESETS: Record<string, { bgTop: string; bgBottom: string; text: string; muted: string; gold: string; teal: string; font?: string }> = {
   navy: { bgTop: '#06101f', bgBottom: '#0a1a2f', text: '#f3f6fb', muted: '#8fa4bd', gold: '#e0bc6a', teal: '#62d9c6' },
@@ -295,6 +295,7 @@ const I18N: Record<string, Record<string, string>> = {
     streamType: 'Type',
     seconds: 'Seconds',
     streamUrl: 'URL',
+    mirrorUrl: 'Mirror (Facebook Live)',
     enabled: 'Enabled',
     eventsSub: 'Auto-synced from the official JAKIM takwim — dates are updated according to the selected zone.',
     eventsAuto: 'Auto-sync from JAKIM',
@@ -625,6 +626,7 @@ const I18N: Record<string, Record<string, string>> = {
     streamType: 'Jenis',
     seconds: 'Saat',
     streamUrl: 'URL',
+    mirrorUrl: 'Mirror (Facebook Live)',
     enabled: 'Aktif',
     eventsSub: 'Auto-sync dari takwim rasmi JAKIM — tarikh dikemas kini mengikut zon yang dipilih.',
     eventsAuto: 'Auto-sync dari JAKIM',
@@ -1825,7 +1827,8 @@ function renderStreams() {
     type: s.type,
     url: s.url,
     duration: s.duration,
-    enabled: s.enabled
+    enabled: s.enabled,
+    mirrorUrl: s.mirrorUrl || ''
   }));
   const list = $('streamList');
   if (!current.length) {
@@ -1835,6 +1838,7 @@ function renderStreams() {
   list.innerHTML = current.map((s) => {
     const st = statusMap.get(s.id);
     const chip = streamStatusChip(st?.status);
+    const isRelay = ['rtsp', 'rtmp', 'onvif', 'dshow'].includes(s.type);
     return `
       <div class="stream-row" data-id="${s.id}">
         <label><span data-i18n="streamName">Name</span><input type="text" class="st-name" value="${escapeHtml(s.name)}" placeholder="Camera 1"></label>
@@ -1842,7 +1846,8 @@ function renderStreams() {
           ${STREAM_TYPES.map((ty) => `<option value="${ty}" ${ty === s.type ? 'selected' : ''}>${ty.toUpperCase()}</option>`).join('')}
         </select></label>
         <label><span data-i18n="seconds">Seconds</span><input type="number" class="st-duration" min="10" max="600" value="${s.duration || 30}"></label>
-        <label class="st-url-wrap"><span data-i18n="streamUrl">URL</span><input type="text" class="st-url" value="${escapeHtml(s.url)}" placeholder="rtsp://… / https://youtu.be/… / https://…"></label>
+        <label class="st-url-wrap"><span data-i18n="streamUrl">URL</span><input type="text" class="st-url" value="${escapeHtml(s.url)}" placeholder="rtsp://… / video=OBS Virtual Camera / https://…"></label>
+        ${isRelay ? `<label class="st-url-wrap"><span data-i18n="mirrorUrl">Mirror (Facebook Live)</span><input type="text" class="st-mirror" value="${escapeHtml(s.mirrorUrl || '')}" placeholder="rtmps://live-api-s.facebook.com:443/rtmp/…"></label>` : ''}
         <label class="checkbox-label"><input type="checkbox" class="st-enabled" ${s.enabled ? 'checked' : ''}> <span data-i18n="enabled">Enabled</span></label>
         <span class="status-chip ${chip.cls}">${chip.text}</span>
         <button class="row-del" data-del>✕</button>
@@ -1880,13 +1885,15 @@ function collectStreams(): StreamRow[] {
   return [...rows].map((rowEl) => {
     const row = rowEl as HTMLElement;
     const q = (sel: string) => row.querySelector(sel) as HTMLInputElement | HTMLSelectElement;
+    const mirrorEl = q('.st-mirror') as HTMLInputElement | null;
     return {
       id: row.dataset.id,
       name: (q('.st-name') as HTMLInputElement).value,
       type: (q('.st-type') as HTMLSelectElement).value,
       url: (q('.st-url') as HTMLInputElement).value,
       duration: Number((q('.st-duration') as HTMLInputElement).value) || 30,
-      enabled: (q('.st-enabled') as HTMLInputElement).checked
+      enabled: (q('.st-enabled') as HTMLInputElement).checked,
+      mirrorUrl: mirrorEl ? mirrorEl.value.trim() : undefined
     };
   });
 }
