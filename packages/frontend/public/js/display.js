@@ -251,7 +251,16 @@ async function api(url) {
   }
   if (token) headers["x-device-token"] = token;
   const res = await fetch(url, { headers });
-  if (!res.ok) throw new Error(`${url} -> ${res.status}`);
+  if (!res.ok) {
+    if (res.status === 503) {
+      const body = await res.clone().json().catch(() => null);
+      if (body && body.code === "DEVICE_UNPAIRED") {
+        location.replace("/display");
+        throw new Error(`${url} -> peranti dinyahpaut, memuat semula`);
+      }
+    }
+    throw new Error(`${url} -> ${res.status}`);
+  }
   return res.json();
 }
 function hexToRgba(hex, alpha) {
@@ -1218,6 +1227,25 @@ setInterval(tickPrayerMode, 1e3);
 setInterval(tickDebug, 2e3);
 setInterval(sync, SYNC_INTERVAL_MS);
 setInterval(loadWeather, 9e5);
+try {
+  const es = new EventSource("/api/events");
+  let sseAlive = false;
+  es.addEventListener("hello", () => {
+    sseAlive = true;
+  });
+  es.addEventListener("sync", () => {
+    sseAlive = true;
+    sync().catch(() => {
+    });
+  });
+  es.addEventListener("unpaired", () => {
+    location.replace("/display");
+  });
+  es.onerror = () => {
+    sseAlive = false;
+  };
+} catch {
+}
 const style = document.createElement("style");
 style.textContent = `
   @keyframes ticker-scroll {

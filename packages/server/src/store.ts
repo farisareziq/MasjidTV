@@ -3,8 +3,7 @@
 
 import crypto from 'node:crypto';
 import bcrypt from 'bcryptjs';
-import { createLocalClient, applySchema, settings, announcements, eq, type LocalClient } from '@masjidtv/db';
-import { DEFAULT_SETTINGS, applyPatch, type Settings, type Announcement } from '@masjidtv/shared';
+import { createLocalClient, applySchema, settings, announcements, eq, type LocalClient } from '@masjidtv/db';import { DEFAULT_SETTINGS, applyPatch, type Settings, type Announcement } from '@masjidtv/shared';
 import fs from 'node:fs';
 import path from 'node:path';
 
@@ -184,7 +183,8 @@ export class Store {
     this.saveAnnouncements([item]);
   }
 
-  // Batch upsert dalam SATU transaksi better-sqlite3 (bukan N autocommit).
+  // Batch upsert dalam SATU transaksi (bukan N autocommit). Kedua-dua driver
+  // mematuhi kontrak better-sqlite3: transaction(fn) pulangkan fungsi.
   saveAnnouncements(items: Announcement[]): void {
     this.client.raw.transaction(() => {
       for (const item of items) {

@@ -132,4 +132,38 @@ describe('Acceptance Testing / cloud user journeys', () => {
     expect(res.json().service).toBe('masjidtv-cloud');
     expect(res.json().ok).toBe(true);
   });
+
+  // --- SSE sync (pentest + fungsi) ------------------------------------------
+
+  it('SEC1 — /api/events menolak tanpa auth dan token palsu', async () => {
+    const no = await app.inject({ method: 'GET', url: '/api/events' });
+    expect(no.statusCode).toBe(401);
+    const fake = await app.inject({
+      method: 'GET', url: '/api/events',
+      headers: { 'x-device-token': 'token-palsu'.repeat(4) }
+    });
+    expect(fake.statusCode).toBe(401);
+  });
+
+  it('SSE1 — penulisan admin tidak merosakkan API (rev bump selamat)', async () => {
+    const login = await app.inject({
+      method: 'POST', url: '/api/auth/login',
+      payload: { username: 'ustaz', password: 'rahsia123' }
+    });
+    const token = login.json().token;
+    // Dua penulisan berturut — hook bumpRev mesti tidak menghalang/gagalkan.
+    for (let i = 0; i < 2; i++) {
+      const put = await app.inject({
+        method: 'PUT', url: '/api/admin/settings',
+        headers: { authorization: `Bearer ${token}` },
+        payload: { mosque: { name: 'Masjid SSE ' + i } }
+      });
+      expect(put.statusCode).toBe(200);
+    }
+    // API kekal sihat selepas bump.
+    const health = await app.inject({ method: 'GET', url: '/api/health' });
+    expect(health.statusCode).toBe(200);
+    // (Broadcast SSE disahkan penuh dalam scripts/e2e-pairing.mjs — ujian
+    // latensi & kandungan dijalankan di sana dengan server socket sebenar.)
+  });
 });

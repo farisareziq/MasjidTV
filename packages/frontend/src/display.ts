@@ -259,7 +259,18 @@ async function api(url: string): Promise<any> {
   }
   if (token) headers['x-device-token'] = token;
   const res = await fetch(url, { headers });
-  if (!res.ok) throw new Error(`${url} -> ${res.status}`);
+  if (!res.ok) {
+    // KELAKUAN ANDROID TV: peranti dinyahpaut di cloud (503 DEVICE_UNPAIRED)
+    // → reload; server kini mod pairing dan /display papar kod baharu.
+    if (res.status === 503) {
+      const body = await res.clone().json().catch(() => null as any);
+      if (body && body.code === 'DEVICE_UNPAIRED') {
+        location.replace('/display');
+        throw new Error(`${url} -> peranti dinyahpaut, memuat semula`);
+      }
+    }
+    throw new Error(`${url} -> ${res.status}`);
+  }
   return res.json();
 }
 
@@ -1361,6 +1372,24 @@ setInterval(tickPrayerMode, 1000);
 setInterval(tickDebug, 2000);
 setInterval(sync, SYNC_INTERVAL_MS);
 setInterval(loadWeather, 900000);
+
+// SYNC SEGERA: SSE lokal /api/events — event 'sync' dari admin cloud (mel-
+// alui jambatan mini PC) memicu sync() serta-merta (<1sa). Fallback: poll
+// 10sa kekal jika SSE gagal/legacy. Event 'unpaired' → reload ke pairing.
+try {
+  const es = new EventSource('/api/events');
+  let sseAlive = false;
+  es.addEventListener('hello', () => { sseAlive = true; });
+  es.addEventListener('sync', () => { sseAlive = true; sync().catch(() => {}); });
+  es.addEventListener('unpaired', () => { location.replace('/display'); });
+  es.onerror = () => {
+    // SSE putus (server restart / legacy) — EventSource auto-reconnect;
+    // jika tiada sokongan, poll 10sa mengambil alih secara senyap.
+    sseAlive = false;
+  };
+} catch {
+  /* pelayar tanpa EventSource — poll sahaja */
+}
 
 
 const style = document.createElement('style');

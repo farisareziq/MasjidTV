@@ -19,6 +19,7 @@ import {
   signToken, verifyToken, hashPassword, comparePassword, checkRateLimit, recordFailure, clearFailures
 } from './auth.js';
 import { verifyLicense, licenseStatus, type LicenseStatus } from './license.js';
+import { registerSse, bumpRev } from './sse.js';
 import { ASSETS } from './pages.generated.js';
 
 const PAIR_CODE_CHARS = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
@@ -38,7 +39,7 @@ export async function createCloudApp(): Promise<FastifyInstance> {
   if (isProd && !process.env.TURSO_URL) {
     throw new Error('TURSO_URL diperlukan — tetapkan pemboleh ubah persekitaran TURSO_URL sebelum deploy produksi');
   }
-  const db = createCloudClient(
+  const db = await createCloudClient(
     process.env.TURSO_URL || 'file:./cloud-data/masjidtv.db',
     process.env.TURSO_AUTH_TOKEN || ''
   );
@@ -61,6 +62,22 @@ export async function createCloudApp(): Promise<FastifyInstance> {
 
   app.addHook('onClose', async () => {
     await db.close();
+  });
+
+  // SYNC SEGERA: setiap laluan TULIS /api/admin/* yang berjaya (2xx) untuk
+  // sebuah tenant → bumpRev → SSE 'sync' kepada paparan. Hook onResponse
+  // tunggal menggantikan bump manual pada setiap laluan (minimum damage).
+  app.addHook('onResponse', async (req, reply) => {
+    const m = req.method;
+    if (m !== 'PUT' && m !== 'POST' && m !== 'PATCH' && m !== 'DELETE') return;
+    if (!(req.url || '').startsWith('/api/admin/')) return;
+    if (reply.statusCode >= 300) return;
+    // Laluan yang tidak mengubah kandungan paparan — langkau.
+    if (/\/api\/admin\/(password|license|events\/sync)$/.test(req.url || '')) return;
+    try {
+      const tenant = await tenantFromRequest(req);
+      if (tenant) bumpRev(tenant.id);
+    } catch { /* SSE gagal tidak boleh gagalkan balasan */ }
   });
 
   for (const ct of Object.keys(UPLOAD_TYPES)) {
@@ -863,6 +880,9 @@ export async function createCloudApp(): Promise<FastifyInstance> {
     await store.deleteDevice(tenant.id, (req.params as { id: string }).id);
     reply.send({ ok: true });
   });
+
+  // SSE untuk sync segera paparan (lihat sse.ts).
+  registerSse(app, store);
 
   app.setNotFoundHandler((_req, reply) => jsonError(reply, 404, 'Tidak dijumpai'));
   app.setErrorHandler((err, _req, reply) => {

@@ -17,6 +17,11 @@ export default tseslint.config(
       'apps/android-tv/build/**',
       'apps/android-tv/.dart_tool/**',
       'apps/android-tv/android/**',
+      // Output kiosk packaging (exe/asar) & build stamp — bukan kod sumber.
+      'apps/kiosk/dist/**',
+      'apps/kiosk/dist-kiosk/**',
+      'apps/kiosk/resources/**',
+      'apps/kiosk/bin/**',
       // Output kompilasi TypeScript (dikom semula daripada .ts — jangan lint).
       'packages/shared/src/*.js',
       'packages/shared/src/*.d.ts',
@@ -41,7 +46,14 @@ export default tseslint.config(
         URLSearchParams: 'readonly',
         AbortController: 'readonly',
         AbortSignal: 'readonly',
-        queueMicrotask: 'readonly'
+        queueMicrotask: 'readonly',
+        TextDecoder: 'readonly',
+        TextEncoder: 'readonly',
+        Response: 'readonly',
+        EventSource: 'readonly',
+        location: 'readonly',
+        document: 'readonly',
+        window: 'readonly'
       }
     },
     rules: {

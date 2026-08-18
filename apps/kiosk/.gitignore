@@ -1,0 +1,8 @@
+# Build output (electron-builder stamps) — dibilang kedalam repo.
+dist/
+dist-kiosk/
+resources/
+# ffmpeg binari besar — dimuat turun semasa build (tools/download-ffmpeg.mjs).
+bin/
+.ffmpeg-*
+node_modules/

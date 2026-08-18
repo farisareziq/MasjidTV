@@ -1,0 +1,69 @@
+{
+  "name": "@masjidtv/kiosk",
+  "version": "1.0.0",
+  "private": true,
+  "description": "MasjidTV kiosk mini-PC app (Electron): embedded server + fullscreen kiosk display",
+  "main": "dist/index.js",
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "dev": "node tools/dev.mjs",
+    "start": "electron .",
+    "package": "node tools/package.mjs",
+    "test": "echo \"kiosk tests run from repo root (vitest workspace)\" && exit 0"
+  },
+  "dependencies": {
+    "@masjidtv/server": "workspace:*"
+  },
+  "devDependencies": {
+    "electron": "^37.0.0",
+    "electron-builder": "^26.0.0",
+    "typescript": "^5.7.2"
+  },
+  "build": {
+    "appId": "app.masjidtv.kiosk",
+    "productName": "MasjidTV Kiosk",
+    "directories": {
+      "output": "C:\\Users\\faris\\Codex GPT\\MasjidTV\\global\\apps\\kiosk\\dist-kiosk\\202608181123"
+    },
+    "files": [
+      "dist/**/*",
+      "package.json"
+    ],
+    "extraResources": [
+      {
+        "from": "resources/frontend/public",
+        "to": "frontend/public"
+      },
+      {
+        "from": "resources/bin",
+        "to": "bin"
+      }
+    ],
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        },
+        {
+          "target": "portable",
+          "arch": [
+            "x64"
+          ]
+        }
+      ]
+    },
+    "nsis": {
+      "oneClick": true,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": false,
+      "artifactName": "MasjidTV-Kiosk-Setup-${version}.${ext}"
+    },
+    "portable": {
+      "artifactName": "MasjidTV-Kiosk-Portable-${version}.${ext}"
+    }
+  }
+}

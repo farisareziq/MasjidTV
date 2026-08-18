@@ -15,7 +15,8 @@ import {
 import { Store } from './store.js';
 import { AnnouncementService } from './announcements.js';
 import { StreamManager } from './streams.js';
-import { applyCloudSync, cloudSyncEnabled } from './cloudsync.js';
+import { cloudSyncEnabled, handleCloudSync, cloudPageRedirect, startCloudSseBridge, addLocalSseRoute } from './cloudsync.js';
+import { applyPairing, PAIR_PAGE_HTML_SRC } from './pair.js';
 import { ensureFfmpeg } from './ensure-ffmpeg.js';
 
 const SESSION_TTL_MS = 12 * 60 * 60 * 1000;
@@ -55,6 +56,8 @@ export interface AppOptions {
   dataDir: string;
   publicDir: string;
   port?: number;
+  /** Laluan ffmpeg ditetapkan oleh hos (cth. app kiosk yang membundel binari). */
+  ffmpegPathOverride?: string;
 }
 
 export async function buildApp(opts: AppOptions): Promise<FastifyInstance> {
@@ -73,8 +76,11 @@ export async function buildApp(opts: AppOptions): Promise<FastifyInstance> {
   const tokens = new Map<string, number>();
   const loginAttempts = new Map<string, { count: number; until: number }>();
   const PORT = opts.port || Number(process.env.PORT) || 3000;
-  // Mod cloud-sync: laluan paparan tempatan dilumpuhkan (proksi cloud ambil alih).
-  const cloudMode = cloudSyncEnabled();
+  // Mod cloud-sync (hot): endpoint paparan SENTIASA didaftarkan sekali; bila
+  // config pairing aktif mereka berkhidmat dari cloud (proksi+cache), bila
+  // tidak — data tempatan. Tiada restart diperlukan selepas /pair.
+  // cloudMode hanya mengawal tugas latar (ffmpeg/JAKIM) semasa boot.
+  const cloudMode = cloudSyncEnabled(opts.dataDir);
 
   const settings = () => store.getSettings();
   const tz = () => settings().prayer.timezone || 'Asia/Kuala_Lumpur';
@@ -123,6 +129,8 @@ export async function buildApp(opts: AppOptions): Promise<FastifyInstance> {
   }
 
   function requireDisplayKey(req: FastifyRequest, reply: FastifyReply, done: (err?: Error) => void): void {
+    // Dipaut dengan cloud? Token peranti = akses paparan (kelakuan TV).
+    if (cloudSyncEnabled(opts.dataDir)) return done();
     const expected = settings().security?.displayKey;
     if (!expected) return done();
     const key = (req.headers['x-display-key'] as string) || (req.query as Record<string, string>).key || '';
@@ -164,11 +172,42 @@ export async function buildApp(opts: AppOptions): Promise<FastifyInstance> {
     decorateReply: false
   });
 
-  // Static public files (display/admin/sw.js).
-  app.register(import('@fastify/static'), {
-    root: opts.publicDir,
-    prefix: '/'
-  });
+  // Static public files (display/admin/sw.js). publicDir mungkin folder
+  // sebenar ATAU 'masjidtv-assets://virtual' (binari SEA — aset dari memori).
+  const VIRTUAL_PREFIX = 'masjidtv-assets://virtual';
+  const virtualAssets = opts.publicDir.startsWith(VIRTUAL_PREFIX)
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    ? (require('./public-assets.cjs') as { getPublicAssets: () => { get(file: string): Buffer | null } | null }).getPublicAssets()
+    : null;
+  if (opts.publicDir.startsWith(VIRTUAL_PREFIX) && !virtualAssets) {
+    throw new Error('Aset maya diminta tetapi tidak tersedia (bukan runtime SEA?)');
+  }
+  const MIME: Record<string, string> = {
+    '.html': 'text/html; charset=utf-8', '.css': 'text/css; charset=utf-8',
+    '.js': 'application/javascript; charset=utf-8', '.mjs': 'application/javascript; charset=utf-8',
+    '.json': 'application/json', '.webmanifest': 'application/manifest+json',
+    '.png': 'image/png', '.svg': 'image/svg+xml', '.ico': 'image/x-icon',
+    '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.gif': 'image/gif',
+    '.woff': 'font/woff', '.woff2': 'font/woff2', '.ttf': 'font/ttf'
+  };
+  // Layar fail awam dari publicDir (folder) atau aset maya (SEA).
+  const servePublic = (reply: FastifyReply, file: string): boolean => {
+    if (virtualAssets) {
+      const buf = virtualAssets.get(file);
+      if (!buf) return false;
+      reply.header('Content-Type', MIME[path.extname(file).toLowerCase()] || 'application/octet-stream');
+      if (file === 'sw.js') reply.header('Cache-Control', 'no-cache, no-store');
+      reply.send(buf);
+      return true;
+    }
+    reply.type('text/html').sendFile(file);
+    return true;
+  };  if (!virtualAssets) {
+    app.register(import('@fastify/static'), {
+      root: opts.publicDir,
+      prefix: '/'
+    });
+  }
 
   // Relay output (HLS segments) with no-cache headers.
   app.register(import('@fastify/static'), {
@@ -182,10 +221,13 @@ export async function buildApp(opts: AppOptions): Promise<FastifyInstance> {
     }
   });
 
-  // Cloud sync mode (proxy + cache) — takes precedence when enabled. In this
-  // mode the local display/admin routes below are NOT registered (Fastify
-  // rejects duplicate method+url, unlike Express first-wins).
-  applyCloudSync(app, opts.dataDir, requireDisplayKey);
+  // Mod pairing mini PC: halaman /pair + API (sentiasa tersedia — kedua-dua
+  // mod lokal dan cloud-sync; pasangan berjaya diaktifkan secara hot).
+  applyPairing(app, opts.dataDir);
+
+  // SSE lokal untuk paparan (sync segera; berfungsi dalam & luar mod cloud —
+  // luar mod cloud tiada event sync, hanya hello/heartbeat).
+  addLocalSseRoute(app);
 
   // --- Public (display) endpoints ------------------------------------------
 
@@ -196,29 +238,30 @@ export async function buildApp(opts: AppOptions): Promise<FastifyInstance> {
   app.get('/api/methods', async (_req, reply) => reply.send(METHODS));
   app.get('/api/zones', async (_req, reply) => reply.send({ zones: getZonesGrouped() }));
 
-  if (!cloudMode) {
-    app.get('/api/settings', { preHandler: requireDisplayKey }, async (_req, reply) => {
-      const pub = buildPublicSettings(settings(), { includeEventsSync: true });
-      pub.events = buildEventsPayload((pub.events as Settings['events']) || [], new Date(), tz());
-      pub.streams = ((pub.streams as Stream[]) || []).map(publicStream);
-      reply.send(pub);
-    });
+  app.get('/api/settings', { preHandler: requireDisplayKey }, async (_req, reply) => {
+    if (await handleCloudSync(reply, opts.dataDir, '/api/settings', true)) return;
+    const pub = buildPublicSettings(settings(), { includeEventsSync: true });
+    pub.events = buildEventsPayload((pub.events as Settings['events']) || [], new Date(), tz());
+    pub.streams = ((pub.streams as Stream[]) || []).map(publicStream);
+    reply.send(pub);
+  });
 
-    app.get('/api/today', { preHandler: requireDisplayKey }, async (_req, reply) => {
-      try {
-        reply.send(await buildTodayPayload(settings()));
-      } catch (err) {
-        console.error('[api] /api/today failed:', err instanceof Error ? err.message : err);
-        jsonError(reply, 500, 'Failed to compute prayer times');
-      }
-    });
+  app.get('/api/today', { preHandler: requireDisplayKey }, async (_req, reply) => {
+    if (await handleCloudSync(reply, opts.dataDir, '/api/today', false)) return;
+    try {
+      reply.send(await buildTodayPayload(settings()));
+    } catch (err) {
+      console.error('[api] /api/today failed:', err instanceof Error ? err.message : err);
+      jsonError(reply, 500, 'Failed to compute prayer times');
+    }
+  });
 
-    app.get('/api/slides', { preHandler: requireDisplayKey }, async (_req, reply) => {
-      const active = announcements.listActive(new Date(), tz());
-      const resolved = resolveQuranAnnouncements(active, dateKeyInZone(new Date(), tz()));
-      reply.send({ announcements: resolved, builtin: resolved.length ? [] : builtinContent });
-    });
-  }
+  app.get('/api/slides', { preHandler: requireDisplayKey }, async (_req, reply) => {
+    if (await handleCloudSync(reply, opts.dataDir, '/api/slides', true)) return;
+    const active = announcements.listActive(new Date(), tz());
+    const resolved = resolveQuranAnnouncements(active, dateKeyInZone(new Date(), tz()));
+    reply.send({ announcements: resolved, builtin: resolved.length ? [] : builtinContent });
+  });
 
   // --- Admin auth -----------------------------------------------------------
 
@@ -382,24 +425,52 @@ export async function buildApp(opts: AppOptions): Promise<FastifyInstance> {
   });
 
   // --- Pages ----------------------------------------------------------------
+  // KELAKUAN ANDROID TV: satu URL /display untuk semua keadaan.
+  //   - Belum dipaut + tiada display key → halaman pairing (auto kod).
+  //   - Belum dipaut + ada display key (setup lokal normal) → paparan lokal.
+  //   - Dipaut → paparan lokal berkhidmat dari proksi+cache cloud.
+  // Unpair di cloud (401) → auto-reset → paparan reload → pairing.
 
-  if (!cloudMode) {
-    app.get('/', async (_req, reply) => reply.redirect('/display'));
-    app.get('/display', (_req, reply) => {
-      reply.type('text/html').sendFile('display.html');
-    });
-    app.get('/admin', (_req, reply) => {
-      reply.type('text/html').sendFile('admin.html');
-    });
-    app.get('/sw.js', (_req, reply) => {
-      reply.header('Cache-Control', 'no-cache, no-store').type('application/javascript').sendFile('sw.js');
-    });
-  }
+  app.get('/', async (_req, reply) => {
+    reply.redirect('/display');
+  });
+  app.get('/display', (req, reply) => {
+    const paired = cloudSyncEnabled(opts.dataDir);
+    const expected = settings().security?.displayKey;
+    const urlKey = (req.query as Record<string, string>).key;
+    const hdrKey = req.headers['x-display-key'] as string | undefined;
+    const keyOk = expected ? (urlKey && safeEqualStr(urlKey, expected)) || (hdrKey && safeEqualStr(hdrKey, expected)) : true;
+    // KELAKUAN ANDROID TV: belum dipaut + tiada kunci sah → skrin pairing.
+    // (Kiosk launcher sentiasa bawa ?key= — jadi paparan lokal kekal untuk
+    // pemasangan lokal sedia ada; TV berpandukan cloud tidak perlu kunci.)
+    if (!paired && !keyOk) {
+      reply.type('text/html').send(PAIR_PAGE_HTML_SRC);
+      return;
+    }
+    servePublic(reply, 'display.html');
+  });
+  app.get('/admin', (_req, reply) => {
+    if (cloudPageRedirect(reply, opts.dataDir, '/admin')) return;
+    servePublic(reply, 'admin.html');
+  });
+  app.get('/pair', async (_req, reply) => {
+    reply.type('text/html').send(PAIR_PAGE_HTML_SRC);
+  });
+
+  app.get('/sw.js', (_req, reply) => {
+    reply.header('Cache-Control', 'no-cache, no-store');
+    servePublic(reply, 'sw.js');
+  });
 
   app.setNotFoundHandler((req, reply) => {
     if (cloudMode && req.url.startsWith('/api/admin')) {
       reply.status(404).send({ error: 'Admin hanya di cloud' });
       return;
+    }
+    // Mod maya (SEA): aset statik awam dilayani di sini (tiada @fastify/static).
+    if (virtualAssets) {
+      const file = (req.url || '').split('?')[0].replace(/^\/+/, '');
+      if (file && !file.includes('..') && !file.startsWith('api/') && servePublic(reply, file)) return;
     }
     reply.status(404).send({ error: 'Not found' });
   });
@@ -425,24 +496,38 @@ export async function startServer(opts: AppOptions): Promise<FastifyInstance> {
   const PORT = opts.port || Number(process.env.PORT) || 3000;
   await app.listen({ port: PORT, host: '0.0.0.0' });
 
+  // Jambatan SSE cloud→lokal (sync segera; selamat dipanggil walau belum
+  // dipaut — ia akan menunggu config pairing muncul).
+  startCloudSseBridge(opts.dataDir).catch(() => {});
+
   // Pariti rujukan: semak ffmpeg + sync relay, dan sync acara Islam pada
   // permulaan (plus ulang setiap 12 jam).
-  if (!cloudSyncEnabled()) {
-    // Auto-provision ffmpeg: jika tiada pada sistem, muat turun binaan
-    // statik ke <dataDir>/bin dan simpan laluan ke settings.media.ffmpegPath
-    // supaya relay dan admin nampak sumbernya.
-    ensureFfmpeg(opts.dataDir).then(async (r) => {
-      console.log(`  ffmpeg: ${r.ok ? 'available' : 'NOT FOUND — RTSP/RTMP/ONVIF streams need ffmpeg'}${r.ok && r.path ? ` (${r.path})` : ''}`);
-      if (!r.ok) console.log(`  ffmpeg: ${r.message}`);
-      if (r.ok && r.path) {
-        const cur = app.masjidStore.getSettings().media.ffmpegPath;
-        if (!cur || cur === 'ffmpeg') {
-          app.masjidStore.updateSettings({ media: { ffmpegPath: r.path } });
-          app.masjidStreams.resetFfmpegCheck();
-        }
+  if (!cloudSyncEnabled(opts.dataDir)) {
+    // Laluan ffmpeg dari hos (kiosk bundel) diutamakan — terus guna tanpa
+    // muat turun. ensure-ffmpeg kekal sebagai fallback pemasangan lokal.
+    const presetFfmpeg = opts.ffmpegPathOverride;
+    if (presetFfmpeg) {
+      const cur = app.masjidStore.getSettings().media.ffmpegPath;
+      if (!cur || cur === 'ffmpeg') {
+        app.masjidStore.updateSettings({ media: { ffmpegPath: presetFfmpeg } });
+        app.masjidStreams.resetFfmpegCheck();
       }
       app.masjidStreams.checkFfmpeg().then(() => app.masjidStreams.sync());
-    });
+      console.log(`  ffmpeg: ${presetFfmpeg}`);
+    } else {
+      ensureFfmpeg(opts.dataDir).then(async (r) => {
+        console.log(`  ffmpeg: ${r.ok ? 'available' : 'NOT FOUND — RTSP/RTMP/ONVIF streams need ffmpeg'}${r.ok && r.path ? ` (${r.path})` : ''}`);
+        if (!r.ok) console.log(`  ffmpeg: ${r.message}`);
+        if (r.ok && r.path) {
+          const cur = app.masjidStore.getSettings().media.ffmpegPath;
+          if (!cur || cur === 'ffmpeg') {
+            app.masjidStore.updateSettings({ media: { ffmpegPath: r.path } });
+            app.masjidStreams.resetFfmpegCheck();
+          }
+        }
+        app.masjidStreams.checkFfmpeg().then(() => app.masjidStreams.sync());
+      });
+    }
     syncEventsFor(app.masjidStore.getSettings(), (patch) => {
       app.masjidStore.updateSettings(patch as Record<string, unknown>);
       return Promise.resolve();
