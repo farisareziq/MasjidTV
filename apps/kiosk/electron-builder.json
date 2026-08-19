@@ -10,7 +10,8 @@
   ],
   "extraResources": [
     { "from": "resources/frontend/public", "to": "frontend/public" },
-    { "from": "resources/bin", "to": "bin" }
+    { "from": "resources/bin", "to": "bin" },
+    { "from": "resources/updater.json", "to": "updater.json" }
   ],
   "win": {
     "icon": "build/icon.png",

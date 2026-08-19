@@ -270,6 +270,27 @@ export function applyPairing(app: FastifyInstance, dataDir: string): void {
     }
   });
 
+  // Status self-updater kiosk (B1) — ditulis oleh app kiosk melalui
+  // update-status.json (lihat apps/kiosk/main/updater.ts). Endpoint lokal
+  // tanpa auth untuk menu tersembunyi, sama pola seperti /api/devices-hw;
+  // hanya status (tiada rahsia). Server legacy (tiada updater) → state
+  // 'disabled'.
+  app.get('/api/update-status', async (_req, reply) => {
+    try {
+      const raw = JSON.parse(fs.readFileSync(path.join(dataDir, 'update-status.json'), 'utf8'));
+      reply.send({
+        state: typeof raw.state === 'string' ? raw.state : 'disabled',
+        currentVersion: typeof raw.currentVersion === 'string' ? raw.currentVersion : '',
+        availableVersion: typeof raw.availableVersion === 'string' ? raw.availableVersion : null,
+        lastCheckAt: Number(raw.lastCheckAt) || null,
+        lastError: typeof raw.lastError === 'string' ? raw.lastError : null,
+        portable: Boolean(raw.portable)
+      });
+    } catch {
+      reply.send({ state: 'disabled', currentVersion: '', availableVersion: null, lastCheckAt: null, lastError: null, portable: false });
+    }
+  });
+
   // Mulakan sesi pairing di cloud — IDEMPOTEN: jika sesi aktif untuk cloud
   // yang sama masih belum tamat tempoh, pulangkan semula kod sedia ada.
   // Ini mengelakkan setiap page-load/watchdog-restart menjana kod baharu

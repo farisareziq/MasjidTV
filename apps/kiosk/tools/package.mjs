@@ -16,6 +16,11 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const kioskDir = path.resolve(__dirname, '..');
 const repo = path.resolve(kioskDir, '..', '..');
 
+// Repo GitHub untuk self-updater (B1) — updater.json dihantar ke resources/
+// dan dibundel electron-builder melalui extraResources (sebelah exe).
+const UPDATE_REPO = 'farisareziq/MasjidTV';
+const UPDATE_BINARY_NAME = 'MasjidTV-Kiosk-Setup';
+
 const run = (cmd, cwd) => execSync(cmd, { cwd, stdio: 'inherit' });
 
 // 1) Build kebergantungan: server + frontend (dist).
@@ -38,6 +43,12 @@ if (fs.existsSync(binDir)) {
 } else {
   console.log('[pkg] AMARAN: bin/ffmpeg.exe tiada — jalankan tools/download-ffmpeg.mjs untuk bundel.');
 }
+
+// 3b) updater.json (B1) — {repo, binaryName} dibaca kiosk di sebelah exe.
+//     extraResources meletakkannya dalam resources/ → kandidat loadConfig().
+const updaterJson = { repo: UPDATE_REPO, binaryName: UPDATE_BINARY_NAME };
+fs.writeFileSync(path.join(kioskDir, 'resources', 'updater.json'), JSON.stringify(updaterJson, null, 2), 'utf8');
+console.log(`[pkg] updater.json ditulis (repo=${UPDATE_REPO}).`);
 
 // 4) BUNDLE main process (esbuild CJS) — elak masalah resolve module native
 //    dalam asar. Native/libsql distub keluar (server lokal guna node:sqlite

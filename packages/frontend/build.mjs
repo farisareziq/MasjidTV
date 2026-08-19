@@ -10,22 +10,21 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 // Paths must resolve from THIS script's location — the cloud build invokes it
 // with a different cwd (repo root on Vercel), which broke relative entries.
 const targets = [
-  // Display entries import display-core.ts at runtime (value import) — they
-  // must be BUNDLED so esbuild inlines the shared module (an emitted bare
+  // Display & admin entries import shared modules at runtime (value imports) —
+  // they must be BUNDLED so esbuild inlines the shared code (an emitted bare
   // import would 404 in the browser, which loads these as classic scripts).
-  // Admin entries stay self-contained/unbundled → output byte-identical.
-  ['src/display.ts', 'public/js/display.js', true],
-  ['src/admin.ts', 'public/js/admin.js', false],
-  ['src/display-cloud.ts', 'public-cloud/js/display.js', true],
-  ['src/admin-cloud.ts', 'public-cloud/js/admin.js', false]
+  ['src/display.ts', 'public/js/display.js'],
+  ['src/admin.ts', 'public/js/admin.js'],
+  ['src/display-cloud.ts', 'public-cloud/js/display.js'],
+  ['src/admin-cloud.ts', 'public-cloud/js/admin.js']
 ];
 
-for (const [entry, outfile, bundle] of targets) {
+for (const [entry, outfile] of targets) {
   await build({
     entryPoints: [path.join(__dirname, entry)],
     outfile: path.join(__dirname, outfile),
     target: 'es2022',
-    bundle: !!bundle,
+    bundle: true,
     sourcemap: false,
     logLevel: 'info'
   });

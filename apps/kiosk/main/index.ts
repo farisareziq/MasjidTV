@@ -15,6 +15,7 @@ import { startServer } from './server-stub.js';
 import { resolveFfmpeg } from './ffmpeg.js';
 import { installAutostart, removeAutostart } from './autostart.js';
 import { startCameraWatch } from './devices.js';
+import { startKioskUpdater } from './updater.js';
 
 const args = process.argv.slice(2);
 const hasFlag = (n: string) => args.includes(n);
@@ -135,12 +136,25 @@ const HIDDEN_MENU_JS = `(async function () {
         return '<div><b>Stream:</b> ' + s.name + ' — ' + s.status + (s.lastError ? ' <span style="color:#ff9d9d">(' + s.lastError + ')</span>' : '') + '</div>';
       }).join('');
     } catch (e) { /* tidak kritikal */ }
+    // Status self-updater (B1) — endpoint lokal; gagal = updater tidak aktif.
+    var updRow = '';
+    try {
+      var upd = await (await fetch('/api/update-status')).json();
+      var ustate = { idle: 'Terkini', checking: 'Menyemak…', downloading: 'Memuat turun…', ready: 'Sedia dipasang', installing: 'Memasang…', error: 'Ralat (cuba semula automatik)', available: 'Tersedia', disabled: 'Tidak aktif' }[upd.state] || upd.state;
+      var uline = '<b>Kemas kini:</b> v' + upd.currentVersion + ' — ' + ustate;
+      if (upd.availableVersion) uline += ' → <b style="color:#8fd6a8">v' + upd.availableVersion + '</b>';
+      if (upd.state === 'available' && upd.portable) uline += '<br><span style="color:#ffd28f;font-size:12px">Mod portable — muat turun manual portable exe baharu dari GitHub Releases.</span>';
+      if (upd.state === 'error' && upd.lastError) uline += ' <span style="color:#ff9d9d;font-size:12px">(' + upd.lastError + ')</span>';
+      if (upd.lastCheckAt) uline += '<br><span style="color:#86a99a;font-size:12px">Semakan terakhir: ' + new Date(upd.lastCheckAt).toLocaleString() + '</span>';
+      updRow = '<div style="margin-top:10px">' + uline + '</div>';
+    } catch (e) { /* updater tidak aktif */ }
     body.innerHTML =
       '<div><b>Status:</b> ' + (cfg.paired ? 'Dipaut' : 'Belum dipaut') + '</div>'
       + (cfg.paired ? '<div><b>Masjid:</b> ' + (cfg.tenantName || '-') + '<br><b>Cloud:</b> ' + cfg.cloudUrl + '</div>' : '')
       + '<div style="margin-top:10px"><b>Kamera (PnP):</b> ' + (cams.length ? cams.join(' • ') : 'tiada dikesan') + '</div>'
       + '<div><b>Peranti DSHOW (ffmpeg):</b> ' + (dshow.length ? dshow.join(' • ') : 'tiada — OBS: tekan Start Virtual Camera') + '</div>'
       + streamRow
+      + updRow
       + '<div style="color:#86a99a;font-size:12px;margin-top:8px">Semakan: ' + (hw.checkedAt ? new Date(hw.checkedAt).toLocaleString() : '-') + '</div>';
   } catch (e) {
     body.innerHTML = 'Gagal memuat status: ' + e.message;
@@ -209,6 +223,11 @@ async function bootstrap(): Promise<void> {
   // Pelayan (kod sedia ada) — node:sqlite, pairing Android TV, cloud-sync SSE.
   await startServer({ dataDir: dataDir(), port: PORT, ffmpegPath: ffmpeg });
   console.log(`[server] http://localhost:${PORT}/display`);
+
+  // Self-updater (PLAN B1): poll GitHub Releases 6 jam — NSIS senyap untuk
+  // pemasangan terpasang; notis sahaja untuk portable. Status ditulis ke
+  // <dataDir>/update-status.json → /api/update-status → menu tersembunyi.
+  startKioskUpdater(dataDir());
 
   // Deteksi peranti (kamera USB + peranti DSHOW ffmpeg) — tulis devices.json,
   // dibaca endpoint /api/devices-hw; laporan berkala ke cloud bila dipaut
