@@ -13,6 +13,7 @@ import { bumpRev, registerSse } from './sse.js';
 import { ASSETS } from './pages.generated.js';
 import { jsonError, tenantFromRequest } from './routes/helpers.js';
 import type { RouteContext } from './routes/context.js';
+import { initErrorReporting } from './reporting.js';
 import { registerPageRoutes } from './routes/pages.js';
 import { registerAuthRoutes } from './routes/auth.js';
 import { registerPublicRoutes } from './routes/public.js';
@@ -169,6 +170,10 @@ export async function createCloudApp(): Promise<FastifyInstance> {
     console.error('[cloud] ralat:', msg);
     reply.status(500).send({ error: 'Ralat dalaman' });
   });
+
+  // Pelaporan ralat ENV-GATED (C4) — hook onError selepas handler asal;
+  // no-op sepenuhnya tanpa SENTRY_DSN (tiada dependency baru).
+  initErrorReporting(app);
 
   return app;
 }

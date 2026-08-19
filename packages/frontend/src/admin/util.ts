@@ -33,6 +33,15 @@ export function shiftTime(hhmm: string, mins: number): string {
   return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
 }
 
+// Nama peranti DSHOW daripada pelbagai bentuk laporan: awan menyimpan
+// hw.dshow sebagai string[] (routes/device.ts memetakan {name} → string),
+// manakala devices.json kiosk lokal mengekalkan objek { name }.
+export function dshowDeviceName(entry: unknown): string {
+  if (typeof entry === 'string') return entry;
+  if (entry && typeof entry === 'object') return String((entry as { name?: unknown }).name || '');
+  return '';
+}
+
 const EXT_MIME: Record<string, string> = {
   mp4: 'video/mp4', mov: 'video/quicktime', m4v: 'video/x-m4v', mkv: 'video/x-matroska',
   webm: 'video/webm', ogv: 'video/ogg', avi: 'video/x-msvideo', mpg: 'video/mpeg', mpeg: 'video/mpeg',

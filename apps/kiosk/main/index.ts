@@ -16,6 +16,7 @@ import { resolveFfmpeg } from './ffmpeg.js';
 import { installAutostart, removeAutostart } from './autostart.js';
 import { startCameraWatch } from './devices.js';
 import { startKioskUpdater } from './updater.js';
+import { initCrashReporter } from './crash-report.js';
 
 const args = process.argv.slice(2);
 const hasFlag = (n: string) => args.includes(n);
@@ -28,10 +29,24 @@ const PORT = Number(flagValue('--port') || process.env.PORT || 3000);
 
 let mainWindow: BrowserWindow | null = null;
 let powerBlockerId: number | -1 = -1;
+// Pelapor crash (C4) — diinisialisasi sebaik app ready (perlu dataDir).
+let crashReporter: ReturnType<typeof initCrashReporter> | null = null;
 
 function dataDir(): string {
   return process.env.MASJIDTV_DATA_DIR
     || path.join(app.getPath('appData'), 'MasjidTV');
+}
+
+// Destinasi muat naik crash dari cloud.json pairing (pola sama seperti
+// devices.ts) — null bila belum dipaut.
+function crashCloudTarget(): { cloudUrl: string; deviceToken: string } | null {
+  try {
+    const raw = JSON.parse(fs.readFileSync(path.join(dataDir(), 'cloud.json'), 'utf8'));
+    if (raw?.cloudUrl && raw?.deviceToken) {
+      return { cloudUrl: String(raw.cloudUrl), deviceToken: String(raw.deviceToken) };
+    }
+  } catch { /* belum dipaut */ }
+  return null;
 }
 
 function createKioskWindow(): BrowserWindow {
@@ -68,6 +83,7 @@ function createKioskWindow(): BrowserWindow {
   // Pemulihan deterministik: renderer crash → reload (bukan relaunch app).
   win.webContents.on('render-process-gone', (_e, details) => {
     console.error('[kiosk] renderer hilang:', details.reason, '— reload.');
+    crashReporter?.record('renderer-gone', `reason=${details.reason} exitCode=${details.exitCode}`);
     win.loadURL(url).catch(() => {});
   });
   win.webContents.on('did-fail-load', (_e, code, desc, url2, isMain) => {
@@ -229,6 +245,10 @@ async function bootstrap(): Promise<void> {
   // <dataDir>/update-status.json → /api/update-status → menu tersembunyi.
   startKioskUpdater(dataDir());
 
+  // Pelaporan crash (C4): log berputar <dataDir>/logs/crash-*.log sentiasa
+  // aktif; muat naik ke cloud pilihan (MASJIDTV_CRASH_UPLOAD=1).
+  crashReporter = initCrashReporter(dataDir(), crashCloudTarget);
+
   // Deteksi peranti (kamera USB + peranti DSHOW ffmpeg) — tulis devices.json,
   // dibaca endpoint /api/devices-hw; laporan berkala ke cloud bila dipaut
   // (web admin nampak status kamera + senarai nama DSHOW setiap mini PC).
@@ -263,6 +283,7 @@ async function bootstrap(): Promise<void> {
 // (data SQLite selamat — WAL). Elak kiosk mati senyap di masjid.
 process.on('uncaughtException', (err) => {
   console.error('[kiosk] uncaught:', err);
+  crashReporter?.record('uncaught', `${err.name}: ${err.message}`);
   app.relaunch();
   app.exit(1);
 });

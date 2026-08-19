@@ -392,6 +392,29 @@ function setTestTimeFromPrayer(shiftMins: number | 'iqamah') {
 
 // ------------------------------------------------------------------- streams
 
+// Pilihan DSHOW semasa (diisi refreshDshowDatalist; kosong = datalist kosong,
+// medan URL kekal teks-bebas seperti biasa — pemilih ialah penambahbaikan
+// progresif, tiada perubahan pengesahan).
+let dshowOpts: Array<{ value: string; label: string }> = [];
+
+// Segarkan <datalist id="dshowDevices"> daripada cangkuk varian (awan:
+// kesatuan dshow[] peranti terpaut; lokal: /api/devices-hw). Dipanggil pada
+// setiap renderStreams() supaya laporan perkakasan terkini terpakai tanpa
+// perlu muat semula halaman. Kegagalan fetch diabaikan secara senyap.
+async function refreshDshowDatalist(): Promise<void> {
+  if (!featureHooks.dshowOptions) return;
+  try {
+    dshowOpts = (await featureHooks.dshowOptions()) || [];
+  } catch {
+    dshowOpts = [];
+  }
+  const dl = document.getElementById('dshowDevices');
+  if (!dl) return;
+  dl.innerHTML = dshowOpts
+    .map((o) => `<option value="${escapeHtml(o.value)}" label="${escapeHtml(o.label)}"></option>`)
+    .join('');
+}
+
 function renderStreams() {
   const statusMap = new Map((state.streamsStatus || []).map((s) => [s.id, s]));
   const current = [...statusMap.values()].map((s) => ({
@@ -408,10 +431,18 @@ function renderStreams() {
     list.innerHTML = `<div class="empty-state">${escapeHtml(t('emptyStreams'))}</div>`;
     return;
   }
+  // (ciri varian) Segarkan datalist peranti DSHOW pada setiap render —
+  // tidak menyekat (fire-and-forget) supaya render kekal segerak.
+  refreshDshowDatalist();
   list.innerHTML = current.map((s) => {
     const st = statusMap.get(s.id);
     const chip = streamStatusChip(st?.status);
     const isRelay = ['rtsp', 'rtmp', 'onvif', 'dshow'].includes(s.type);
+    // Label bantuan hanya muncul untuk stream DSHOW bila peranti melapor
+    // (penambahbaikan progresif — tiada peranti, tiada label, medan biasa).
+    const dshowHint = s.type === 'dshow' && dshowOpts.length
+      ? `<p class="sub" data-dshow-hint>${escapeHtml(t('dshowPickHint'))}</p>`
+      : '';
     return `
       <div class="stream-row" data-id="${s.id}">
         <label><span data-i18n="streamName">Name</span><input type="text" class="st-name" value="${escapeHtml(s.name)}" placeholder="Camera 1"></label>
@@ -419,7 +450,7 @@ function renderStreams() {
           ${STREAM_TYPES.map((ty) => `<option value="${ty}" ${ty === s.type ? 'selected' : ''}>${ty.toUpperCase()}</option>`).join('')}
         </select></label>
         <label><span data-i18n="seconds">Seconds</span><input type="number" class="st-duration" min="10" max="600" value="${s.duration || 30}"></label>
-        <label class="st-url-wrap"><span data-i18n="streamUrl">URL</span><input type="text" class="st-url" value="${escapeHtml(s.url)}" placeholder="rtsp://… / video=OBS Virtual Camera / https://…"></label>
+        <label class="st-url-wrap"><span data-i18n="streamUrl">URL</span><input type="text" class="st-url" list="dshowDevices" value="${escapeHtml(s.url)}" placeholder="rtsp://… / video=OBS Virtual Camera / https://…">${dshowHint}</label>
         ${isRelay ? `<label class="st-url-wrap"><span data-i18n="mirrorUrl">Mirror (Live FB)</span><input type="text" class="st-mirror" value="${escapeHtml(s.mirrorUrl || '')}" placeholder="rtmps://live-api-s.facebook.com:443/rtmp/…"></label>` : ''}
         <label class="checkbox-label"><input type="checkbox" class="st-enabled" ${s.enabled ? 'checked' : ''}> <span data-i18n="enabled">Enabled</span></label>
         <span class="status-chip ${chip.cls}">${chip.text}</span>
@@ -1201,6 +1232,15 @@ export function bootAdmin(config: AdminVariantConfig): void {
     const row = del.closest('.stream-row') as HTMLElement | null;
     state.streamsStatus = collectStreams().filter((s) => s.id !== row!.dataset.id);
     renderStreams();
+  });
+
+  // Tunjuk/sembunyi label bantuan DSHOW serta-merta bila jenis stream
+  // bertukar (tanpa render semula — nilai medan pengguna dikekalkan).
+  $('streamList').addEventListener('change', (e) => {
+    const sel = (e.target as HTMLElement).closest('select.st-type') as HTMLSelectElement | null;
+    if (!sel) return;
+    const hint = sel.closest('.stream-row')?.querySelector('[data-dshow-hint]') as HTMLElement | null;
+    if (hint) hint.hidden = sel.value !== 'dshow';
   });
 
   $('addStreamBtn').addEventListener('click', () => {

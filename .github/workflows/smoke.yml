@@ -16,7 +16,21 @@ jobs:
           node-version: 24
 
       - name: Run preflight against production
+        id: preflight
         env:
           PREFLIGHT_URL: ${{ vars.MASJIDTV_PROD_URL }}
           PREFLIGHT_SKIP_ENV: '1' # env vars live in Vercel, not on the runner
         run: node scripts/preflight.mjs --url "$PREFLIGHT_URL"
+
+      # C4: Notifikasi kegagalan sahaja — POST ke Discord/Slack incoming-webhook
+      # (mana-mana secret yang ditetapkan; tiada secret = dry-run cetak).
+      # if: failure() → step ini berjalan HANYA bila step sebelum gagal.
+      # continue-on-error + skrip sentiasa exit 0 → alert TIDAK BOLEH
+      # menggagalkan workflow itu sendiri.
+      - name: Notify on failure (Discord/Slack)
+        if: failure()
+        continue-on-error: true
+        env:
+          DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+        run: node scripts/alert.mjs --status failure --step "Run preflight against production" || true

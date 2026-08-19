@@ -23,8 +23,17 @@ export type LicenseInfo = { status: string; trialUntil?: number; apiKey?: string
 export type TenantInfo = { id: string; name: string; status: string; apiKey: string; license?: { status: string; trialUntil?: number } };
 export type TvDevice = {
   id: string; device_id: string; name?: string; last_seen?: number | string;
-  hw?: { cameras?: { id?: string; name?: string; status?: string }[]; dshow?: { name?: string }[]; at?: number } | null;
+  // Nota: awan menyimpan hw.dshow sebagai string[] (lihat routes/device.ts —
+  // nama peranti dipetakan kepada string); kiosk lokal pula menulis
+  // { name }[] ke devices.json. Medan dikecualikan kepada unknown[] supaya
+  // kedua-dua bentuk boleh dilalukan oleh pembantu penukar.
+  hw?: { cameras?: { id?: string; name?: string; status?: string }[]; dshow?: unknown[]; at?: number } | null;
 };
+
+// Satu pilihan dalam datalist pemilih peranti DSHOW (medan URL stream).
+// value = nilai medan sebenar ("video=<nama>"), label = teks bantuan
+// (nama peranti + nama kamera) yang dipapar pelayar sebagai label pilihan.
+export type DshowOption = { value: string; label: string };
 
 export interface AdminState {
   token: string;
@@ -139,6 +148,11 @@ export interface AdminFeatureHooks {
   refreshTenants?: () => Promise<void>;
   // Awan: blok lesen pada hujung renderOverview.
   renderOverviewExtra?: () => void;
+  // Pemilih peranti DSHOW (datalist pada medan URL stream): pulangkan
+  // senarai pilihan daripada peranti yang melapor, atau [] jika tiada
+  // (medan kekal teks-bebas seperti biasa). Awan: kesatuan dshow[] peranti
+  // terpaut; lokal: devices.json kiosk melalui /api/devices-hw.
+  dshowOptions?: () => Promise<DshowOption[]>;
 }
 
 export const featureHooks: AdminFeatureHooks = {};

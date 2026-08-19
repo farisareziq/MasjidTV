@@ -272,6 +272,7 @@
       streamUrl: "URL",
       mirrorUrl: "Mirror (Facebook Live)",
       enabled: "Enabled",
+      dshowPickHint: "DSHOW: pick a reported device from the list, or type the name manually.",
       eventsSub: "Auto-synced from the official JAKIM takwim \u2014 dates are updated according to the selected zone.",
       eventsAuto: "Auto-sync from JAKIM",
       syncNow: "Sync now",
@@ -607,6 +608,7 @@
       streamUrl: "URL",
       mirrorUrl: "Mirror (Facebook Live)",
       enabled: "Aktif",
+      dshowPickHint: "DSHOW: pilih peranti yang dilaporkan daripada senarai, atau taip nama secara manual.",
       eventsSub: "Auto-sync dari takwim rasmi JAKIM \u2014 tarikh dikemas kini mengikut zon yang dipilih.",
       eventsAuto: "Auto-sync dari JAKIM",
       syncNow: "Sync sekarang",
@@ -783,6 +785,11 @@
     const [h, m] = String(hhmm).split(":").map(Number);
     const d = new Date(2e3, 0, 1, h, m + mins);
     return `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
+  }
+  function dshowDeviceName(entry) {
+    if (typeof entry === "string") return entry;
+    if (entry && typeof entry === "object") return String(entry.name || "");
+    return "";
   }
   var EXT_MIME = {
     mp4: "video/mp4",
@@ -1116,7 +1123,7 @@
         const cams = d.hw?.cameras || [];
         const dshow = d.hw?.dshow || [];
         const camLine = cams.length ? `\u{1F4F9} ${cams.map((c) => `${escapeHtml(c.name || "Kamera")}${c.status === "OK" ? "" : " \u26A0"}`).join(", ")}` : "";
-        const dshowLine = dshow.length ? `\u{1F3A5} DSHOW: ${dshow.map((c) => `video=${escapeHtml(c.name || "")}`).join(" \u2022 ")}` : "";
+        const dshowLine = dshow.length ? `\u{1F3A5} DSHOW: ${dshow.map((c) => `video=${escapeHtml(dshowDeviceName(c))}`).join(" \u2022 ")}` : "";
         return `
       <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;padding:12px 0;border-bottom:1px solid rgba(196,220,248,0.12)">
         <div style="min-width:0">
@@ -1174,7 +1181,24 @@
       toast(err.message, "err");
     }
   });
-  registerAdminFeatures({ renderTv, refreshTenants, renderOverviewExtra });
+  async function dshowOptions() {
+    const res = await api("/api/admin/devices");
+    const devices = res.devices || [];
+    const seen = /* @__PURE__ */ new Set();
+    const opts = [];
+    for (const d of devices) {
+      for (const raw of d.hw?.dshow || []) {
+        const name = dshowDeviceName(raw);
+        if (!name) continue;
+        const value = `video=${name}`;
+        if (seen.has(value)) continue;
+        seen.add(value);
+        opts.push({ value, label: `${d.name || d.device_id} \u2014 ${name}` });
+      }
+    }
+    return opts;
+  }
+  registerAdminFeatures({ renderTv, refreshTenants, renderOverviewExtra, dshowOptions });
 
   // src/admin/core.ts
   function renderAll() {
@@ -1501,6 +1525,18 @@
     $("stTestTime").value = time;
     if ($("stTestPrayer").value === "jumaah") $("stTestDate").value = nextFridayKey();
   }
+  var dshowOpts = [];
+  async function refreshDshowDatalist() {
+    if (!featureHooks.dshowOptions) return;
+    try {
+      dshowOpts = await featureHooks.dshowOptions() || [];
+    } catch {
+      dshowOpts = [];
+    }
+    const dl = document.getElementById("dshowDevices");
+    if (!dl) return;
+    dl.innerHTML = dshowOpts.map((o) => `<option value="${escapeHtml(o.value)}" label="${escapeHtml(o.label)}"></option>`).join("");
+  }
   function renderStreams() {
     const statusMap = new Map((state.streamsStatus || []).map((s) => [s.id, s]));
     const current = [...statusMap.values()].map((s) => ({
@@ -1517,10 +1553,12 @@
       list.innerHTML = `<div class="empty-state">${escapeHtml(t("emptyStreams"))}</div>`;
       return;
     }
+    refreshDshowDatalist();
     list.innerHTML = current.map((s) => {
       const st = statusMap.get(s.id);
       const chip = streamStatusChip(st?.status);
       const isRelay = ["rtsp", "rtmp", "onvif", "dshow"].includes(s.type);
+      const dshowHint = s.type === "dshow" && dshowOpts.length ? `<p class="sub" data-dshow-hint>${escapeHtml(t("dshowPickHint"))}</p>` : "";
       return `
       <div class="stream-row" data-id="${s.id}">
         <label><span data-i18n="streamName">Name</span><input type="text" class="st-name" value="${escapeHtml(s.name)}" placeholder="Camera 1"></label>
@@ -1528,7 +1566,7 @@
           ${STREAM_TYPES.map((ty) => `<option value="${ty}" ${ty === s.type ? "selected" : ""}>${ty.toUpperCase()}</option>`).join("")}
         </select></label>
         <label><span data-i18n="seconds">Seconds</span><input type="number" class="st-duration" min="10" max="600" value="${s.duration || 30}"></label>
-        <label class="st-url-wrap"><span data-i18n="streamUrl">URL</span><input type="text" class="st-url" value="${escapeHtml(s.url)}" placeholder="rtsp://\u2026 / video=OBS Virtual Camera / https://\u2026"></label>
+        <label class="st-url-wrap"><span data-i18n="streamUrl">URL</span><input type="text" class="st-url" list="dshowDevices" value="${escapeHtml(s.url)}" placeholder="rtsp://\u2026 / video=OBS Virtual Camera / https://\u2026">${dshowHint}</label>
         ${isRelay ? `<label class="st-url-wrap"><span data-i18n="mirrorUrl">Mirror (Live FB)</span><input type="text" class="st-mirror" value="${escapeHtml(s.mirrorUrl || "")}" placeholder="rtmps://live-api-s.facebook.com:443/rtmp/\u2026"></label>` : ""}
         <label class="checkbox-label"><input type="checkbox" class="st-enabled" ${s.enabled ? "checked" : ""}> <span data-i18n="enabled">Enabled</span></label>
         <span class="status-chip ${chip.cls}">${chip.text}</span>
@@ -2240,6 +2278,12 @@
       const row = del.closest(".stream-row");
       state.streamsStatus = collectStreams().filter((s) => s.id !== row.dataset.id);
       renderStreams();
+    });
+    $("streamList").addEventListener("change", (e) => {
+      const sel = e.target.closest("select.st-type");
+      if (!sel) return;
+      const hint = sel.closest(".stream-row")?.querySelector("[data-dshow-hint]");
+      if (hint) hint.hidden = sel.value !== "dshow";
     });
     $("addStreamBtn").addEventListener("click", () => {
       const draft = { id: `draft-${Date.now()}`, name: "", type: "rtsp", url: "", duration: 30, enabled: true };

@@ -8,9 +8,9 @@
 // dimuat), jadi susunan import pada wrapper adalah signifikan.
 
 import { $, state, registerAdminFeatures } from './types';
-import type { LicenseInfo, TvDevice } from './types';
+import type { DshowOption, LicenseInfo, TvDevice } from './types';
 import { t, i18nEntry, currentAdminLang } from './i18n';
-import { escapeHtml } from './util';
+import { escapeHtml, dshowDeviceName } from './util';
 import { api, toast } from './api';
 
 // ------------------------------------------------------------------ license
@@ -179,7 +179,7 @@ async function renderTv() {
       // Nama peranti DSHOW sebenar — boleh copy terus ke medan URL stream
       // (video=<nama>). Dipapar bila kiosk melaporkan peranti.
       const dshowLine = dshow.length
-        ? `🎥 DSHOW: ${dshow.map((c) => `video=${escapeHtml(c.name || '')}`).join(' • ')}`
+        ? `🎥 DSHOW: ${dshow.map((c) => `video=${escapeHtml(dshowDeviceName(c))}`).join(' • ')}`
         : '';
       return `
       <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;padding:12px 0;border-bottom:1px solid rgba(196,220,248,0.12)">
@@ -243,4 +243,29 @@ $('tvDeviceList').addEventListener('click', async (e) => {
   }
 });
 
-registerAdminFeatures({ renderTv, refreshTenants, renderOverviewExtra });
+// ------------------------------------------------------------- pemilih DSHOW
+
+// Pilihan datalist untuk medan URL stream DSHOW: kesatuan dshow[] yang
+// dilaporkan oleh semua peranti terpaut tenant (endpoint admin sedia ada
+// /api/admin/devices). Nilai = "video=<nama>" (skim tepat yang server
+// jangkakan — lihat packages/server/src/streams.ts); label = nama peranti
+// TV + nama peranti DSHOW. [] jika tiada laporan — medan kekal teks-bebas.
+async function dshowOptions(): Promise<DshowOption[]> {
+  const res = await api('/api/admin/devices');
+  const devices: TvDevice[] = res.devices || [];
+  const seen = new Set<string>();
+  const opts: DshowOption[] = [];
+  for (const d of devices) {
+    for (const raw of d.hw?.dshow || []) {
+      const name = dshowDeviceName(raw);
+      if (!name) continue;
+      const value = `video=${name}`;
+      if (seen.has(value)) continue; // nama sama daripada dua peranti — sekali sahaja
+      seen.add(value);
+      opts.push({ value, label: `${d.name || d.device_id} — ${name}` });
+    }
+  }
+  return opts;
+}
+
+registerAdminFeatures({ renderTv, refreshTenants, renderOverviewExtra, dshowOptions });

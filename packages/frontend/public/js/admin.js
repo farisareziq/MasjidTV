@@ -52,8 +52,74 @@
     Object.assign(featureHooks, h);
   }
 
+  // src/admin/util.ts
+  function escapeHtml(str) {
+    return String(str ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#39;");
+  }
+  function formatDuration(ms) {
+    const s = Math.max(0, Math.floor(ms / 1e3));
+    const h = Math.floor(s / 3600);
+    const m = Math.floor(s % 3600 / 60);
+    const sec = s % 60;
+    const pad = (n) => String(n).padStart(2, "0");
+    return `${pad(h)}:${pad(m)}:${pad(sec)}`;
+  }
+  function formatUptime(seconds) {
+    const d = Math.floor(seconds / 86400);
+    const h = Math.floor(seconds % 86400 / 3600);
+    const m = Math.floor(seconds % 3600 / 60);
+    return d ? `${d}d ${h}h ${m}m` : h ? `${h}h ${m}m` : `${m}m`;
+  }
+  function shiftTime(hhmm, mins) {
+    const [h, m] = String(hhmm).split(":").map(Number);
+    const d = new Date(2e3, 0, 1, h, m + mins);
+    return `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
+  }
+  function dshowDeviceName(entry) {
+    if (typeof entry === "string") return entry;
+    if (entry && typeof entry === "object") return String(entry.name || "");
+    return "";
+  }
+  var EXT_MIME = {
+    mp4: "video/mp4",
+    mov: "video/quicktime",
+    m4v: "video/x-m4v",
+    mkv: "video/x-matroska",
+    webm: "video/webm",
+    ogv: "video/ogg",
+    avi: "video/x-msvideo",
+    mpg: "video/mpeg",
+    mpeg: "video/mpeg",
+    "3gp": "video/3gpp",
+    "3g2": "video/3gpp2",
+    ts: "video/mp2t",
+    flv: "video/x-flv",
+    mp3: "audio/mpeg",
+    wav: "audio/wav",
+    ogg: "audio/ogg",
+    m4a: "audio/mp4",
+    aac: "audio/aac",
+    jpg: "image/jpeg",
+    jpeg: "image/jpeg",
+    png: "image/png",
+    gif: "image/gif",
+    webp: "image/webp"
+  };
+  function fileMime(file) {
+    if (file.type && file.type !== "application/octet-stream") return file.type;
+    const ext = (file.name.split(".").pop() || "").toLowerCase();
+    return EXT_MIME[ext] || "application/octet-stream";
+  }
+
   // src/admin/local.ts
-  registerAdminFeatures({});
+  async function dshowOptions() {
+    const res = await fetch("/api/devices-hw");
+    if (!res.ok) return [];
+    const j = await res.json();
+    const names = (j.dshow || []).map(dshowDeviceName).filter(Boolean);
+    return names.map((name) => ({ value: `video=${name}`, label: name }));
+  }
+  registerAdminFeatures({ dshowOptions });
 
   // src/admin/i18n.ts
   var ADMIN_LANG_KEY = "tvm_admin_lang";
@@ -275,6 +341,7 @@
       streamUrl: "URL",
       mirrorUrl: "Mirror (Facebook Live)",
       enabled: "Enabled",
+      dshowPickHint: "DSHOW: pick a reported device from the list, or type the name manually.",
       eventsSub: "Auto-synced from the official JAKIM takwim \u2014 dates are updated according to the selected zone.",
       eventsAuto: "Auto-sync from JAKIM",
       syncNow: "Sync now",
@@ -610,6 +677,7 @@
       streamUrl: "URL",
       mirrorUrl: "Mirror (Facebook Live)",
       enabled: "Aktif",
+      dshowPickHint: "DSHOW: pilih peranti yang dilaporkan daripada senarai, atau taip nama secara manual.",
       eventsSub: "Auto-sync dari takwim rasmi JAKIM \u2014 tarikh dikemas kini mengikut zon yang dipilih.",
       eventsAuto: "Auto-sync dari JAKIM",
       syncNow: "Sync sekarang",
@@ -756,60 +824,6 @@
     adminLang = lang === "ms" ? "ms" : "en";
     localStorage.setItem(ADMIN_LANG_KEY, adminLang);
     applyLang();
-  }
-
-  // src/admin/util.ts
-  function escapeHtml(str) {
-    return String(str ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#39;");
-  }
-  function formatDuration(ms) {
-    const s = Math.max(0, Math.floor(ms / 1e3));
-    const h = Math.floor(s / 3600);
-    const m = Math.floor(s % 3600 / 60);
-    const sec = s % 60;
-    const pad = (n) => String(n).padStart(2, "0");
-    return `${pad(h)}:${pad(m)}:${pad(sec)}`;
-  }
-  function formatUptime(seconds) {
-    const d = Math.floor(seconds / 86400);
-    const h = Math.floor(seconds % 86400 / 3600);
-    const m = Math.floor(seconds % 3600 / 60);
-    return d ? `${d}d ${h}h ${m}m` : h ? `${h}h ${m}m` : `${m}m`;
-  }
-  function shiftTime(hhmm, mins) {
-    const [h, m] = String(hhmm).split(":").map(Number);
-    const d = new Date(2e3, 0, 1, h, m + mins);
-    return `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
-  }
-  var EXT_MIME = {
-    mp4: "video/mp4",
-    mov: "video/quicktime",
-    m4v: "video/x-m4v",
-    mkv: "video/x-matroska",
-    webm: "video/webm",
-    ogv: "video/ogg",
-    avi: "video/x-msvideo",
-    mpg: "video/mpeg",
-    mpeg: "video/mpeg",
-    "3gp": "video/3gpp",
-    "3g2": "video/3gpp2",
-    ts: "video/mp2t",
-    flv: "video/x-flv",
-    mp3: "audio/mpeg",
-    wav: "audio/wav",
-    ogg: "audio/ogg",
-    m4a: "audio/mp4",
-    aac: "audio/aac",
-    jpg: "image/jpeg",
-    jpeg: "image/jpeg",
-    png: "image/png",
-    gif: "image/gif",
-    webp: "image/webp"
-  };
-  function fileMime(file) {
-    if (file.type && file.type !== "application/octet-stream") return file.type;
-    const ext = (file.name.split(".").pop() || "").toLowerCase();
-    return EXT_MIME[ext] || "application/octet-stream";
   }
 
   // src/admin/api.ts
@@ -1291,6 +1305,18 @@
     $("stTestTime").value = time;
     if ($("stTestPrayer").value === "jumaah") $("stTestDate").value = nextFridayKey();
   }
+  var dshowOpts = [];
+  async function refreshDshowDatalist() {
+    if (!featureHooks.dshowOptions) return;
+    try {
+      dshowOpts = await featureHooks.dshowOptions() || [];
+    } catch {
+      dshowOpts = [];
+    }
+    const dl = document.getElementById("dshowDevices");
+    if (!dl) return;
+    dl.innerHTML = dshowOpts.map((o) => `<option value="${escapeHtml(o.value)}" label="${escapeHtml(o.label)}"></option>`).join("");
+  }
   function renderStreams() {
     const statusMap = new Map((state.streamsStatus || []).map((s) => [s.id, s]));
     const current = [...statusMap.values()].map((s) => ({
@@ -1307,10 +1333,12 @@
       list.innerHTML = `<div class="empty-state">${escapeHtml(t("emptyStreams"))}</div>`;
       return;
     }
+    refreshDshowDatalist();
     list.innerHTML = current.map((s) => {
       const st = statusMap.get(s.id);
       const chip = streamStatusChip(st?.status);
       const isRelay = ["rtsp", "rtmp", "onvif", "dshow"].includes(s.type);
+      const dshowHint = s.type === "dshow" && dshowOpts.length ? `<p class="sub" data-dshow-hint>${escapeHtml(t("dshowPickHint"))}</p>` : "";
       return `
       <div class="stream-row" data-id="${s.id}">
         <label><span data-i18n="streamName">Name</span><input type="text" class="st-name" value="${escapeHtml(s.name)}" placeholder="Camera 1"></label>
@@ -1318,7 +1346,7 @@
           ${STREAM_TYPES.map((ty) => `<option value="${ty}" ${ty === s.type ? "selected" : ""}>${ty.toUpperCase()}</option>`).join("")}
         </select></label>
         <label><span data-i18n="seconds">Seconds</span><input type="number" class="st-duration" min="10" max="600" value="${s.duration || 30}"></label>
-        <label class="st-url-wrap"><span data-i18n="streamUrl">URL</span><input type="text" class="st-url" value="${escapeHtml(s.url)}" placeholder="rtsp://\u2026 / video=OBS Virtual Camera / https://\u2026"></label>
+        <label class="st-url-wrap"><span data-i18n="streamUrl">URL</span><input type="text" class="st-url" list="dshowDevices" value="${escapeHtml(s.url)}" placeholder="rtsp://\u2026 / video=OBS Virtual Camera / https://\u2026">${dshowHint}</label>
         ${isRelay ? `<label class="st-url-wrap"><span data-i18n="mirrorUrl">Mirror (Live FB)</span><input type="text" class="st-mirror" value="${escapeHtml(s.mirrorUrl || "")}" placeholder="rtmps://live-api-s.facebook.com:443/rtmp/\u2026"></label>` : ""}
         <label class="checkbox-label"><input type="checkbox" class="st-enabled" ${s.enabled ? "checked" : ""}> <span data-i18n="enabled">Enabled</span></label>
         <span class="status-chip ${chip.cls}">${chip.text}</span>
@@ -2030,6 +2058,12 @@
       const row = del.closest(".stream-row");
       state.streamsStatus = collectStreams().filter((s) => s.id !== row.dataset.id);
       renderStreams();
+    });
+    $("streamList").addEventListener("change", (e) => {
+      const sel = e.target.closest("select.st-type");
+      if (!sel) return;
+      const hint = sel.closest(".stream-row")?.querySelector("[data-dshow-hint]");
+      if (hint) hint.hidden = sel.value !== "dshow";
     });
     $("addStreamBtn").addEventListener("click", () => {
       const draft = { id: `draft-${Date.now()}`, name: "", type: "rtsp", url: "", duration: 30, enabled: true };
