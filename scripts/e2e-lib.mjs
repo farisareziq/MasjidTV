@@ -100,7 +100,11 @@ export function killOrphanFfmpeg() {
 }
 
 /** Tunggu endpoint /api/health sedia. */
-export async function waitHealth(url, label, tries = 90, intervalMs = 500) {
+export async function waitHealth(url, label, tries, intervalMs = 500) {
+  // CI runner Windows headless: Electron GUI (app.whenReady) lambat mula —
+  // benarkan override melalui env (saat). Lalai kekal 45sa untuk larian lokal.
+  const defTries = Number(process.env.E2E_HEALTH_TIMEOUT_S || 45) * 2;
+  tries = tries || defTries;
   for (let i = 0; i < tries; i++) {
     try {
       const r = await fetch(url + '/api/health', { signal: AbortSignal.timeout(2000) });

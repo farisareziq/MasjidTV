@@ -64,9 +64,15 @@ jobs:
         run: pnpm --filter @masjidtv/shared --filter @masjidtv/db --filter @masjidtv/server build
 
       - name: E2E pairing (cloud + kiosk Electron)
+        # Runner Windows headless — Electron GUI (app.whenReady) lambat mula;
+        # benarkan timeout health lebih panjang (lalai 45sa terlalu ketat di CI).
+        env:
+          E2E_HEALTH_TIMEOUT_S: '180'
         run: node scripts/e2e-pairing.mjs
 
       - name: Dry-run kiosk (simulasi hari operasi)
+        env:
+          E2E_HEALTH_TIMEOUT_S: '180'
         run: node scripts/dry-run-kiosk.mjs
 
   build:
