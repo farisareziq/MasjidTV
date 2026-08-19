@@ -75,6 +75,24 @@ jobs:
         run: node tools/download-ffmpeg.mjs
         working-directory: apps/kiosk
 
+      # DIAGNOSTIK: uji Electron boleh lancar di runner (tangkap ralat GUI).
+      - name: Probe Electron launch
+        shell: pwsh
+        run: |
+          $exe = "apps/kiosk/node_modules/electron/dist/electron.exe"
+          Write-Host "exe exists: $(Test-Path $exe)"
+          & $exe --version 2>&1 | Out-String | Write-Host
+          Write-Host "exit: $LASTEXITCODE"
+          # Uji lancarkan app sebenar 15sa — tangkap stdout/stderr.
+          $env:MASJIDTV_HEADLESS='1'; $env:MASJIDTV_DATA_DIR="$env:TEMP\kprobe"
+          $p = Start-Process $exe -ArgumentList '.','--no-kiosk','--no-autostart','--port','59990' -WorkingDirectory 'apps/kiosk' -RedirectStandardOutput "$env:TEMP\kout.txt" -RedirectStandardError "$env:TEMP\kerr.txt" -PassThru
+          Start-Sleep -Seconds 15
+          Write-Host "hasexited: $($p.HasExited) exitcode: $($p.ExitCode)"
+          Write-Host "--- STDOUT ---"; Get-Content "$env:TEMP\kout.txt" -ErrorAction SilentlyContinue
+          Write-Host "--- STDERR ---"; Get-Content "$env:TEMP\kerr.txt" -ErrorAction SilentlyContinue
+          try { (Invoke-WebRequest 'http://localhost:59990/api/health' -TimeoutSec 3 -UseBasicParsing).StatusCode | Write-Host } catch { Write-Host "no health: $($_.Exception.Message)" }
+          Stop-Process -Id $p.Id -Force -ErrorAction SilentlyContinue
+
       - name: E2E pairing (cloud + kiosk Electron)
         # Runner Windows headless — Electron GUI (app.whenReady) lambat mula;
         # benarkan timeout health lebih panjang (lalai 45sa terlalu ketat di CI).
