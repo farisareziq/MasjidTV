@@ -10,10 +10,15 @@ const repo = path.resolve(kioskDir, '..', '..');
 const electron = path.join(kioskDir, 'node_modules', 'electron');
 const { default: electronPath } = await import(electron);
 
+// VS Code/agent terminal menetapkan ELECTRON_RUN_AS_NODE=1 pada sesi —
+// tanpa dibuang, Electron kiosk boot sebagai Node biasa (tiada API app).
+const { ELECTRON_RUN_AS_NODE, ...cleanEnv } = process.env;
+void ELECTRON_RUN_AS_NODE;
+
 const p = spawn(electronPath, ['.'], {
   cwd: kioskDir,
   env: {
-    ...process.env,
+    ...cleanEnv,
     MASJIDTV_PUBLIC_DIR: path.join(repo, 'packages', 'frontend', 'public'),
     NODE_ENV: 'development'
   },

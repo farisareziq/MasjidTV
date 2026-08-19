@@ -24,9 +24,12 @@ MasjidTV/global/
 │   └── frontend/         # Paparan + admin — sumber TypeScript (src/*.ts),
 │                         #   dikompile esbuild ke public*/js (pariti penuh)
 ├── apps/android-tv/      # App Android TV (Flutter): WebView + ExoPlayer + pairing
-├── scripts/              # dry-run E2E, build-dist, deploy-cloud, turso-backup
+├── apps/kiosk/           # Kiosk Electron mini PC: server terbenam + paparan
+│                         #   fullscreen + pairing + relay ffmpeg + DSHOW/OBS
+├── scripts/              # run-e2e (8 peringkat), pentest, dry-run, e2e-pairing,
+│                         #   dry-run-kiosk, build-dist, deploy-cloud, turso-backup
 ├── tools/                # license-gen.mjs (alat lesen OFFLINE — kunci peribadi luar repo)
-└── .github/workflows/    # CI (typecheck + lint + test + build)
+└── .github/workflows/    # CI (typecheck+lint+test+e2e), backup harian, smoke 6j, release tag
 ```
 
 ## Cipta permulaan (lokal)
@@ -44,9 +47,29 @@ automatik — paparan: `http://<lan-ip>:3000/display?key=<displayKey>`.
 ## Ujian
 
 ```bash
-pnpm test               # unit + integration (vitest)
-node scripts/dry-run.mjs  # E2E: API, JAKIM, keselamatan, CRUD, muat naik
+pnpm test                  # unit + integration (vitest, 122 ujian)
+node scripts/dry-run.mjs   # E2E: API, JAKIM, keselamatan, CRUD, muat naik
+node scripts/pentest.mjs   # pentest keselamatan penuh (cloud + server lokal)
+node scripts/run-e2e.mjs   # SEMUA peringkat: build→typecheck→lint→test→
+                           #   dry-run→pentest→e2e-pairing→dry-run-kiosk
 ```
+
+`run-e2e.mjs` — satu arahan untuk keseluruhan saluran ujian (8 peringkat,
+fail-fast, ringkasan hijau/merah). `--fast` melangkau dry-run-kiosk (perlu
+Windows + Electron); `--only nama1,nama2` untuk peringkat terpilih.
+
+**Pentest** (`scripts/pentest.mjs`) — ujian keselamatan automatik berorientasi
+OWASP API Top 10 terhadap cloud lokal + server lokal: isolasi tenant (BOLA),
+JWT falsifikasi (alg none / rahsia salah), SQL/NoSQL injection, XSS tersimpan,
+path traversal, validasi upload (magic bytes), rate-limit brute-force,
+kebocoran rahsia (stream key mirrorUrl, kredensial kamera, hash password),
+header keselamatan (CSP/XFO/nosniff), CORS, enumerasi pengguna, pairing
+brute-force + kod dipakai semula. Keluar 0 = tiada temuan kritikal.
+
+**Nota keselamatan kiosk LAN**: endpoint `/api/devices-hw` dan
+`/api/streams-status` dilayan tanpa auth dalam LAN (nama kamera/status
+sahaja — tiada kredensial). Diterima untuk operasi kiosk; dilaporkan sebagai
+INFO oleh pentest pada setiap larian.
 
 ## Senarai semak go-live (deployment)
 
@@ -67,21 +90,51 @@ node scripts/dry-run.mjs  # E2E: API, JAKIM, keselamatan, CRUD, muat naik
    (destruktif — truncate + reinsert).
 6. **Smoke berkala** — workflow `Prod Smoke Test` (setiap 6 jam) memerlukan
    variable `MASJIDTV_PROD_URL` di GitHub.
-7. **Kiosk mini PC** — `install-kiosk.ps1` → sahkan Edge kiosk, display key,
-   akses LAN, dan tahan-reboot pada peranti sebenar. `winget install ffmpeg`
-   untuk stream RTSP/RTMP/ONVIF.
+7. **Kiosk mini PC** — pasang `MasjidTV-Kiosk-Setup-x.y.z.exe` (lihat seksyen
+   Kiosk di bawah); sahkan pairing, paparan, DSHOW/OBS, autostart, dan
+   tahan-reboot pada peranti sebenar.
 8. **Android TV** — sahkan ExoPlayer/UVC/auto-start pada TV sebenar sebelum
    bergantung padanya.
 
-## Kiosk (Windows mini PC)
+## Kiosk (Windows mini PC — Electron)
+
+App kiosk Electron ialah cara pasang semasa ini (menggantikan Edge kiosk +
+watchdog lama). Satu proses memiliki SEMUA: pelayan Fastify terbenam, tetingkap
+kiosk fullscreen, relay ffmpeg, pairing cloud, autostart.
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File .\packages\server\scripts\install-kiosk.ps1
+# Bina installer (NSIS + portable) — perlu sekali:
+node apps/kiosk/tools/download-ffmpeg.mjs   # bundel ffmpeg (~160MB, sekali)
+pnpm --filter @masjidtv/kiosk package       # -> apps/kiosk/dist-kiosk/<stamp>/
+
+# Pasang: jalankan MasjidTV-Kiosk-Setup-x.y.z.exe (atau Portable).
+# Jalankan dev: pnpm --filter @masjidtv/kiosk dev
 ```
 
-Menjadualkan tugas (logon/statup), memulakan pelayan + Edge kiosk + watchdog
-(10s). ffmpeg diperlukan untuk stream RTSP/RTMP/ONVIF (`winget install ffmpeg`,
-laluan boleh diubah melalui `media.ffmpegPath`).
+Ciri utama kiosk:
+- **Pairing**: skrin kod 6-digit automatik → tuntut di Web Admin Cloud
+  (Peranti TV). Hot-activation — tiada restart.
+- **Ctrl+Shift+M**: menu tersembunyi (status pairing, kamera PnP, peranti
+  DSHOW/OBS, status stream, unpair).
+- **OBS DSHOW**: peranti `video=OBS Virtual Camera` dikesan dan boleh
+  dijadikan stream (relay ffmpeg lokal → HLS).
+- **Mirror FB Live**: `mirrorUrl` (stream key rahsia) sampai ke kiosk melalui
+  endpoint peranti `/api/device/streams` — TIDAK didedahkan dalam settings awam.
+- **Offline-first**: cloud putus → paparan kekal dari cache; cloud kembali →
+  catch-up automatik (jambatan SSE).
+- **Autostart**: didaftarkan automatik kali pertama (shortcut Startup folder);
+  `--no-autostart` untuk kedai demo.
+- **Ketahanan**: renderer crash → reload; 401 transien semasa restart cloud
+  tidak memutuskan pairing (probe pengesahan sebelum auto-reset unpair).
+
+Rilis automatik: tag `v*` → workflow `release.yml` membina installer di
+windows-latest dan memuat naik ke GitHub Release (dengan `.sha256`).
+
+### Server lokal lama (alternatif tiada-Electron)
+
+`node scripts/build-exe.mjs` masih tersedia (binari SEA tunggal ~92MB vs
+installer Electron ~138MB) dan `install-kiosk.ps1` (Edge kiosk + watchdog)
+untuk pemasangan lama — tetapi kiosk Electron ialah laluan utama.
 
 ## Cloud (Vercel + Turso + Blob)
 

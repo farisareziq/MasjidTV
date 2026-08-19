@@ -376,7 +376,7 @@ function tickDebug(): void {
   // Fasa semasa + baki masa — memudahkan pengesahan aliran ujian azan/iqamah.
   const st = computePrayerPhase();
   const phaseInfo = st.phase === 'normal' ? 'normal' : `${st.phase} ${Math.ceil((st.remaining || 0) / 1000)}s`;
-  el.textContent = `${innerWidth}×${innerHeight} dpr${devicePixelRatio} | ${phaseInfo} | ${boxes.join(' | ')}`;
+  el.textContent = `${innerWidth}×${innerHeight} dpr${devicePixelRatio} | ${phaseInfo} | sse:${sseAlive ? 'live' : 'poll'} | ${boxes.join(' | ')}`;
   el.hidden = false;
 }
 
@@ -1418,9 +1418,10 @@ setInterval(loadWeather, 900000);
 // SYNC SEGERA: SSE lokal /api/events — event 'sync' dari admin cloud (mel-
 // alui jambatan mini PC) memicu sync() serta-merta (<1sa). Fallback: poll
 // 10sa kekal jika SSE gagal/legacy. Event 'unpaired' → reload ke pairing.
+// sseAlive juga dipapar dalam chip debug (?debug=1) sebagai sse:live/poll.
+let sseAlive = false;
 try {
   const es = new EventSource('/api/events');
-  let sseAlive = false;
   es.addEventListener('hello', () => { sseAlive = true; });
   es.addEventListener('sync', () => { sseAlive = true; sync().catch(() => {}); });
   es.addEventListener('unpaired', () => { location.replace('/display'); });

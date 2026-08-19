@@ -1,6 +1,6 @@
 {
   "name": "@masjidtv/shared",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "type": "module",
   "description": "Shared domain core: types, prayer engine, JAKIM client, zones, hijri, events, verses",
   "main": "./dist/index.js",

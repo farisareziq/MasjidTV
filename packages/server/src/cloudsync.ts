@@ -122,6 +122,27 @@ async function cloudFetch(cfg: CloudConfig, p: string): Promise<{ ok: boolean; s
   return { ok: true, status: 200, json: await res.json() };
 }
 
+/**
+ * Sahkan token peranti BENAR-BENAR ditolak oleh cloud sebelum auto-reset.
+ * 401 tunggal boleh menjadi transien (cloud sedang restart, cold-start
+ * serverless belum siap membaca DB, glitch rangkaian) — unpair palsu
+ * memutuskan paparan masjid yang sebenarnya masih dipaut.
+ * Kaedah: 401 pertama → tunggu singkat → probe kedua. 401 berterusan
+ * (dua kali berturut) = unpair sebenar; selain itu (200/probe gagal) =
+ * kekal dipaut, data dari cache.
+ */
+async function isTokenReallyRejected(cfg: CloudConfig): Promise<boolean> {
+  await new Promise((r) => setTimeout(r, 2000));
+  try {
+    const probe = await cloudFetch(cfg, '/api/settings');
+    // 200 = token masih sah (glitch pertama). Ralat rangkaian = cloud
+    // tidak stabil — JANGAN unpair. 401 berterusan = unpair sebenar.
+    return probe.status === 401;
+  } catch {
+    return false; // cloud tidak boleh dihubungi — bukan unpair
+  }
+}
+
 // --- SSE bridge: cloud → mini PC → paparan lokal ------------------------------
 //
 // Pelanggan SSE kepada cloud /api/events (device-token). Setiap event 'sync'
@@ -185,10 +206,15 @@ export async function handleCloudSync(reply: FastifyReply, dataDir: string, p: s
       return true;
     }
     if (cloud.status === 401) {
-      // AUTO-RESET: token peranti ditolak (unpair di cloud) — buang config,
-      // paparan akan reload ke mod pairing (seperti Android TV).
-      deviceUnpaired(dataDir, cfg.deviceToken);
-      reply.status(503).send({ error: 'Sesi peranti tidak sah — memulakan pairing semula', code: 'DEVICE_UNPAIRED' });
+      // AUTO-RESET: token peranti ditolak (unpair di cloud) — sahkan dahulu
+      // (401 transien semasa restart cloud tidak memutuskan pairing).
+      const reallyRejected = await isTokenReallyRejected(cfg);
+      if (reallyRejected) {
+        deviceUnpaired(dataDir, cfg.deviceToken);
+        reply.status(503).send({ error: 'Sesi peranti tidak sah — memulakan pairing semula', code: 'DEVICE_UNPAIRED' });
+      } else {
+        serveFromCache();
+      }
       return true;
     }
     serveFromCache();
@@ -291,11 +317,18 @@ export async function startCloudSseBridge(dataDir: string): Promise<void> {
         signal: ctrl.signal
       });
       if (res.status === 401) {
-        // Unpair di cloud — auto-reset; jambatan akan re-check config.
-        deviceUnpaired(dataDir, cfg.deviceToken);
-        broadcastLocal('unpaired', {});
-        setTimeout(connect, 5000).unref?.();
-        return;
+        // Unpair di cloud — sahkahkan dahulu (401 transien semasa restart
+        // cloud / cold-start serverless tidak memutuskan pairing). Jika
+        // benar-benar ditolak: auto-reset; jambatan akan re-check config.
+        const reallyRejected = await isTokenReallyRejected(cfg);
+        if (reallyRejected) {
+          deviceUnpaired(dataDir, cfg.deviceToken);
+          broadcastLocal('unpaired', {});
+          setTimeout(connect, 5000).unref?.();
+          return;
+        }
+        // Glitch transien — retry dengan backoff biasa.
+        throw new Error('SSE 401 transien');
       }
       if (res.status === 403) {
         // Lesen/trial tamat — tiada SSE; poll+cache kekal (grace 30 hari).

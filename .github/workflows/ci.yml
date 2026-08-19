@@ -2,7 +2,7 @@ name: CI
 
 on:
   push:
-    branches: [main]
+    branches: [master, main]
   pull_request:
 
 jobs:
@@ -25,17 +25,53 @@ jobs:
 
       # Bina pakej asas dahulu — type/test server & cloud menyelesaikan
       # @masjidtv/{shared,db} melalui dist/ (lihat package exports).
+      # Server dist juga diperlukan oleh @masjidtv/kiosk (typecheck).
       - name: Build workspace deps
-        run: pnpm --filter @masjidtv/shared --filter @masjidtv/db build
+        run: pnpm --filter @masjidtv/shared --filter @masjidtv/db --filter @masjidtv/server build
 
       - name: Typecheck
-        run: pnpm --filter @masjidtv/shared typecheck && pnpm --filter @masjidtv/db typecheck && pnpm --filter @masjidtv/server typecheck && pnpm --filter @masjidtv/cloud typecheck && pnpm --filter @masjidtv/frontend typecheck
+        run: pnpm --filter @masjidtv/shared typecheck && pnpm --filter @masjidtv/db typecheck && pnpm --filter @masjidtv/server typecheck && pnpm --filter @masjidtv/cloud typecheck && pnpm --filter @masjidtv/frontend typecheck && pnpm --filter @masjidtv/kiosk typecheck
 
       - name: Lint
         run: pnpm lint
 
       - name: Test
         run: pnpm test
+
+      # E2E Linux-safe: pelayan lokal sahaja (tiada Electron diperlukan).
+      - name: E2E dry-run (local server)
+        run: node scripts/dry-run.mjs
+
+      # E2E keselamatan (cloud lokal + server lokal) — Linux-safe.
+      - name: Pentest (security regression)
+        run: node scripts/pentest.mjs
+
+  e2e-kiosk:
+    name: E2E kiosk (Windows)
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build workspace deps
+        run: pnpm --filter @masjidtv/shared --filter @masjidtv/db --filter @masjidtv/server build
+
+      - name: E2E pairing (cloud + kiosk Electron)
+        run: node scripts/e2e-pairing.mjs
+
+      - name: Dry-run kiosk (simulasi hari operasi)
+        run: node scripts/dry-run-kiosk.mjs
 
   build:
     runs-on: ubuntu-latest

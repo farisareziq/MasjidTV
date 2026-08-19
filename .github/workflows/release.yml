@@ -1,0 +1,81 @@
+name: Release
+
+# Bina installer kiosk (Windows) setiap tag v* — muat naik sebagai GitHub
+# Release artifact. Menggantikan binaan manual `node apps/kiosk/tools/package.mjs`.
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  kiosk:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build workspace
+        run: pnpm build
+
+      # ffmpeg dibundel bersama installer (resources/bin) — cache unduhan
+      # supaya larian berturut tidak muat turun semula (~80MB).
+      - name: Cache ffmpeg
+        uses: actions/cache@v4
+        with:
+          path: apps/kiosk/bin/ffmpeg.exe
+          key: ffmpeg-win-x64-v1
+
+      # download-ffmpeg.mjs mengesahkan sha256 zip (API digest / FFMPEG_SHA256)
+      # sebelum pakej — tanpa pengesahan, rilis GAGAL.
+      - name: Download ffmpeg (if not cached)
+        run: node tools/download-ffmpeg.mjs
+        working-directory: apps/kiosk
+
+      - name: Package kiosk (electron-builder NSIS + portable)
+        run: node tools/package.mjs
+        working-directory: apps/kiosk
+
+      # Stamp terkini dalam dist-kiosk — muat naik SEMUA installer/portable.
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: kiosk-windows
+          path: |
+            apps/kiosk/dist-kiosk/*/*.exe
+          retention-days: 14
+
+      - name: Attach to GitHub Release
+        if: startsWith(github.ref, 'refs/tags/')
+        shell: pwsh
+        run: |
+          $tag = "${env:GITHUB_REF}" -replace '^refs/tags/', ''
+          $files = Get-ChildItem -Path apps/kiosk/dist-kiosk -Recurse -Filter *.exe |
+            Where-Object { $_.FullName -match 'win-unpacked' -eq $false }
+          Write-Host "Artifacts: $($files.FullName -join ', ')"
+          foreach ($f in $files) {
+            # sha256 bersebelahan setiap artifact (sama format seperti rilis lama)
+            $hash = (Get-FileHash -Path $f.FullName -Algorithm SHA256).Hash.ToLower()
+            "$hash  $($f.Name)" | Set-Content -Path "$($f.FullName).sha256" -NoNewline
+            & gh release upload $tag "$($f.FullName)" "$($f.FullName).sha256" --clobber
+            if ($LASTEXITCODE -ne 0) {
+              # Rilis belum wujud — cipta dahulu.
+              & gh release create $tag "$($f.FullName)" "$($f.FullName).sha256" --title "MasjidTV $tag" --generate-notes
+              if ($LASTEXITCODE -ne 0) { throw "gh release gagal" }
+            }
+          }
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}

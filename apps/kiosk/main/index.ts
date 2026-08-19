@@ -25,7 +25,7 @@ const flagValue = (n: string) => {
 
 const PORT = Number(flagValue('--port') || process.env.PORT || 3000);
 
-let mainWindow: BrowserWindow | null;
+let mainWindow: BrowserWindow | null = null;
 let powerBlockerId: number | -1 = -1;
 
 function dataDir(): string {
@@ -266,4 +266,10 @@ app.on('before-quit', () => {
   try {
     if (powerBlockerId >= 0) powerSaveBlocker.stop(powerBlockerId);
   } catch { /* sudah berhenti */ }
+  // Rujukan crash-recovery: pastikan tetingkap utama tertutup bersih supaya
+  // `window-all-closed` (relaunch kiosk) tidak terpicu oleh quirk lifecycle.
+  try {
+    mainWindow?.destroy();
+  } catch { /* sudah musnah */ }
+  mainWindow = null;
 });

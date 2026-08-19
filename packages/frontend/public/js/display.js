@@ -356,7 +356,7 @@ function tickDebug() {
   }
   const st = computePrayerPhase();
   const phaseInfo = st.phase === "normal" ? "normal" : `${st.phase} ${Math.ceil((st.remaining || 0) / 1e3)}s`;
-  el.textContent = `${innerWidth}\xD7${innerHeight} dpr${devicePixelRatio} | ${phaseInfo} | ${boxes.join(" | ")}`;
+  el.textContent = `${innerWidth}\xD7${innerHeight} dpr${devicePixelRatio} | ${phaseInfo} | sse:${sseAlive ? "live" : "poll"} | ${boxes.join(" | ")}`;
   el.hidden = false;
 }
 function renderPrayerStrip() {
@@ -1262,9 +1262,9 @@ setInterval(tickPrayerMode, 1e3);
 setInterval(tickDebug, 2e3);
 setInterval(sync, SYNC_INTERVAL_MS);
 setInterval(loadWeather, 9e5);
+let sseAlive = false;
 try {
   const es = new EventSource("/api/events");
-  let sseAlive = false;
   es.addEventListener("hello", () => {
     sseAlive = true;
   });

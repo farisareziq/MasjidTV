@@ -1,6 +1,6 @@
 {
   "name": "@masjidtv/db",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "type": "module",
   "description": "Drizzle schema + migrations + client factory (better-sqlite3 local, libsql cloud)",
   "main": "./dist/index.js",
