@@ -86,7 +86,8 @@ jobs:
           # Uji lancarkan app sebenar 15sa — tangkap stdout/stderr.
           $env:MASJIDTV_HEADLESS='1'; $env:MASJIDTV_DATA_DIR="$env:TEMP\kprobe"
           $env:ELECTRON_ENABLE_LOGGING='1'; $env:ELECTRON_ENABLE_STACK_DUMPING='1'
-          $p = Start-Process $exe -ArgumentList '.','--in-process-gpu','--no-kiosk','--no-autostart','--port','59990' -WorkingDirectory 'apps/kiosk' -RedirectStandardOutput "$env:TEMP\kout.txt" -RedirectStandardError "$env:TEMP\kerr.txt" -PassThru
+          # Uji TANPA redirect (output terus ke log) — ketepikan isu pipe buffering.
+          $p = Start-Process $exe -ArgumentList '.','--in-process-gpu','--no-kiosk','--no-autostart','--port','59990' -WorkingDirectory 'apps/kiosk' -PassThru
           Start-Sleep -Seconds 20
           Write-Host "hasexited: $($p.HasExited) exitcode: $($p.ExitCode)"
           Write-Host "--- STDOUT ---"; Get-Content "$env:TEMP\kout.txt" -ErrorAction SilentlyContinue
