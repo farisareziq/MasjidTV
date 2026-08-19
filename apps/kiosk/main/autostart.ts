@@ -19,10 +19,13 @@ function startupFolder(): string {
 }
 
 function isPortable(): boolean {
-  // electron-builder portable mengekstrak ke %TEMP% sebelum berjalan —
-  // process.execPath berada dalam folder temp berdigit (bukan folder pasang).
+  // Isyarat paling boleh dipercayai ialah env electron-builder portable.
+  // Regex laluan %TEMP% hanyalah fallback — nama folder temp electron-builder
+  // boleh mengandungi '-'/'.'/'_' (cth. "<hash>.tmp"), jadi kelas aksara
+  // [a-zA-Z0-9] dahulu akan gagal padan (B1). Benarkan aksara tersebut.
+  if (process.env.PORTABLE_EXECUTABLE_FILE || process.env.PORTABLE_EXECUTABLE_DIR) return true;
   const p = process.execPath;
-  return /\\Temp\\[a-zA-Z0-9]+\\MasjidTV/i.test(p) || portableMarkerExists();
+  return /\\Temp\\[a-zA-Z0-9._-]+\\[^\\]*MasjidTV/i.test(p) || portableMarkerExists();
 }
 
 function portableMarkerExists(): boolean {

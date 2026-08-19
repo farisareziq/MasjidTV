@@ -77,11 +77,6 @@ export function listCameras(): Promise<HwDevice[]> {
   });
 }
 
-export interface DevicesState {
-  cameras: HwDevice[];
-  checkedAt: number;
-}
-
 export function devicesStatePath(dataDir: string): string {
   return path.join(dataDir, 'devices.json');
 }

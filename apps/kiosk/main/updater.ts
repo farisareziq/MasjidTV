@@ -102,8 +102,10 @@ function sha256Hex(buf: Buffer): string {
 // (process.execPath berada dalam folder temp). Sama heuristik seperti
 // autostart.ts — installer NSIS meninggalkan kunci uninstall, portable tidak.
 function isPortableMode(): boolean {
+  // Env electron-builder portable ialah isyarat utama; regex laluan %TEMP%
+  // hanya fallback — benarkan '-'/'.'/''_' dalam nama folder temp (B1).
   if (process.env.PORTABLE_EXECUTABLE_FILE || process.env.PORTABLE_EXECUTABLE_DIR) return true;
-  return /\\Temp\\[a-zA-Z0-9]+\\MasjidTV/i.test(process.execPath);
+  return /\\Temp\\[a-zA-Z0-9._-]+\\[^\\]*MasjidTV/i.test(process.execPath);
 }
 
 // Baca updater.json di sebelah exe (extraResources → resources/updater.json).
