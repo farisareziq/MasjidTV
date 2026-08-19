@@ -81,7 +81,7 @@ describe('Pairing Testing / mini-PC cloud pairing (OOB)', () => {
   it('GET /api/pair/config reports unpaired initially', async () => {
     const res = await srv.app.inject({ method: 'GET', url: '/api/pair/config' });
     expect(res.statusCode).toBe(200);
-    expect(res.json()).toEqual({ paired: false, cloudUrl: '', tenantName: '' });
+    expect(res.json()).toEqual({ paired: false, cloudUrl: '', tenantName: '', deviceId: '' });
   });
 
   it('/display without key shows the pairing page (Android TV behaviour)', async () => {

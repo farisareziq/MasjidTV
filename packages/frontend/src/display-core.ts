@@ -1406,10 +1406,29 @@ async function refresh(): Promise<void> {
     const el = $('slide');
     if (String((err as Error).message).includes('401')) {
       if (cfg.features.recoverMissingKey && recoverMissingKey()) return;
-      el.innerHTML = '<p class="slide-msg">Sesi TV tidak sah — sila pautkan semula di admin.</p>';
+      // 401: sesi TV tamat/dinyahpaut. Papar panduan boleh-tindak (bukan ayat
+      // mati) — admin perlu tahu APA yang perlu dibuat seterusnya.
+      el.innerHTML =
+        '<div class="slide-msg" style="max-width:640px;text-align:center;line-height:1.8">'
+        + '<div style="font-size:1.4em;margin-bottom:12px">⚠️ Sesi TV tidak sah</div>'
+        + '<div style="opacity:.85">TV ini telah dinyahpaut. Untuk memaut semula:</div>'
+        + '<div style="margin-top:10px;text-align:left;display:inline-block">'
+        + '1. Buka <b>Web Admin</b> pada telefon/komputer anda<br>'
+        + '2. Pergi ke <b>TV &amp; Paparan</b><br>'
+        + '3. Padam TV ini, kemudian masukkan kod baharu yang dipapar pada skrin kiosk'
+        + '</div>'
+        + '<div style="opacity:.6;font-size:.85em;margin-top:14px">TV session expired — re-pair this screen via the Web Admin (TV &amp; Screens).</div>'
+        + '</div>';
       notifySessionInvalid();
     } else {
-      el.innerHTML = '<p class="slide-msg">Menghubungi pelayan… / Connecting to server…</p>';
+      // Offline/gagal hubungi pelayan: meyakinkan — paparan cuba semula
+      // automatik; kandungan cache kekal dipapar sebaik rangkaian kembali.
+      el.innerHTML =
+        '<div class="slide-msg" style="max-width:560px;text-align:center;line-height:1.8">'
+        + '<div style="font-size:1.3em;margin-bottom:10px">📡 Menghubungi pelayan…</div>'
+        + '<div style="opacity:.7">Sambungan terputus — paparan akan menyambung semula secara automatik.</div>'
+        + '<div style="opacity:.55;font-size:.85em;margin-top:8px">Connecting to server — the display will reconnect automatically.</div>'
+        + '</div>';
     }
     el.classList.add('visible');
   }

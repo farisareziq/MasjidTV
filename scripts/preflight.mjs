@@ -51,6 +51,28 @@ if (env.JWT_SECRET) {
   });
 }
 
+// --- 2b. Env produksi pilihan (C4 + public URL) — WARN sahaja, bukan blocker.
+// Tanpa ini ciri beroperasi tetapi kehilangan pemantauan ralat / URL skrin
+// yang stabil / alert smoke.
+if (process.env.PREFLIGHT_SKIP_ENV !== '1') {
+  check('SENTRY_DSN (C4: pemantauan ralat 5xx)', {
+    required: false,
+    ok: !!env.SENTRY_DSN,
+    detail: 'disyorkan — tanpa ini ralat 5xx cloud tidak dilaporkan (no-op selamat)'
+  });
+  check('MASJIDTV_PUBLIC_URL (URL skrin stabil)', {
+    required: false,
+    ok: !!env.MASJIDTV_PUBLIC_URL,
+    detail: 'disyorkan — tanpa ini URL skrin diterbit daripada Host header (pecah pada preview/custom domain)'
+  });
+  const hasAlertHook = !!(env.DISCORD_WEBHOOK_URL || env.SLACK_WEBHOOK_URL);
+  check('Alert webhook smoke (DISCORD/SLACK_WEBHOOK_URL)', {
+    required: false,
+    ok: hasAlertHook,
+    detail: 'disyorkan — tanpa ini kegagalan smoke 6-jam tidak menghantar alert (secret GitHub, bukan Vercel)'
+  });
+}
+
 // --- 3. License keypair match ---------------------------------------------
 // Derive the public key from the vendor private key and compare with the
 // cloud LICENSE_PUBLIC_KEY — mismatch = every activation fails with

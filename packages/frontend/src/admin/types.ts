@@ -179,6 +179,10 @@ export interface AdminFeatureHooks {
   // TTL 5 minit — dikongsi dshowOptions) untuk label status relay jujur.
   // Kegagalan rangkaian → null (label kembali kepada ffmpegOk pelayan).
   pairedDeviceCount?: () => Promise<number | null>;
+  // Awan: jumlah peranti TV berpasangan MASA KINI (sync, daripada cache
+  // devices yang diisi renderTv/loadApp). -1 = tiada maklumat (lokal).
+  // Digunakan oleh kad panduan first-run (langkah "Pautkan TV").
+  deviceCount?: () => number;
 }
 
 export const featureHooks: AdminFeatureHooks = {};

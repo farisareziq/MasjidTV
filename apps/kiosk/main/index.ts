@@ -124,10 +124,10 @@ const HIDDEN_MENU_JS = `(async function () {
   var box = document.createElement('div');
   box.id = '__kioskMenu';
   box.style.cssText = 'position:fixed;inset:0;z-index:99999;background:rgba(0,20,12,.92);color:#eef7f2;font-family:Segoe UI,system-ui,sans-serif;display:flex;align-items:center;justify-content:center;padding:24px;';
-  box.innerHTML = '<div style="max-width:520px;width:100%;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.15);border-radius:16px;padding:28px 32px">'
+  box.innerHTML = '<div style="max-width:560px;width:100%;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.15);border-radius:16px;padding:28px 32px;max-height:88vh;overflow-y:auto">'
     + '<h2 style="margin:0 0 4px;font-size:20px">Menu Kiosk MasjidTV</h2>'
     + '<p style="color:#9fc3b2;font-size:12px;margin:0 0 18px">Ctrl+Shift+M untuk tutup</p>'
-    + '<div id="__kmBody" style="font-size:14px;line-height:1.9">Memuat…</div>'
+    + '<div id="__kmBody" style="font-size:14px;line-height:1.85">Memuat…</div>'
     + '<div style="display:flex;gap:10px;margin-top:18px;flex-wrap:wrap">'
     + '<button id="__kmUnpair" style="padding:10px 18px;border:0;border-radius:8px;background:#8a3b2f;color:#fff;cursor:pointer;font-size:13px">Nyahpaut & Pair Semula</button>'
     + '<button id="__kmClose" style="padding:10px 18px;border:1px solid rgba(255,255,255,.25);border-radius:8px;background:transparent;color:#eef7f2;cursor:pointer;font-size:13px">Tutup</button>'
@@ -135,7 +135,14 @@ const HIDDEN_MENU_JS = `(async function () {
   document.body.appendChild(box);
   box.addEventListener('click', function (e) { if (e.target === box) box.remove(); });
   document.getElementById('__kmClose').onclick = function () { box.remove(); };
+  // CONFIRM: nyahpaut memutuskan sambungan TV ke cloud — pastikan dahulu.
   document.getElementById('__kmUnpair').onclick = async function () {
+    var ok = window.confirm(
+      'Nyahpaut TV ini daripada cloud?\\n\\n'
+      + 'Skrin akan berhenti menerima tetapan daripada cloud dan menunjukkan kod pairing baharu. '
+      + 'Anda perlu memasukkan kod baharu itu di Web Admin untuk memaut semula.\\n\\nTeruskan?'
+    );
+    if (!ok) return;
     await fetch('/api/pair/unpair', { method: 'POST' });
     location.replace('/display');
   };
@@ -143,23 +150,40 @@ const HIDDEN_MENU_JS = `(async function () {
   // Escape sebelum innerHTML — nilai dari endpoint LAN (updater/stream/peranti)
   // boleh dipengaruhi pihak ketiga (DNS-spoof / fail tempatan) → elak XSS.
   function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
+  function row(label, valueHtml) { return '<div style="margin:4px 0"><b>' + label + ':</b> ' + valueHtml + '</div>'; }
   try {
     var cfg = await (await fetch('/api/pair/config')).json();
     var hw = await (await fetch('/api/devices-hw')).json();
-    var cams = (hw.cameras || []).map(function (c) { return esc(c.name) + (c.status === 'OK' ? '' : ' (' + esc(c.status) + ')'); });
+
+    // Capaian internet/cloud — soalan pertama yang sokongan akan tanya.
+    var netLine = '<span style="color:#ffd28f">menyemak…</span>';
+    var cloudTarget = cfg.paired && cfg.cloudUrl ? cfg.cloudUrl : null;
+
+    var cams = (hw.cameras || []).map(function (c) { return esc(c.name) + (c.status === 'OK' ? '' : ' ⚠'); });
     var dshow = (hw.dshow || []).map(function (c) { return 'video=' + esc(c.name); });
+    var camHtml = cams.length
+      ? '<span style="color:#8fd6a8">✔</span> ' + cams.join(' • ')
+      : '<span style="color:#ff9d9d">✖ Tiada kamera dikesan</span> — pastikan kamera USB dipasang rapi';
+    var dshowHtml = dshow.length
+      ? dshow.join(' • ')
+      : '<span style="color:#86a99a">Tiada</span> — jika guna OBS, tekan <b>Start Virtual Camera</b>';
+
     var streamRow = '';
     try {
       var st = await (await fetch('/api/streams-status')).json();
-      streamRow = (st.streams || []).map(function (s) {
-        return '<div><b>Stream:</b> ' + esc(s.name) + ' — ' + esc(s.status) + (s.lastError ? ' <span style="color:#ff9d9d">(' + esc(s.lastError) + ')</span>' : '') + '</div>';
-      }).join('');
+      var ss = st.streams || [];
+      streamRow = ss.length ? ss.map(function (s) {
+        var okRun = String(s.status).toLowerCase() === 'running';
+        var chip = okRun ? '<span style="color:#8fd6a8">berjalan</span>' : '<span style="color:#ff9d9d">' + esc(s.status) + '</span>';
+        return row('Stream “' + esc(s.name) + '”', chip + (s.lastError ? ' <span style="color:#ff9d9d;font-size:12px">(' + esc(s.lastError) + ')</span>' : ''));
+      }).join('') : '';
     } catch (e) { /* tidak kritikal */ }
+
     // Status self-updater (B1) — endpoint lokal; gagal = updater tidak aktif.
     var updRow = '';
     try {
       var upd = await (await fetch('/api/update-status')).json();
-      var ustate = { idle: 'Terkini', checking: 'Menyemak…', downloading: 'Memuat turun…', ready: 'Sedia dipasang', installing: 'Memasang…', error: 'Ralat (cuba semula automatik)', available: 'Tersedia', disabled: 'Tidak aktif' }[upd.state] || upd.state;
+      var ustate = { idle: 'Terkini ✔', checking: 'Menyemak…', downloading: 'Memuat turun…', ready: 'Sedia dipasang', installing: 'Memasang…', error: 'Ralat (cuba semula automatik)', available: 'Tersedia', disabled: 'Tidak aktif' }[upd.state] || upd.state;
       var uline = '<b>Kemas kini:</b> v' + esc(upd.currentVersion) + ' — ' + esc(ustate);
       if (upd.availableVersion) uline += ' → <b style="color:#8fd6a8">v' + esc(upd.availableVersion) + '</b>';
       if (upd.state === 'available' && upd.portable) uline += '<br><span style="color:#ffd28f;font-size:12px">Mod portable — muat turun manual portable exe baharu dari GitHub Releases.</span>';
@@ -167,16 +191,48 @@ const HIDDEN_MENU_JS = `(async function () {
       if (upd.lastCheckAt) uline += '<br><span style="color:#86a99a;font-size:12px">Semakan terakhir: ' + new Date(upd.lastCheckAt).toLocaleString() + '</span>';
       updRow = '<div style="margin-top:10px">' + uline + '</div>';
     } catch (e) { /* updater tidak aktif */ }
+
+    // Ringkasan sokongan satu baris — senang dibaca melalui telefon/WhatsApp.
+    var supportLine = (cfg.paired ? 'DIPAUT' : 'BELUM DIPAUT')
+      + ' • ' + esc(cfg.tenantName || '-')
+      + ' • ID: ' + esc(cfg.deviceId || '-')
+      + ' • ' + esc(cfg.cloudUrl || '-');
+
     body.innerHTML =
-      '<div><b>Status:</b> ' + (cfg.paired ? 'Dipaut' : 'Belum dipaut') + '</div>'
-      + (cfg.paired ? '<div><b>Masjid:</b> ' + esc(cfg.tenantName || '-') + '<br><b>Cloud:</b> ' + esc(cfg.cloudUrl) + '</div>' : '')
-      + '<div style="margin-top:10px"><b>Kamera (PnP):</b> ' + (cams.length ? cams.join(' • ') : 'tiada dikesan') + '</div>'
-      + '<div><b>Peranti DSHOW (ffmpeg):</b> ' + (dshow.length ? dshow.join(' • ') : 'tiada — OBS: tekan Start Virtual Camera') + '</div>'
+      row('Status', cfg.paired ? '<span style="color:#8fd6a8">✔ Dipaut — semua OK</span>' : '<span style="color:#ffd28f">Belum dipaut</span> — masukkan kod di Web Admin')
+      + (cfg.paired ? row('Masjid', esc(cfg.tenantName || '-')) : '')
+      + row('Internet / Cloud', netLine)
+      + row('Kamera', camHtml)
+      + row('Kamera maya (OBS)', dshowHtml)
       + streamRow
       + updRow
-      + '<div style="color:#86a99a;font-size:12px;margin-top:8px">Semakan: ' + (hw.checkedAt ? new Date(hw.checkedAt).toLocaleString() : '-') + '</div>';
+      + '<div style="color:#86a99a;font-size:12px;margin-top:12px;border-top:1px solid rgba(255,255,255,.12);padding-top:10px">'
+      + '<b>Ringkasan sokongan</b> (baca ini bila hubungi sokongan):<br>' + supportLine
+      + '<br>Semakan perkakasan: ' + (hw.checkedAt ? new Date(hw.checkedAt).toLocaleString() : '-')
+      + '</div>';
+
+    // Isi baris capaian secara async (selepas render utama supaya menu pantas).
+    (async function () {
+      var el = body.querySelectorAll('b');
+      var target = null;
+      for (var i = 0; i < el.length; i++) if (el[i].textContent === 'Internet / Cloud') target = el[i].parentNode;
+      var result;
+      if (!cloudTarget) {
+        result = '<span style="color:#86a99a">—</span> (TV belum dipaut)';
+      } else {
+        try {
+          var r = await fetch(cloudTarget + '/api/health', { signal: AbortSignal.timeout(6000) });
+          result = r.ok
+            ? '<span style="color:#8fd6a8">✔ Boleh capai cloud</span> (' + esc(cloudTarget) + ')'
+            : '<span style="color:#ff9d9d">✖ Cloud balas HTTP ' + r.status + '</span> — semak internet';
+        } catch (e) {
+          result = '<span style="color:#ff9d9d">✖ Tidak dapat capai cloud</span> — semak kabel/Wi-Fi internet mini PC ini';
+        }
+      }
+      if (target) target.innerHTML = '<b>Internet / Cloud:</b> ' + result;
+    })();
   } catch (e) {
-    body.innerHTML = 'Gagal memuat status: ' + e.message;
+    body.innerHTML = 'Gagal memuat status: ' + esc(e.message);
   }
 })()`;
 

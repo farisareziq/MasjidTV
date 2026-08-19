@@ -167,11 +167,12 @@ export class KioskUpdater {
   }
 
   // Tulis status ke <dataDir>/update-status.json — dibaca /api/update-status
-  // (menu tersembunyi). Throttled 2sa: hanya pada peralihan state/semakan.
-  private writeStatus(): void {
+  // (menu tersembunyi). Throttled 2sa pada laluan biasa; force=true memintas
+  // throttle (keadaan terminal + ujian automatik yang membaca fail segera).
+  private writeStatus(force = false): void {
     if (!this.statusFile) return;
     const now = Date.now();
-    if (now - this.lastStatusWrite < 2000) return;
+    if (!force && now - this.lastStatusWrite < 2000) return;
     this.lastStatusWrite = now;
     try {
       fs.writeFileSync(this.statusFile, JSON.stringify(this.status), 'utf8');
@@ -204,6 +205,15 @@ export class KioskUpdater {
       console.error('[updater] semakan gagal (senyap):', err instanceof Error ? err.message : String(err));
       this.writeStatus();
     }
+  }
+
+  // checkOnce: dedah satu kitaran semakan untuk harness ujian automatik
+  // (scripts/test-updater.mjs) — memintas pemasa startup/poll + throttle
+  // status (ujian membaca fail segera selepas pulang). Produk menggunakan
+  // start() biasa; ini hanya untuk ujian.
+  async checkOnce(): Promise<void> {
+    await this.safeCheck();
+    this.writeStatus(true);
   }
 
   private async check(): Promise<void> {
@@ -313,6 +323,14 @@ export class KioskUpdater {
     this.status.lastError = null;
     this.writeStatus();
     console.log(`[updater] installer ${setupName} disahkan — sedia dipasang.`);
+
+    // UJIAN (MASJIDTV_UPDATE_DRY_RUN=1): sahkan checksum + tulis installer,
+    // tetapi JANGAN lancarkan installer / quit — untuk harness automatik
+    // (scripts/test-updater.mjs). Tiada kesan dalam produksi.
+    if (process.env.MASJIDTV_UPDATE_DRY_RUN === '1') {
+      console.log('[updater] DRY-RUN — pemasangan dilangkau (ujian).');
+      return;
+    }
 
     // Pasang serta-merta: kemas kini kiosk tidak patut menunggu reboot —
     // paparan terputus beberapa saat kemudian dilancarkan semula oleh NSIS

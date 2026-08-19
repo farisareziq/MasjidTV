@@ -124,7 +124,7 @@
 
   // src/admin/i18n.ts
   var ADMIN_LANG_KEY = "tvm_admin_lang";
-  var adminLang = localStorage.getItem(ADMIN_LANG_KEY) || "en";
+  var adminLang = localStorage.getItem(ADMIN_LANG_KEY) || "ms";
   var I18N = {
     en: {
       loginSub: "Manage the mosque signage system",
@@ -164,6 +164,14 @@
       note1Cloud: "Open {url} fullscreen on your signage player \u2014 the public cloud URL works anywhere with internet. Paired kiosks/TVs open it automatically.",
       notePassword: "\u26A0\uFE0F The default admin password file still exists at {file}. Change the password in Settings and the file is removed.",
       noteJakim: "Prayer times and hijri date come from the official JAKIM e-Solat API (selected zone), with automatic offline calculation fallback.",
+      firstRunTitle: "\u{1F44B} Welcome! Complete these steps to get your screen running:",
+      firstRunStep1: "Set your mosque profile (name & logo)",
+      firstRunStep2: "Pick your JAKIM prayer zone",
+      firstRunStep3: "Add your first announcement",
+      firstRunStep4: "Pair your TV / mini PC",
+      firstRunDone: "\u2713 All set \u2014 your signage is ready!",
+      hintZone: "\u26A0\uFE0F No prayer zone selected \u2014 prayer times may be wrong. Pick your zone below.",
+      hintMosqueName: "\u26A0\uFE0F Mosque name is still the default \u2014 update it below.",
       noteAudio: "\u{1F50A} Adhan/Iqamah audio is configured \u2014 the screen will call at prayer times.",
       noteStreams: "\u{1F4E1} {count} live stream(s) configured. RTSP/RTMP/ONVIF need ffmpeg on the mini PC.",
       noteStreamsCloud: "\u{1F4E1} {count} live stream(s) configured. Camera streams (RTSP/RTMP/ONVIF/DSHOW) are relayed by a paired kiosk mini PC \u2014 the cloud host has no ffmpeg.",
@@ -355,6 +363,7 @@
       date: "Date",
       repeatYearly: "Repeat yearly",
       emptyEvents: "No Islamic events yet.",
+      noTenants: "No mosques (tenants) yet. Create your first tenant above.",
       eventNew: "new",
       eventNotUpcoming: "not upcoming",
       sourceJakim: "JAKIM",
@@ -521,6 +530,14 @@
       note1Cloud: "Buka {url} skrin penuh pada pemain paparan anda \u2014 URL awan awam ini berfungsi di mana-mana sahaja ada internet. Kiosk/TV berpasangan membukanya secara automatik.",
       notePassword: "\u26A0\uFE0F Fail kata laluan lalai masih wujud di {file}. Tukar kata laluan di Tetapan dan fail akan dipadam.",
       noteJakim: "Waktu solat dan tarikh hijrah datang dari API rasmi JAKIM e-Solat (zon terpilih), dengan fallback pengiraan tempatan automatik.",
+      firstRunTitle: "\u{1F44B} Selamat datang! Lengkapkan langkah ini untuk menghidupkan skrin anda:",
+      firstRunStep1: "Tetapkan profil masjid (nama & logo)",
+      firstRunStep2: "Pilih zon solat JAKIM anda",
+      firstRunStep3: "Tambah pengumuman pertama anda",
+      firstRunStep4: "Pautkan TV / mini PC anda",
+      firstRunDone: "\u2713 Semua siap \u2014 paparan anda sedia!",
+      hintZone: "\u26A0\uFE0F Tiada zon solat dipilih \u2014 waktu solat mungkin salah. Pilih zon anda di bawah.",
+      hintMosqueName: "\u26A0\uFE0F Nama masjid masih lalai \u2014 kemaskini di bawah.",
       noteAudio: "\u{1F50A} Audio azan/iqamah dikonfigurasi \u2014 skrin akan berbunyi pada waktu solat.",
       noteStreams: "\u{1F4E1} {count} live stream dikonfigurasi. RTSP/RTMP/ONVIF memerlukan ffmpeg pada mini PC.",
       noteStreamsCloud: "\u{1F4E1} {count} live stream dikonfigurasi. Stream kamera (RTSP/RTMP/ONVIF/DSHOW) direlay oleh kiosk mini PC berpasangan \u2014 hos awan tiada ffmpeg.",
@@ -704,7 +721,7 @@
       dshowPickHint: "DSHOW: pilih peranti yang dilaporkan daripada senarai, atau taip nama secara manual.",
       eventsSub: "Auto-sync dari takwim rasmi JAKIM \u2014 tarikh dikemas kini mengikut zon yang dipilih.",
       eventsAuto: "Auto-sync dari JAKIM",
-      syncNow: "Sync sekarang",
+      syncNow: "Segerak sekarang",
       addEvent: "+ Tambah acara",
       saveEvents: "Simpan acara",
       nameBm: "Nama (BM)",
@@ -712,6 +729,7 @@
       date: "Tarikh",
       repeatYearly: "Berulang tahunan",
       emptyEvents: "Tiada hari kebesaran lagi.",
+      noTenants: "Tiada masjid (tenant) lagi. Cipta tenant pertama anda di atas.",
       eventNew: "baharu",
       eventNotUpcoming: "tidak akan datang",
       sourceJakim: "JAKIM",
@@ -755,7 +773,7 @@
       streamsSaved: "Stream disimpan & relay dimulakan semula",
       syncInProgress: "Menyelaraskan dengan JAKIM\u2026",
       syncDone: "Sync selesai: {n} tarikh",
-      syncFailed: "Sync gagal",
+      syncFailed: "Segerak gagal",
       eventsSaved: "Acara disimpan",
       passwordChanged: "Kata laluan ditukar",
       fillPasswords: "Isi semua ruangan kata laluan",
@@ -786,7 +804,7 @@
       thursday: "Khamis",
       friday: "Jumaat",
       saturday: "Sabtu",
-      loginUsername: "Username",
+      loginUsername: "Nama pengguna",
       pinChangeSub: "Tetapkan PIN superuser anda sebelum meneruskan",
       newPin: "PIN baharu",
       confirmPin: "Sahkan PIN",
@@ -798,11 +816,11 @@
       masjidSub: "Daftar akaun masjid dan urus lesen.",
       registerMasjid: "Daftar masjid",
       mosqueNameLabel: "Nama masjid",
-      usernameLabel: "Username admin",
+      usernameLabel: "Nama pengguna admin",
       passwordLabel: "Kata laluan admin",
       registerBtn: "Daftar",
       license: "Lesen",
-      licenseTrial: "Trial \u2014 {d} hari lagi",
+      licenseTrial: "Percubaan \u2014 {d} hari lagi",
       licenseActive: "Berlesen (kekal)",
       licenseLocked: "Lesen diperlukan",
       licenseSuspended: "Digantung",
@@ -819,7 +837,7 @@
       removeUser: "Buang",
       createdOn: "Dicipta {d}",
       tenantStatus: "Status: {s}",
-      trialEnds: "Trial hingga {d}",
+      trialEnds: "Percubaan hingga {d}",
       adminBadge: "admin",
       deleteTenantConfirm: "Padam \u201C{name}\u201D? Akaun masjid, pengguna admin, pengumuman dan media akan dipadam kekal.",
       userDeleteConfirm: "Buang pengguna \u201C{name}\u201D?",
@@ -1106,7 +1124,40 @@
     $("streamNote").innerHTML = t(F.kioskStreams() ? "noteStreamsCloud" : "noteStreams", { count: `${s.activeStreamCount}/${s.streamCount}` });
     $("eventsSyncNote").hidden = !s.eventsSync?.enabled;
     if (featureHooks.renderOverviewExtra) featureHooks.renderOverviewExtra();
+    renderFirstRun();
     renderNextPrayer();
+  }
+  function renderFirstRun() {
+    const card = $("firstRunCard");
+    const list = $("firstRunList");
+    if (!card || !list || !state.status) return;
+    const s = state.status;
+    const settings = state.settings || {};
+    const announcements = state.announcements || [];
+    const deviceCount = featureHooks.deviceCount ? featureHooks.deviceCount() : -1;
+    const mosqueName = (settings.mosque?.name || s.mosque || "").trim();
+    const mosqueIsDefault = !mosqueName || /masjid al-?hidayah/i.test(mosqueName);
+    const zoneCode = (settings.prayer?.zone || s.prayerZone || "").trim();
+    const zoneUnset = !zoneCode || zoneCode === "auto";
+    const noAnnouncements = announcements.length === 0;
+    const noDevices = deviceCount === 0;
+    const steps = [
+      { done: !mosqueIsDefault, label: t("firstRunStep1") },
+      { done: !zoneUnset, label: t("firstRunStep2") },
+      { done: !noAnnouncements, label: t("firstRunStep3") }
+    ];
+    if (deviceCount >= 0) steps.push({ done: !noDevices, label: t("firstRunStep4") });
+    const pending = steps.filter((st) => !st.done);
+    if (!pending.length) {
+      card.hidden = true;
+      return;
+    }
+    card.hidden = false;
+    list.innerHTML = steps.map((st) => {
+      const mark = st.done ? "\u2705" : "\u2B1C";
+      const style = st.done ? ' style="opacity:.55;text-decoration:line-through"' : "";
+      return `<li${style}>${mark} ${escapeHtml(st.label)}</li>`;
+    }).join("");
   }
   function renderNextPrayer() {
     const next = state.today?.next;

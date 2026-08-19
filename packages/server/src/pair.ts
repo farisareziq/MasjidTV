@@ -104,22 +104,35 @@ const PAIR_PAGE_CSS = `
   }
   .card {
     background: rgba(255,255,255,.04); border: 1px solid rgba(255,255,255,.12);
-    border-radius: 18px; padding: 44px 52px; text-align: center;
-    max-width: 640px; width: 100%; box-shadow: 0 24px 80px rgba(0,0,0,.45);
+    border-radius: 18px; padding: 40px 48px; text-align: center;
+    max-width: 720px; width: 100%; box-shadow: 0 24px 80px rgba(0,0,0,.45);
   }
   h1 { font-size: 26px; margin-bottom: 6px; letter-spacing: .5px; }
-  .sub { color: #9fc3b2; font-size: 15px; margin-bottom: 28px; }
+  .sub { color: #9fc3b2; font-size: 15px; margin-bottom: 20px; }
   .logo { width: 74px; height: 74px; margin: 0 auto 14px; border-radius: 16px; background: rgba(126,240,176,.12);
     display: flex; align-items: center; justify-content: center; }
   .logo svg { width: 44px; height: 44px; }
   .code {
     font-family: 'Cascadia Mono', Consolas, monospace;
-    font-size: 88px; font-weight: 700; letter-spacing: 18px;
+    font-size: 80px; font-weight: 700; letter-spacing: 16px;
     color: #7ef0b0; text-shadow: 0 0 34px rgba(126,240,176,.4);
-    margin: 18px 0 10px; padding-left: 18px; /* imbangi letter-spacing */
+    margin: 14px 0 6px; padding-left: 16px; /* imbangi letter-spacing */
   }
-  .status { font-size: 17px; color: #cfe7db; min-height: 26px; margin-bottom: 24px; }
-  .hint { color: #86a99a; font-size: 13.5px; line-height: 1.6; }
+  .expiry { color: #86a99a; font-size: 13px; margin-bottom: 14px; min-height: 18px; }
+  .status { font-size: 16.5px; color: #cfe7db; min-height: 26px; margin-bottom: 8px; }
+  .status .en { display: block; color: #86a99a; font-size: 13px; margin-top: 2px; }
+  .err-tip { color: #f0c27e; font-size: 13.5px; line-height: 1.55; min-height: 20px; margin-bottom: 14px; }
+  .steps {
+    text-align: left; margin: 0 auto 18px; max-width: 520px;
+    background: rgba(126,240,176,.06); border: 1px solid rgba(126,240,176,.15);
+    border-radius: 12px; padding: 16px 20px;
+  }
+  .steps ol { padding-left: 20px; }
+  .steps li { font-size: 14.5px; line-height: 1.7; color: #cfe7db; margin-bottom: 4px; }
+  .steps li .en { display: block; color: #86a99a; font-size: 12.5px; }
+  .steps a, .admin-url { color: #7ef0b0; font-weight: 600; text-decoration: none; word-break: break-all; }
+  .steps b { color: #7ef0b0; }
+  .hint { color: #86a99a; font-size: 13px; line-height: 1.6; }
   .ok-badge { color: #7ef0b0; font-size: 20px; font-weight: 700; margin: 10px 0 22px; }
 `;
 
@@ -143,17 +156,29 @@ const PAIR_PAGE_HTML = `<!doctype html>
     </svg>
   </div>
   <h1 id="title">Pautkan TV</h1>
-  <p class="sub">Masukkan kod ini di Web Admin Cloud</p>
+  <p class="sub">Pair this TV — MasjidTV</p>
   <div id="view-waiting">
     <div class="code" id="code">······</div>
-    <div class="status" id="status">Menyambung ke cloud…</div>
-    <p class="hint">Web Admin Cloud → <b>Peranti TV</b> → masukkan kod<br>
-    Cloud: <span id="cloudUrlLabel">—</span></p>
+    <div class="expiry" id="expiry"></div>
+    <div class="status" id="status">Menyambung ke cloud…<span class="en">Connecting to cloud…</span></div>
+    <div class="err-tip" id="errTip"></div>
+    <div class="steps">
+      <ol>
+        <li>Buka <a id="adminUrl" href="#" target="_blank" rel="noopener">—</a> pada telefon/komputer anda
+          <span class="en">Open the admin page above on your phone/computer</span></li>
+        <li>Log masuk, kemudian pergi ke <b>TV &amp; Paparan</b>
+          <span class="en">Log in, then go to <b>TV &amp; Screens</b></span></li>
+        <li>Masukkan kod 6-digit ini
+          <span class="en">Enter this 6-digit code</span></li>
+      </ol>
+    </div>
+    <p class="hint">Belum ada akaun? Hubungi pentadbir sistem masjid anda.<br>
+    <span class="en">No account yet? Contact your mosque's system administrator.</span></p>
   </div>
   <div id="view-done" style="display:none">
-    <div class="ok-badge">✓ Berjaya dipautkan</div>
+    <div class="ok-badge">✓ Berjaya dipautkan / Paired successfully</div>
     <div class="status" id="doneTenant"></div>
-    <p class="hint">Paparan akan bermula segera…</p>
+    <p class="hint">Paparan akan bermula segera…<br><span class="en">The display will start shortly…</span></p>
   </div>
 </div>
 <script src="/pair.js"></script>
@@ -170,38 +195,82 @@ const PAIR_PAGE_JS = `(function () {
   var vDone = document.getElementById('view-done');
   var elCode = document.getElementById('code');
   var elStatus = document.getElementById('status');
-  var elCloud = document.getElementById('cloudUrlLabel');
+  var elExpiry = document.getElementById('expiry');
+  var elErrTip = document.getElementById('errTip');
+  var elAdmin = document.getElementById('adminUrl');
   var elTenant = document.getElementById('doneTenant');
   var timer = null;
+  var expiryTimer = null;
+  var expiresAt = 0;
+  var lastCloudUrl = DEFAULT_URL;
 
   function show(view) {
     vWait.style.display = view === 'wait' ? '' : 'none';
     vDone.style.display = view === 'done' ? '' : 'none';
   }
 
+  function setStatus(ms, en) {
+    elStatus.innerHTML = '';
+    elStatus.appendChild(document.createTextNode(ms));
+    if (en) {
+      var span = document.createElement('span');
+      span.className = 'en';
+      span.textContent = en;
+      elStatus.appendChild(span);
+    }
+  }
+
+  function setErrTip(text) { elErrTip.textContent = text || ''; }
+
+  function adminUrlFor(cloudUrl) {
+    return cloudUrl.replace(/\\/+$/, '') + '/admin';
+  }
+
+  function renderExpiry() {
+    if (!expiresAt) { elExpiry.textContent = ''; return; }
+    var left = Math.max(0, Math.round((expiresAt - Date.now()) / 1000));
+    var mm = Math.floor(left / 60), ss = left % 60;
+    elExpiry.textContent = 'Kod sah untuk ' + mm + ':' + (ss < 10 ? '0' : '') + ss + ' lagi — Code valid for '
+      + mm + ':' + (ss < 10 ? '0' : '') + ss + ' more';
+  }
+
   function start(url) {
+    lastCloudUrl = url || DEFAULT_URL;
     elCode.textContent = '······';
-    elStatus.textContent = 'Menyambung ke cloud…';
+    expiresAt = 0;
+    if (expiryTimer) { clearInterval(expiryTimer); expiryTimer = null; }
+    setStatus('Menyambung ke cloud…', 'Connecting to cloud…');
+    setErrTip('');
     show('wait');
     fetch('/api/pair/start', {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ cloudUrl: url || DEFAULT_URL })
+      body: JSON.stringify({ cloudUrl: lastCloudUrl })
     }).then(function (r) { return r.json().then(function (d) { return { s: r.status, d: d }; }); })
       .then(function (res) {
         if (res.s !== 200) {
-          elStatus.textContent = (res.d && res.d.error) || 'Gagal menghubungi cloud — cuba semula…';
+          setStatus('Gagal menghubungi cloud', 'Cannot reach the cloud');
+          setErrTip('Semak sambungan internet mini PC ini (kabel/Wi-Fi). Cuba semula secara automatik… '
+            + '(Check this mini PC\\'s internet connection — retrying automatically…)');
           setTimeout(function () { start(url); }, 10000);
           return;
         }
         elCode.textContent = res.d.code;
-        if (elCloud) elCloud.textContent = (url || DEFAULT_URL);
-        elStatus.textContent = 'Menunggu pengesahan admin…';
+        expiresAt = Number(res.d.expiresAt) || 0;
+        var aUrl = adminUrlFor(lastCloudUrl);
+        if (elAdmin) { elAdmin.textContent = aUrl; elAdmin.href = aUrl; }
+        setStatus('Menunggu pengesahan admin…', 'Waiting for admin confirmation…');
+        setErrTip('');
+        renderExpiry();
+        if (expiryTimer) clearInterval(expiryTimer);
+        expiryTimer = setInterval(renderExpiry, 1000);
         if (timer) clearInterval(timer);
         timer = setInterval(check, 3000);
       })
       .catch(function () {
-        elStatus.textContent = 'Tidak dapat menghubungi pelayan — cuba semula…';
+        setStatus('Tidak dapat menghubungi pelayan', 'Cannot reach the server');
+        setErrTip('Semak sambungan internet mini PC ini (kabel/Wi-Fi). Cuba semula secara automatik… '
+          + '(Check this mini PC\\'s internet connection — retrying automatically…)');
         setTimeout(function () { start(url); }, 10000);
       });
   }
@@ -211,13 +280,17 @@ const PAIR_PAGE_JS = `(function () {
       if (!d) return;
       if (d.status === 'paired') {
         clearInterval(timer);
+        if (expiryTimer) clearInterval(expiryTimer);
         elTenant.textContent = d.tenantName ? ('Masjid: ' + d.tenantName) : '';
         show('done');
         setTimeout(function () { location.replace('/display'); }, 3000);
       } else if (d.status === 'expired' || d.status === 'none') {
-        // Kod tamat / sesi hilang — mula sesi baharu serta-merta.
+        // Kod tamat / sesi hilang — maklumkan pengguna, kemudian mula semula.
         clearInterval(timer);
-        start(null);
+        if (expiryTimer) { clearInterval(expiryTimer); expiryTimer = null; }
+        setStatus('Kod tamat tempoh — kod baharu dijana…', 'Code expired — generating a new code…');
+        setErrTip('');
+        setTimeout(function () { start(null); }, 1500);
       }
     }).catch(function () {});
   }
@@ -245,10 +318,15 @@ export function applyPairing(app: FastifyInstance, dataDir: string): void {
   // Skrip pairing (halaman dihantar oleh app.ts /display + /pair).
   app.get('/pair.js', (_req, reply) => jsonScript(reply, PAIR_PAGE_JS));
 
-  // Status semasa (untuk halaman & debug).
+  // Status semasa (untuk halaman & debug + ringkasan sokongan menu kiosk).
   app.get('/api/pair/config', async (_req, reply) => {
     const cfg = readCloudConfig(dataDir);
-    reply.send({ paired: Boolean(cfg), cloudUrl: cfg?.cloudUrl || '', tenantName: cfg?.tenantName || '' });
+    reply.send({
+      paired: Boolean(cfg),
+      cloudUrl: cfg?.cloudUrl || '',
+      tenantName: cfg?.tenantName || '',
+      deviceId: cfg?.deviceId || ''
+    });
   });
 
   // Status perkakasan mini PC (kamera USB dsb.) — ditulis oleh app kiosk

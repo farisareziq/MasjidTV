@@ -374,7 +374,15 @@ function uploadErrorMessage(raw: string): string | null {
   return /blob tidak dikonfigurasi/i.test(raw) ? t('uploadBlobMissing') : null;
 }
 
-registerAdminFeatures({ renderTv, refreshTenants, renderOverviewExtra, dshowOptions, pairedDeviceCount, uploadErrorMessage });
+// Jumlah peranti berpasangan MASA KINI daripada cache devices (sync) — untuk
+// kad panduan first-run. Cache diisi renderTv/loadApp; kosong → fetch latar
+// belakang (tidak menyekat render) — checklist dikemas kini pada sync seterusnya.
+function deviceCount(): number {
+  if (!devicesCache) fetchDevices().catch(() => {});
+  return devicesCache ? devicesCache.length : 0;
+}
+
+registerAdminFeatures({ renderTv, refreshTenants, renderOverviewExtra, dshowOptions, pairedDeviceCount, deviceCount, uploadErrorMessage });
 
 // ------------------------------------------------------------- pustaka media (A4)
 

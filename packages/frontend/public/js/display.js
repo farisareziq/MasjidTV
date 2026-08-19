@@ -1211,10 +1211,10 @@
       const el = $("slide");
       if (String(err.message).includes("401")) {
         if (cfg.features.recoverMissingKey && recoverMissingKey()) return;
-        el.innerHTML = '<p class="slide-msg">Sesi TV tidak sah \u2014 sila pautkan semula di admin.</p>';
+        el.innerHTML = '<div class="slide-msg" style="max-width:640px;text-align:center;line-height:1.8"><div style="font-size:1.4em;margin-bottom:12px">\u26A0\uFE0F Sesi TV tidak sah</div><div style="opacity:.85">TV ini telah dinyahpaut. Untuk memaut semula:</div><div style="margin-top:10px;text-align:left;display:inline-block">1. Buka <b>Web Admin</b> pada telefon/komputer anda<br>2. Pergi ke <b>TV &amp; Paparan</b><br>3. Padam TV ini, kemudian masukkan kod baharu yang dipapar pada skrin kiosk</div><div style="opacity:.6;font-size:.85em;margin-top:14px">TV session expired \u2014 re-pair this screen via the Web Admin (TV &amp; Screens).</div></div>';
         notifySessionInvalid();
       } else {
-        el.innerHTML = '<p class="slide-msg">Menghubungi pelayan\u2026 / Connecting to server\u2026</p>';
+        el.innerHTML = '<div class="slide-msg" style="max-width:560px;text-align:center;line-height:1.8"><div style="font-size:1.3em;margin-bottom:10px">\u{1F4E1} Menghubungi pelayan\u2026</div><div style="opacity:.7">Sambungan terputus \u2014 paparan akan menyambung semula secara automatik.</div><div style="opacity:.55;font-size:.85em;margin-top:8px">Connecting to server \u2014 the display will reconnect automatically.</div></div>';
       }
       el.classList.add("visible");
     }

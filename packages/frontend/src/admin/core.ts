@@ -103,7 +103,48 @@ function renderOverview() {
   $('streamNote').innerHTML = t(F.kioskStreams() ? 'noteStreamsCloud' : 'noteStreams', { count: `${s.activeStreamCount}/${s.streamCount}` });
   $('eventsSyncNote').hidden = !(s.eventsSync?.enabled);
   if (featureHooks.renderOverviewExtra) featureHooks.renderOverviewExtra();
+  renderFirstRun();
   renderNextPrayer();
+}
+
+// ---------------------------------------------------------- first-run guide
+// Kad panduan "langkah pertama" — dipapar hanya bila mana-mana langkah asas
+// belum selesai (nama masjid lalai / zon belum dipilih / tiada pengumuman /
+// tiada peranti TV). Membantu admin baharu yang membuka dashboard kosong.
+function renderFirstRun() {
+  const card = $('firstRunCard') as HTMLElement | null;
+  const list = $('firstRunList') as HTMLElement | null;
+  if (!card || !list || !state.status) return;
+  const s = state.status;
+  const settings = state.settings || ({} as Settings);
+  const announcements = state.announcements || [];
+  const deviceCount = featureHooks.deviceCount ? featureHooks.deviceCount() : -1; // -1 = tiada hook (lokal)
+
+  // Nama masjid masih lalai? Semak nilai placeholder biasa.
+  const mosqueName = (settings.mosque?.name || s.mosque || '').trim();
+  const mosqueIsDefault = !mosqueName || /masjid al-?hidayah/i.test(mosqueName);
+  // Zon belum dipilih? (kod zon kosong / 'auto' — lihat settings.prayer.zone)
+  const zoneCode = (settings.prayer?.zone || s.prayerZone || '').trim();
+  const zoneUnset = !zoneCode || zoneCode === 'auto';
+  const noAnnouncements = announcements.length === 0;
+  const noDevices = deviceCount === 0;
+
+  const steps: Array<{ done: boolean; label: string }> = [
+    { done: !mosqueIsDefault, label: t('firstRunStep1') },
+    { done: !zoneUnset, label: t('firstRunStep2') },
+    { done: !noAnnouncements, label: t('firstRunStep3') }
+  ];
+  // Hanya tunjukkan langkah pairing untuk varian yang ada hook peranti (awan).
+  if (deviceCount >= 0) steps.push({ done: !noDevices, label: t('firstRunStep4') });
+
+  const pending = steps.filter((st) => !st.done);
+  if (!pending.length) { card.hidden = true; return; }
+  card.hidden = false;
+  list.innerHTML = steps.map((st) => {
+    const mark = st.done ? '✅' : '⬜';
+    const style = st.done ? ' style="opacity:.55;text-decoration:line-through"' : '';
+    return `<li${style}>${mark} ${escapeHtml(st.label)}</li>`;
+  }).join('');
 }
 
 function renderNextPrayer() {
