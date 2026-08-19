@@ -347,7 +347,11 @@ process.on('uncaughtException', (err) => {
   app.exit(1);
 });
 
-app.whenReady().then(bootstrap).catch((err) => {
+console.log('[kiosk] rintisan — menunggu app ready...');
+app.whenReady().then(() => {
+  console.log('[kiosk] app ready.');
+  return bootstrap();
+}).catch((err) => {
   console.error('[kiosk] gagal bermula:', err);
   app.exit(1);
 });

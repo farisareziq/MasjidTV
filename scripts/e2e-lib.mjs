@@ -254,13 +254,14 @@ export async function spawnKiosk({ port, dataDir } = {}) {
     }
   }
 
-  // Runner CI Windows ialah headless (tiada display/GPU sebenar) — Electron
-  // gagal menyelesaikan app.whenReady() dalam mod GPU lalai walaupun
-  // --no-kiosk melangkau tetingkap. Tambahkan flag headless/disable-gpu bila
-  // E2E_HEADLESS=1 (atau CI automatik) supaya Electron mula tanpa GPU.
+  // Runner CI Windows ialah headless (tiada display/GPU sebenar). NOTA:
+  // `--headless` DIBUANG — ia menghalang app.whenReady() daripada selesai
+  // (direka untuk mod satu-suntingan Chromium, bukan aplikasi Electron penuh)
+  // → server tidak pernah mula. Kekalkan hanya flag GPU-selamat yang disahkan
+  // berfungsi: whenReady() selesai walaupun tanpa GPU sebenar (SwiftShader).
   const headless = process.env.E2E_HEADLESS === '1' || Boolean(process.env.CI);
   const headlessArgs = headless
-    ? ['--headless', '--disable-gpu', '--no-sandbox', '--disable-dev-shm-usage', '--disable-software-rasterizer']
+    ? ['--disable-gpu', '--disable-software-rasterizer', '--no-sandbox']
     : [];
 
   const electronExe = path.join(process.cwd(), 'apps', 'kiosk', 'node_modules', 'electron', 'dist', 'electron.exe');
