@@ -2,7 +2,6 @@
 
 import crypto from 'node:crypto';
 import { METHODS } from './prayers.js';
-import { isRelayType } from './payloads.js';
 import type { Settings, StreamType, Weekday } from './types.js';
 
 const WEEKDAYS: Weekday[] = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
@@ -364,15 +363,7 @@ export function applyPatch(current: Settings, patch: AnyPatch): Settings {
         type: s.type as StreamType,
         url: String(s.url || '').trim().slice(0, 1000),
         duration: clampNum(s.duration, 10, 600, 30),
-        enabled: s.enabled !== false,
-        // Mirror ke live RTMPS (Facebook Live dsb.) — hanya untuk jenis
-        // relay; disahkan sebagai URL rtmps/rtmp sah. Sekat aksara '|' kerana
-        // ia mengubah parsing arg 'tee' ffmpeg (W6-b) — elak misconfig muxer.
-        mirrorUrl: (typeof s.mirrorUrl === 'string' && isRelayType(s.type as StreamType)
-          && /^rtmps?:\/\//.test(s.mirrorUrl.trim()) && s.mirrorUrl.length <= 1000
-          && !s.mirrorUrl.includes('|'))
-          ? s.mirrorUrl.trim()
-          : undefined
+        enabled: s.enabled !== false
       }));
   }
 

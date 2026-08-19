@@ -99,23 +99,6 @@ describe('Unit Testing / SSRF stream URL guard', () => {
     expect(isSafeStreamUrl('http://169.254.169.254/x', 'dshow')).toBe(false);
   });
 
-  it('mirror URL: applyPatch keeps rtmps only for relay types', () => {
-    const base = JSON.parse(JSON.stringify(DEFAULT_SETTINGS)) as typeof DEFAULT_SETTINGS;
-    const withMirror = applyPatch(base, {
-      streams: [{ id: 's1', name: 'Cam', type: 'rtsp', url: 'rtsp://192.168.1.50/s', duration: 30, enabled: true, mirrorUrl: 'rtmps://live-api-s.facebook.com:443/rtmp/KEY' }]
-    });
-    expect(withMirror.streams[0].mirrorUrl).toBe('rtmps://live-api-s.facebook.com:443/rtmp/KEY');
-    // mirror ditolak untuk jenis bukan-relay (hls) dan skema bukan rtmp(s).
-    const bad = applyPatch(base, {
-      streams: [
-        { id: 's2', name: 'HLS', type: 'hls', url: 'https://example.com/s.m3u8', duration: 30, enabled: true, mirrorUrl: 'rtmps://x/y' },
-        { id: 's3', name: 'R', type: 'rtsp', url: 'rtsp://192.168.1.50/s', duration: 30, enabled: true, mirrorUrl: 'https://not-rtmp.example.com/x' }
-      ]
-    });
-    expect(bad.streams.find((s) => s.id === 's2')!.mirrorUrl).toBeUndefined();
-    expect(bad.streams.find((s) => s.id === 's3')!.mirrorUrl).toBeUndefined();
-  });
-
   it('allows an empty URL (not configured yet)', () => {
     expect(isSafeStreamUrl('', 'rtsp')).toBe(true);
   });

@@ -30,8 +30,6 @@ export function publicStream(s: Stream): Record<string, unknown> {
     // oleh kiosk mini PC (nama peranti DSHOW untuk relay ffmpeg lokal —
     // "video=OBS Virtual Camera" bukan kredensial, selamat kepada peranti
     // terpaut). Paparan bukan-Android guna hlsUrl relay tempatan.
-    // mirrorUrl (stream key FB) TIDAK didedahkan di sini — kiosk membacanya
-    // melalui /api/device/streams (auth device-token).
     return { ...base, kind: 'relay', url: safeUrl, hlsUrl: `/relay/${s.id}/index.m3u8` };
   }
   if (s.type === 'hls') return { ...base, kind: 'hls', url: safeUrl };

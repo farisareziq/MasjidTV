@@ -166,7 +166,7 @@
       noteJakim: "Prayer times and hijri date come from the official JAKIM e-Solat API (selected zone), with automatic offline calculation fallback.",
       noteAudio: "\u{1F50A} Adhan/Iqamah audio is configured \u2014 the screen will call at prayer times.",
       noteStreams: "\u{1F4E1} {count} live stream(s) configured. RTSP/RTMP/ONVIF need ffmpeg on the mini PC.",
-      noteStreamsCloud: "\u{1F4E1} {count} live stream(s) configured. Camera streams (RTSP/RTMP/ONVIF/DSHOW) and the Facebook mirror are relayed by a paired kiosk mini PC \u2014 the cloud host has no ffmpeg.",
+      noteStreamsCloud: "\u{1F4E1} {count} live stream(s) configured. Camera streams (RTSP/RTMP/ONVIF/DSHOW) are relayed by a paired kiosk mini PC \u2014 the cloud host has no ffmpeg.",
       noteEvents: "\u{1F4C5} Islamic events auto-synced from JAKIM takwim.",
       runningFor: "Running for {time} \u2022 v{version}",
       activeNow: "{n} active now",
@@ -333,7 +333,7 @@
       tickerNormal: "Normal",
       tickerFast: "Fast",
       streamsSub: "RTSP, RTMP and ONVIF streams are converted to HLS by ffmpeg on this machine and shown in the slideshow. YouTube accepts a normal or live video URL. WebRTC uses a custom embed URL (e.g. your WebRTC gateway page).",
-      streamsSubCloud: "Camera streams (RTSP/RTMP/ONVIF/DSHOW) and the Facebook mirror are relayed by a paired kiosk mini PC \u2014 this cloud host has no ffmpeg and no /relay endpoint. HLS, YouTube and WebRTC embeds play directly without a kiosk.",
+      streamsSubCloud: "Camera streams (RTSP/RTMP/ONVIF/DSHOW) are relayed by a paired kiosk mini PC \u2014 this cloud host has no ffmpeg and no /relay endpoint. HLS, YouTube and WebRTC embeds play directly without a kiosk.",
       ffmpegPath: "ffmpeg path (for RTSP/RTMP/ONVIF)",
       saveFfmpeg: "Save ffmpeg path",
       addStream: "+ Add stream",
@@ -343,7 +343,6 @@
       streamType: "Type",
       seconds: "Seconds",
       streamUrl: "URL",
-      mirrorUrl: "Mirror (Facebook Live)",
       enabled: "Enabled",
       dshowPickHint: "DSHOW: pick a reported device from the list, or type the name manually.",
       eventsSub: "Auto-synced from the official JAKIM takwim \u2014 dates are updated according to the selected zone.",
@@ -411,8 +410,8 @@
       checkingFfmpeg: "Checking ffmpeg\u2026",
       ffmpegOk: "\u2705 ffmpeg detected \u2014 RTSP/RTMP/ONVIF relays available.",
       ffmpegMissing: "\u26A0\uFE0F ffmpeg NOT found. Install ffmpeg and set its path above for RTSP/RTMP/ONVIF streams (HLS, YouTube and WebRTC embeds work without it).",
-      kioskOk: "\u2705 {n} kiosk device(s) paired \u2014 camera/mirror relays are handled by the kiosk, not this cloud host.",
-      kioskMissing: "\u26A0\uFE0F No kiosk paired. Camera streams (RTSP/RTMP/ONVIF/DSHOW) and the Facebook mirror need a paired kiosk mini PC (TV & Screens) \u2014 HLS, YouTube and WebRTC embeds work without one.",
+      kioskOk: "\u2705 {n} kiosk device(s) paired \u2014 camera relays are handled by the kiosk, not this cloud host.",
+      kioskMissing: "\u26A0\uFE0F No kiosk paired. Camera streams (RTSP/RTMP/ONVIF/DSHOW) need a paired kiosk mini PC (TV & Screens) \u2014 HLS, YouTube and WebRTC embeds work without one.",
       statusRunning: "running",
       statusStarting: "starting",
       statusReady: "ready",
@@ -524,7 +523,7 @@
       noteJakim: "Waktu solat dan tarikh hijrah datang dari API rasmi JAKIM e-Solat (zon terpilih), dengan fallback pengiraan tempatan automatik.",
       noteAudio: "\u{1F50A} Audio azan/iqamah dikonfigurasi \u2014 skrin akan berbunyi pada waktu solat.",
       noteStreams: "\u{1F4E1} {count} live stream dikonfigurasi. RTSP/RTMP/ONVIF memerlukan ffmpeg pada mini PC.",
-      noteStreamsCloud: "\u{1F4E1} {count} live stream dikonfigurasi. Stream kamera (RTSP/RTMP/ONVIF/DSHOW) dan cermin Facebook direlay oleh kiosk mini PC berpasangan \u2014 hos awan tiada ffmpeg.",
+      noteStreamsCloud: "\u{1F4E1} {count} live stream dikonfigurasi. Stream kamera (RTSP/RTMP/ONVIF/DSHOW) direlay oleh kiosk mini PC berpasangan \u2014 hos awan tiada ffmpeg.",
       noteEvents: "\u{1F4C5} Hari kebesaran Islam auto-sync dari takwim JAKIM.",
       runningFor: "Berjalan {time} \u2022 v{version}",
       activeNow: "{n} aktif sekarang",
@@ -691,7 +690,7 @@
       tickerNormal: "Normal",
       tickerFast: "Pantas",
       streamsSub: "Stream RTSP, RTMP dan ONVIF ditukar ke HLS oleh ffmpeg pada mesin ini dan dipaparkan dalam slaid. YouTube menerima URL video biasa atau live. WebRTC menggunakan URL embed tersuai (cth. halaman gateway WebRTC anda).",
-      streamsSubCloud: "Stream kamera (RTSP/RTMP/ONVIF/DSHOW) dan cermin Facebook direlay oleh kiosk mini PC berpasangan \u2014 hos awan ini tiada ffmpeg dan tiada endpoint /relay. HLS, YouTube dan embed WebRTC dimainkan terus tanpa kiosk.",
+      streamsSubCloud: "Stream kamera (RTSP/RTMP/ONVIF/DSHOW) direlay oleh kiosk mini PC berpasangan \u2014 hos awan ini tiada ffmpeg dan tiada endpoint /relay. HLS, YouTube dan embed WebRTC dimainkan terus tanpa kiosk.",
       ffmpegPath: "Laluan ffmpeg (untuk RTSP/RTMP/ONVIF)",
       saveFfmpeg: "Simpan laluan ffmpeg",
       addStream: "+ Tambah stream",
@@ -701,7 +700,6 @@
       streamType: "Jenis",
       seconds: "Saat",
       streamUrl: "URL",
-      mirrorUrl: "Mirror (Facebook Live)",
       enabled: "Aktif",
       dshowPickHint: "DSHOW: pilih peranti yang dilaporkan daripada senarai, atau taip nama secara manual.",
       eventsSub: "Auto-sync dari takwim rasmi JAKIM \u2014 tarikh dikemas kini mengikut zon yang dipilih.",
@@ -769,8 +767,8 @@
       checkingFfmpeg: "Menyemak ffmpeg\u2026",
       ffmpegOk: "\u2705 ffmpeg dikesan \u2014 relay RTSP/RTMP/ONVIF tersedia.",
       ffmpegMissing: "\u26A0\uFE0F ffmpeg TIDAK dijumpai. Pasang ffmpeg dan tetapkan laluannya di atas untuk stream RTSP/RTMP/ONVIF (HLS, YouTube dan embed WebRTC berfungsi tanpanya).",
-      kioskOk: "\u2705 {n} peranti kiosk terpaut \u2014 relay kamera/cermin dikendalikan oleh kiosk, bukan hos awan ini.",
-      kioskMissing: "\u26A0\uFE0F Tiada kiosk terpaut. Stream kamera (RTSP/RTMP/ONVIF/DSHOW) dan cermin Facebook memerlukan kiosk mini PC berpasangan (TV & Paparan) \u2014 HLS, YouTube dan embed WebRTC berfungsi tanpanya.",
+      kioskOk: "\u2705 {n} peranti kiosk terpaut \u2014 relay kamera dikendalikan oleh kiosk, bukan hos awan ini.",
+      kioskMissing: "\u26A0\uFE0F Tiada kiosk terpaut. Stream kamera (RTSP/RTMP/ONVIF/DSHOW) memerlukan kiosk mini PC berpasangan (TV & Paparan) \u2014 HLS, YouTube dan embed WebRTC berfungsi tanpanya.",
       statusRunning: "berjalan",
       statusStarting: "bermula",
       statusReady: "sedia",
@@ -1382,8 +1380,7 @@
       type: s.type,
       url: s.url,
       duration: s.duration,
-      enabled: s.enabled,
-      mirrorUrl: s.mirrorUrl || ""
+      enabled: s.enabled
     }));
     const list = $("streamList");
     if (!current.length) {
@@ -1394,7 +1391,6 @@
     list.innerHTML = current.map((s) => {
       const st = statusMap.get(s.id);
       const chip = streamStatusChip(st?.status);
-      const isRelay = ["rtsp", "rtmp", "onvif", "dshow"].includes(s.type);
       const dshowHint = s.type === "dshow" && dshowOpts.length ? `<p class="sub" data-dshow-hint>${escapeHtml(t("dshowPickHint"))}</p>` : "";
       return `
       <div class="stream-row" data-id="${s.id}">
@@ -1404,7 +1400,6 @@
         </select></label>
         <label><span data-i18n="seconds">Seconds</span><input type="number" class="st-duration" min="10" max="600" value="${s.duration || 30}"></label>
         <label class="st-url-wrap"><span data-i18n="streamUrl">URL</span><input type="text" class="st-url" list="dshowDevices" value="${escapeHtml(s.url)}" placeholder="rtsp://\u2026 / video=OBS Virtual Camera / https://\u2026">${dshowHint}</label>
-        ${isRelay ? `<label class="st-url-wrap"><span data-i18n="mirrorUrl">Mirror (Live FB)</span><input type="text" class="st-mirror" value="${escapeHtml(s.mirrorUrl || "")}" placeholder="rtmps://live-api-s.facebook.com:443/rtmp/\u2026"></label>` : ""}
         <label class="checkbox-label"><input type="checkbox" class="st-enabled" ${s.enabled ? "checked" : ""}> <span data-i18n="enabled">Enabled</span></label>
         <span class="status-chip ${chip.cls}">${chip.text}</span>
         <button class="row-del" data-del>\u2715</button>
@@ -1432,15 +1427,13 @@
     return [...rows].map((rowEl) => {
       const row = rowEl;
       const q = (sel) => row.querySelector(sel);
-      const mirrorEl = q(".st-mirror");
       return {
         id: row.dataset.id,
         name: q(".st-name").value,
         type: q(".st-type").value,
         url: q(".st-url").value,
         duration: Number(q(".st-duration").value) || 30,
-        enabled: q(".st-enabled").checked,
-        mirrorUrl: mirrorEl ? mirrorEl.value.trim() : void 0
+        enabled: q(".st-enabled").checked
       };
     });
   }

@@ -17,7 +17,7 @@ export type AdminStatus = {
   nextEvent: { name: string; next: string; daysLeft: number; today: boolean } | null;
   adminPasswordFile: boolean;
 };
-export type StreamRow = { id: string; name: string; type: string; url: string; duration: number; enabled: boolean; mirrorUrl?: string; status?: string };
+export type StreamRow = { id: string; name: string; type: string; url: string; duration: number; enabled: boolean; status?: string };
 export type UploadResult = { url: string; kind: string };
 export type LicenseInfo = { status: string; trialUntil?: number; apiKey?: string };
 export type TenantInfo = { id: string; name: string; status: string; apiKey: string; license?: { status: string; trialUntil?: number } };

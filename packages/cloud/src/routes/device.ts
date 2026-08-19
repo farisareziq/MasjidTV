@@ -62,9 +62,9 @@ export function registerDeviceRoutes(app: FastifyInstance, ctx: RouteContext): v
     reply.send({ ok: true });
   });
 
-  // Streams PENUH untuk kiosk mini PC (termasuk mirrorUrl stream-key FB dan
-  // nama peranti dshow) — relay ffmpeg lokal memerlukan nilai sebenar yang
-  // tidak didedahkan dalam /api/settings awam. Auth device-token.
+  // Streams PENUH untuk kiosk mini PC (termasuk nama peranti dshow) —
+  // relay ffmpeg lokal memerlukan nilai sebenar yang tidak didedahkan
+  // dalam /api/settings awam. Auth device-token.
   app.get('/api/device/streams', async (req, reply) => {
     const devToken = String(req.headers['x-device-token'] || '');
     if (!devToken) return jsonError(reply, 401, 'Token peranti diperlukan');

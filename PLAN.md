@@ -53,11 +53,8 @@ Semua pakej 1.1.0 (root, shared, db, server, cloud, frontend, kiosk) + VERSION s
 ### B1. Self-updater kiosk ✅ SELESAI (wiring Electron)
 `apps/kiosk/main/updater.ts` (342 baris): baca `updater.json` (repo+binaryName, dihantar ke `resources/` oleh `package.mjs`, diekspot `extraResources`) → poll GitHub Releases 6 jam + semakan 60sa selepas mula → banding semver vs `app.getVersion()` → muat turun `MasjidTV-Kiosk-Setup-x.y.z.exe` + sahkan `.sha256` (fail-closed) → **installer NSIS: spawn `/S` senyap + `app.quit()`**; **portable: notis sahaja** (dikesan via `PORTABLE_EXECUTABLE_FILE` / heuristik %TEMP%). Semua panggilan rangkaian ber-timeout, try/catch penuh — tidak boleh crash kiosk. Env: `MASJIDTV_UPDATE_REPO` (uji), `MASJIDTV_DISABLE_UPDATER=1` (mati). Status dipapar dalam menu tersembunyi (Ctrl+Shift+M) melalui endpoint LAN tanpa-auth baharu `/api/update-status` (pola `devices.json` → `/api/devices-hw`; fail `update-status.json` dalam dataDir, throttled 2sa). **Ujian manual pada peranti sebenar masih diperlukan** (pelan ujian: `%TEMP%\kilo\updater-test-plan.md`).
 
-### B2. Mirror Facebook Live — belum diuji hujung-ke-hujung
-Tee muxer diimplement tapi tiada stream key sebenar pernah diuji.
-- [ ] Uji dengan FB Live producer sebenar (stream key dari masjid)
-- [ ] Sahkan tee `flush_data=1` latensi FB <10sa
-- [ ] Jika tee bermasalah → fallback: dua proses ffmpeg berasingan
+### B2. ~~Mirror Facebook Live~~ — DIBUANG (2026-08-19)
+Ciri mirror ke Facebook Live (paparan → FB) dan input FB Live (FB → paparan) dibuang sepenuhnya. Sebab: FB memerlukan log masuk untuk embed plugin (tidak sesuai kiosk 24/7); mirror FB tidak lagi diperlukan. Integrasi live sosial kini melalui **YouTube Live** sahaja (`youtube-nocookie.com` — embed tanpa log masuk).
 
 ### B3. Android TV — tiada SSE instant sync
 App TV poll 10sa; kiosk & web sudah SSE <2sa.
@@ -108,7 +105,7 @@ Smart App Control menyekat exe tidak ditandatangani (dilalui "Run anyway" semasa
 - [x] ~~`dist-kiosk/*` terkumpul tanpa had~~ ✅ `package.mjs` kini auto-cleanup — simpan stamp semasa + terkini sahaja
 - [x] ~~`.gitignore` `cloud-data/` hanya padan root~~ ✅ kini `**/cloud-data/`
 - [ ] `pnpm-workspace.yaml` `allowBuilds` termasuk electron-winstaller tapi tidak digunakan — buang jika tak perlu
-- [ ] README utama: bahagian mini PC masih terangkan Edge kiosk lama — perlu seksyen kiosk Electron (pasang, pairing, Ctrl+Shift+M, DSHOW/FB mirror)
+- [ ] README utama: bahagian mini PC masih terangkan Edge kiosk lama — perlu seksyen kiosk Electron (pasang, pairing, Ctrl+Shift+M, DSHOW)
 - [ ] Kod SEA legacy (build-exe.mjs/main-exe.ts/public-assets.cjs/asset-zip.cjs) — kekalkan ATAU refactor keluar blok virtual dari app.ts
 - [ ] Test pair idempotent (`pairing.test.ts`) menggunakan fixtur masa sebenar — pertimbangkan fake timer
 
@@ -132,7 +129,7 @@ Smart App Control menyekat exe tidak ditandatangani (dilalui "Run anyway" semasa
 
 | # | Item | Usaha | Nilai |
 |---|---|---|---|
-| 1 | B2: uji FB mirror sebenar (perlu stream key masjid) | 1-2 jam | Tinggi — ciri dijual |
+| 1 | ~~B2: uji FB mirror~~ — DIBUANG (FB disekat) | — | — |
 | 2 | C3: code signing | bergantung dana | Tinggi pra-edaran |
 | 3 | Ujian manual updater kiosk pada peranti sebenar (B1 selesai — kod) | 1 jam | Tinggi |
 | 4 | Persediaan C4 prod: SENTRY_DSN + webhook secret | 30 min | Sederhana-Tinggi |
@@ -144,7 +141,7 @@ Smart App Control menyekat exe tidak ditandatangani (dilalui "Run anyway" semasa
 
 ## F. Nota keputusan seni bina (rekod)
 
-1. **Relay ffmpeg ialah kerja LOKAL** — walaupun tetapan dari cloud, kamera/OBS peranti fizikal mini PC; cloud tidak boleh menariknya. Streams penuh (dshow url + mirrorUrl) sampai ke kiosk melalui `/api/device/streams` (device-token), TIDAK melalui settings awam (mirrorUrl = stream key rahsia).
+1. **Relay ffmpeg ialah kerja LOKAL** — walaupun tetapan dari cloud, kamera/OBS peranti fizikal mini PC; cloud tidak boleh menariknya. Streams penuh (dshow url) sampai ke kiosk melalui `/api/device/streams` (device-token), TIDAK melalui settings awam.
 2. **`omit_endlist+independent_segments` wajib** untuk HLS live kiosk — tanpa itu hls.js sangka stream tamat dan beku.
 3. **Autostart portable** mesti guna shortcut Startup folder — Run key tidak kekal kerana portable launcher exit selepas spawn anak.
 4. **OBS Virtual Camera format native sahaja** — jangan paksa `-video_size/-framerate` (Could not set video options).
@@ -174,7 +171,7 @@ Pentest meliputi (skrip `scripts/pentest.mjs`):
 - **DOS**: body 2MB pada laluan biasa (bodyLimit)
 - **SEC-HDR**: CSP, X-Frame-Options, nosniff, frame-ancestors API
 - **PAIR**: brute force kod (not_found + rate-limit), kod dipakai semula, claim tanpa auth
-- **LEAK**: mirrorUrl/stream-key, kredensial rtsp://user:pass, stack trace, PIN bootstrap, hash password
+- **LEAK**: kredensial rtsp://user:pass, stack trace, PIN bootstrap, hash password
 - **CORS & enumerasi**: ACAO terbuka, mesej "user tidak wujud"
 
 Temuan semasa: **0 CRIT, 0 WARN, 1 INFO** (endpoint LAN tanpa auth — diterima, B5).

@@ -62,7 +62,7 @@ Windows + Electron); `--only nama1,nama2` untuk peringkat terpilih.
 OWASP API Top 10 terhadap cloud lokal + server lokal: isolasi tenant (BOLA),
 JWT falsifikasi (alg none / rahsia salah), SQL/NoSQL injection, XSS tersimpan,
 path traversal, validasi upload (magic bytes), rate-limit brute-force,
-kebocoran rahsia (stream key mirrorUrl, kredensial kamera, hash password),
+kebocoran rahsia (kredensial kamera rtsp://user:pass, hash password),
 header keselamatan (CSP/XFO/nosniff), CORS, enumerasi pengguna, pairing
 brute-force + kod dipakai semula. Keluar 0 = tiada temuan kritikal.
 
@@ -118,8 +118,6 @@ Ciri utama kiosk:
   DSHOW/OBS, status stream, unpair).
 - **OBS DSHOW**: peranti `video=OBS Virtual Camera` dikesan dan boleh
   dijadikan stream (relay ffmpeg lokal → HLS).
-- **Mirror FB Live**: `mirrorUrl` (stream key rahsia) sampai ke kiosk melalui
-  endpoint peranti `/api/device/streams` — TIDAK didedahkan dalam settings awam.
 - **Offline-first**: cloud putus → paparan kekal dari cache; cloud kembali →
   catch-up automatik (jambatan SSE).
 - **Autostart**: didaftarkan automatik kali pertama (shortcut Startup folder);

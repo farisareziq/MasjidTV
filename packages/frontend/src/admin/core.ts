@@ -433,8 +433,7 @@ function renderStreams() {
     type: s.type,
     url: s.url,
     duration: s.duration,
-    enabled: s.enabled,
-    mirrorUrl: s.mirrorUrl || ''
+    enabled: s.enabled
   }));
   const list = $('streamList');
   if (!current.length) {
@@ -447,7 +446,6 @@ function renderStreams() {
   list.innerHTML = current.map((s) => {
     const st = statusMap.get(s.id);
     const chip = streamStatusChip(st?.status);
-    const isRelay = ['rtsp', 'rtmp', 'onvif', 'dshow'].includes(s.type);
     // Label bantuan hanya muncul untuk stream DSHOW bila peranti melapor
     // (penambahbaikan progresif — tiada peranti, tiada label, medan biasa).
     const dshowHint = s.type === 'dshow' && dshowOpts.length
@@ -461,7 +459,6 @@ function renderStreams() {
         </select></label>
         <label><span data-i18n="seconds">Seconds</span><input type="number" class="st-duration" min="10" max="600" value="${s.duration || 30}"></label>
         <label class="st-url-wrap"><span data-i18n="streamUrl">URL</span><input type="text" class="st-url" list="dshowDevices" value="${escapeHtml(s.url)}" placeholder="rtsp://… / video=OBS Virtual Camera / https://…">${dshowHint}</label>
-        ${isRelay ? `<label class="st-url-wrap"><span data-i18n="mirrorUrl">Mirror (Live FB)</span><input type="text" class="st-mirror" value="${escapeHtml(s.mirrorUrl || '')}" placeholder="rtmps://live-api-s.facebook.com:443/rtmp/…"></label>` : ''}
         <label class="checkbox-label"><input type="checkbox" class="st-enabled" ${s.enabled ? 'checked' : ''}> <span data-i18n="enabled">Enabled</span></label>
         <span class="status-chip ${chip.cls}">${chip.text}</span>
         <button class="row-del" data-del>✕</button>
@@ -485,15 +482,13 @@ function collectStreams(): StreamRow[] {
   return [...rows].map((rowEl) => {
     const row = rowEl as HTMLElement;
     const q = (sel: string) => row.querySelector(sel) as HTMLInputElement | HTMLSelectElement;
-    const mirrorEl = q('.st-mirror') as HTMLInputElement | null;
     return {
       id: row.dataset.id,
       name: (q('.st-name') as HTMLInputElement).value,
       type: (q('.st-type') as HTMLSelectElement).value,
       url: (q('.st-url') as HTMLInputElement).value,
       duration: Number((q('.st-duration') as HTMLInputElement).value) || 30,
-      enabled: (q('.st-enabled') as HTMLInputElement).checked,
-      mirrorUrl: mirrorEl ? mirrorEl.value.trim() : undefined
+      enabled: (q('.st-enabled') as HTMLInputElement).checked
     };
   });
 }

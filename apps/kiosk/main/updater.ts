@@ -64,6 +64,9 @@ interface Release {
 
 const POLL_INTERVAL_MS = 6 * 60 * 60 * 1000; // 6 jam
 const STARTUP_DELAY_MS = 60_000;             // semakan pertama ~60sa selepas mula
+// Override host API GitHub — hanya untuk ujian tempatan (pelayan releases
+// palsu). JANGAN ditetapkan dalam produksi; lalai ke api.github.com.
+const UPDATE_HOST = (process.env.MASJIDTV_UPDATE_HOST || 'https://api.github.com').replace(/\/$/, '');
 const NET_TIMEOUT_MS = 15_000;               // semua panggilan rangkaian ~15sa
 const DOWNLOAD_TIMEOUT_MS = 10 * 60 * 1000;  // installer ~150MB — muat turun lebih lama
 const MAX_INSTALLER_BYTES = 400 * 1024 * 1024; // siling saiz installer (400MB)
@@ -205,7 +208,7 @@ export class KioskUpdater {
 
   private async check(): Promise<void> {
     this.status.state = 'checking';
-    const res = await fetch(`https://api.github.com/repos/${this.cfg.repo}/releases/latest`, {
+    const res = await fetch(`${UPDATE_HOST}/repos/${this.cfg.repo}/releases/latest`, {
       headers: { 'User-Agent': 'masjidtv-kiosk-updater', Accept: 'application/vnd.github+json' },
       signal: AbortSignal.timeout(NET_TIMEOUT_MS)
     });

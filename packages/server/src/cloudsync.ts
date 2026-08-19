@@ -191,7 +191,7 @@ export async function handleCloudSync(reply: FastifyReply, dataDir: string, p: s
     if (cloud.ok) {
       saveCache(cacheDir, p, cloud.json);
       // Streams cloud → relay ffmpeg lokal. Settings awam TIDAK mengandungi
-      // nama peranti dshow/mirrorUrl — guna endpoint peranti khusus.
+      // nama peranti dshow — guna endpoint peranti khusus.
       if (p === '/api/settings') fetchDeviceStreams(dataDir).catch(() => {});
       reply.send(rewrite ? rewriteUrls(cfg.cloudUrl, cloud.json) : cloud.json);
       return true;
@@ -274,7 +274,7 @@ function notifyCloudSettings(data: unknown): void {
 
 /**
  * Fetch streams PENUH daripada cloud (endpoint peranti — termasuk nama
- * peranti dshow + mirrorUrl stream-key) dan notifikasi handler relay.
+ * peranti dshow) dan notifikasi handler relay.
  * Dipanggil oleh jambatan SSE pada setiap sync/hello.
  */
 async function fetchDeviceStreams(dataDir: string): Promise<void> {
@@ -362,8 +362,8 @@ export async function startCloudSseBridge(dataDir: string): Promise<void> {
             fs.rmSync(path.join(dataDir, 'cloud-cache'), { recursive: true, force: true });
             broadcastLocal('sync', { rev: safeRev(evData) });
             // Streams relay mesti bertindak segera — fetch streams PENUH
-            // (endpoint peranti: termasuk nama peranti dshow + mirrorUrl
-            // yang tidak didedahkan dalam settings awam).
+            // (endpoint peranti: termasuk nama peranti dshow yang tidak
+            // didedahkan dalam settings awam).
             fetchDeviceStreams(dataDir).catch(() => { /* offline — cache kekal */ });
           }
         }

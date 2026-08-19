@@ -280,11 +280,8 @@ export function registerAdminRoutes(app: FastifyInstance, ctx: RouteContext): vo
   app.get('/api/admin/streams', async (req, reply) => {
     const tenant = await requireAdmin(store, req, reply);
     if (!tenant) return;
-    // Sertakan mirrorUrl (endpoint ADMIN-auth) — tanpanya UI memapar medan
-    // Mirror kosong → save seterusnya memadam kunci FB Live (C1).
     const streams = (tenant.settings.streams || []).map((s) => ({
       id: s.id, name: s.name, type: s.type, url: s.url, duration: s.duration, enabled: s.enabled,
-      mirrorUrl: s.mirrorUrl || '',
       status: s.enabled ? 'configured' : 'disabled',
       hlsUrl: ['rtsp', 'rtmp', 'onvif'].includes(s.type) ? `/relay/${s.id}/index.m3u8` : null
     }));
@@ -306,7 +303,6 @@ export function registerAdminRoutes(app: FastifyInstance, ctx: RouteContext): vo
     reply.send({
       streams: (updated!.streams || []).map((s) => ({
         id: s.id, name: s.name, type: s.type, url: s.url, duration: s.duration, enabled: s.enabled,
-        mirrorUrl: s.mirrorUrl || '',
         status: s.enabled ? 'configured' : 'disabled',
         hlsUrl: ['rtsp', 'rtmp', 'onvif'].includes(s.type) ? `/relay/${s.id}/index.m3u8` : null
       }))

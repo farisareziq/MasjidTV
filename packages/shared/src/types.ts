@@ -148,12 +148,6 @@ export interface Stream {
   url: string;
   duration: number;
   enabled: boolean;
-  /**
-   * MIRROR KE LIVE (cth. Facebook Live RTMPS): bila ditetapkan, ffmpeg
-   * menyalin output relay ke URL ini secara serentak (tee muxer). Kosong =
-   * tiada mirror. Hanya disokong untuk jenis relay (rtsp/rtmp/onvif/dshow).
-   */
-  mirrorUrl?: string;
 }
 
 export interface IslamicEvent {
