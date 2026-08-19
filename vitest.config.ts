@@ -7,7 +7,17 @@ export default defineConfig({
     globalSetup: ['./vitest.setup.mts'],
     coverage: {
       provider: 'v8',
-      include: ['packages/shared/src/**/*.ts'],
+      include: [
+        'packages/shared/src/**/*.ts',
+        'packages/server/src/**/*.ts',
+        'packages/cloud/src/**/*.ts',
+        'packages/db/src/**/*.ts'
+      ],
+      exclude: [
+        '**/pages.generated.ts',
+        '**/sqlite-types.d.ts',
+        'packages/server/src/main-exe.ts'
+      ],
       reporter: ['text', 'json-summary']
     },
     environment: 'node',

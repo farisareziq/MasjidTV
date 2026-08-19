@@ -12,7 +12,7 @@ logs/
 .vite/
 packages/frontend/public/hls.min.js
 data/
-cloud-data/
+**/cloud-data/
 
 .vercel
 .env*

@@ -91,16 +91,20 @@ await esbuild.build({
 //    yang merosakkan package.json semasa proses).
 console.log('[pkg] electron-builder...');
 // Folder output: stamp masa — elak EBUSY dari fail build lama yang dikunci
-// (zombie proses / AV scan). Skrip memadam stamp lama best-effort.
+// (zombie proses / AV scan). Cleanup automatik: simpan stamp semasa + stamp
+// terkini sahaja (rollback pantas), padam selebihnya best-effort.
 const stamp = new Date().toISOString().replace(/[-:T]/g, '').slice(0, 12);
 const outDir = path.join(kioskDir, 'dist-kiosk', stamp);
 fs.mkdirSync(path.dirname(outDir), { recursive: true });
-for (const d of fs.readdirSync(path.dirname(outDir))) {
-  if (/^\d{12}$/.test(d) && d !== stamp) {
-    try {
-      fs.rmSync(path.join(path.dirname(outDir), d), { recursive: true, force: true });
-    } catch { /* dikunci — biarkan, dibuang kemudian */ }
-  }
+const stamps = fs.readdirSync(path.dirname(outDir))
+  .filter((d) => /^\d{12}$/.test(d) && d !== stamp)
+  .sort()
+  .reverse();
+for (const d of stamps.slice(1)) { // stamps[0] = terkini — disimpan
+  try {
+    fs.rmSync(path.join(path.dirname(outDir), d), { recursive: true, force: true });
+    console.log(`[pkg] cleanup stamp lama: ${d}`);
+  } catch { /* dikunci — biarkan, dibuang kemudian */ }
 }
 // electron-builder baca config daripada electron-builder.json; output di-
 // arahkan melalui flag CLI --config.directories.output.
