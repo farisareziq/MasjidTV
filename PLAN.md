@@ -91,10 +91,10 @@ Smart App Control menyekat exe tidak ditandatangani (dilalui "Run anyway" semasa
 
 ### C4. Pemantauan prod ✅ SELESAI (scaffold env-gated)
 - [x] `packages/cloud/src/reporting.ts` (121 baris) — pelapor Sentry/GlitchTip **tanpa dependency**: hook `onError`, hanya 5xx, POST envelope fire-and-forget (5sa timeout). Aktif hanya bila env `SENTRY_DSN` ditetapkan (no-op selain itu).
-- [x] Alert kegagalan smoke 6 jam — step `if: failure()` dalam `smoke.yml` memanggil `scripts/alert.mjs` → POST ke `DISCORD_WEBHOOK_URL` dan/atau `SLACK_WEBHOOK_URL` (secret GitHub). `continue-on-error: true` — alert tidak boleh menggagalkan workflow.
+- [x] Alert kegagalan smoke 6 jam — step `if: failure()` dalam `smoke.yml` + `backup.yml` memanggil `scripts/alert.mjs`. Saluran (berurutan): **GitHub Issue** (lalai tanpa konfigurasi — `GITHUB_TOKEN` runner + label `ci-alert`, dedup komen pada issue terbuka sedia ada) → `DISCORD_WEBHOOK_URL` → `SLACK_WEBHOOK_URL` (secret GitHub, pilihan). `continue-on-error: true` — alert tidak boleh menggagalkan workflow (semua ralat saluran ditelan, exit 0 kekal).
 - [x] Kiosk `apps/kiosk/main/crash-report.ts` (179 baris) — `uncaughtException` + `render-process-gone` → log berputar `%APPDATA%\MasjidTV\logs\crash-YYYY-MM-DD.log` (simpan 7 hari, sentiasa aktif). Muat naik pilihan ke `/api/device/report` (medan `errors` baharu, pilihan & disahkan) bila `MASJIDTV_CRASH_UPLOAD=1` + paired; backlog offline dihantar semula (cursor dedup).
 
-**Persediaan prod (manual):** tetapkan `SENTRY_DSN` di Vercel (→ deploy semula); tetapkan secret `DISCORD_WEBHOOK_URL`/`SLACK_WEBHOOK_URL` di GitHub. Tanpa env ini semuanya no-op selamat.
+**Persediaan prod (manual):** tetapkan `SENTRY_DSN` di Vercel (→ deploy semula); tetapkan secret `DISCORD_WEBHOOK_URL`/`SLACK_WEBHOOK_URL` di GitHub untuk notifikasi luar GitHub (issue `ci-alert` fallback sentiasa berfungsi tanpa konfigurasi). Tanpa env ini semuanya no-op selamat.
 
 ---
 

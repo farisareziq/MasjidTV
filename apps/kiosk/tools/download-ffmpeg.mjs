@@ -2,13 +2,17 @@
 // dalam installer kiosk. Sekali sahaja — disimpan dalam apps/kiosk/bin/.
 //
 // SUPPLY-CHAIN HARDENING: binari pihak ketiga yang diagihkan kepada pelanggan
-// tidak boleh bergantung pada "latest" tanpa pengesahan. Dua lapisan:
-//   1. PIN versi + hash: tetapkan FFMPEG_SHA256 (sha256 zip penuh, dari
-//      nota release BtbN/API `digest`) untuk build rilis yang boleh
-//      diulang-terus (reproducible). Skrip GAGAL jika hash tidak padan.
+// tidak boleh bergantung pada "latest" tanpa pengesahan. Tiga lapisan:
+//   1. PIN versi + hash: PIN_TAG/PIN_SHA256 di bawah (atau env FFMPEG_SHA256)
+//      untuk build rilis yang boleh diulang-terus (reproducible). Skrip GAGAL
+//      jika hash tidak padan.
 //   2. Tanpa pin: sahkan sha256 zip yang dimuat turun sepadan dengan digest
 //      yang diumumkan oleh GitHub API (masih bergantung pada upstream, tetapi
 //      menangkap kerosakan MITM/tampering dalam transit).
+//   3. Sidecar integriti (bin/ffmpeg.exe.sha256): binari sedia ada TERSAHKAN
+//      SEMULA pada setiap larian — cache CI yang rosak/tampung tidak disentuh
+//      dipakai secara senyap. (SHA zip ≠ SHA exe — sidecar menyimpan hash
+//      binari EXE itu sendiri.)
 // Jika FFMPEG_SHA256 kosong DAN digest API tidak diperoleh → ABORT (ralat
 // jelas) kecuali FFMPEG_ALLOW_UNVERIFIED=1 (dev tempatan sahaja).
 import { execSync } from 'node:child_process';
@@ -23,17 +27,40 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const kioskDir = path.resolve(__dirname, '..');
 const binDir = path.join(kioskDir, 'bin');
 const ffmpegPath = path.join(binDir, 'ffmpeg.exe');
+const sidecarPath = ffmpegPath + '.sha256';
 
-if (fs.existsSync(ffmpegPath) && fs.statSync(ffmpegPath).size > 10_000_000) {
-  console.log(`[ffmpeg] sedia: ${ffmpegPath}`);
-  process.exit(0);
+// Hash binari EXE (bukan zip) — digunakan untuk sidecar integriti cache.
+function sha256File(p) {
+  const hash = crypto.createHash('sha256');
+  hash.update(fs.readFileSync(p));
+  return hash.digest('hex');
 }
 
+// Binari sedia ada: hanya terima jika sidecar sah + hash padan. Tanpa sidecar
+// (binari dari versi skrip lama) → anggap tidak dipercayai, muat semula.
+function hasValidCachedBinary() {
+  if (!fs.existsSync(ffmpegPath) || fs.statSync(ffmpegPath).size <= 10_000_000) return false;
+  if (!fs.existsSync(sidecarPath)) return false;
+  const expected = fs.readFileSync(sidecarPath, 'utf8').trim().toLowerCase();
+  if (!/^[0-9a-f]{64}$/.test(expected)) return false;
+  const actual = sha256File(ffmpegPath);
+  if (actual === expected) {
+    console.log(`[ffmpeg] sedia + sidecar sah (sha256 ${actual.slice(0, 16)}…): ${ffmpegPath}`);
+    return true;
+  }
+  console.warn(`[ffmpeg] cache rosak — hash tidak padan (dijangka ${expected.slice(0, 16)}…, dapat ${actual.slice(0, 16)}…). Muat turun semula.`);
+  return false;
+}
+
+if (hasValidCachedBinary()) process.exit(0);
+
 const REPO = 'BtbN/FFmpeg-Builds';
-// Pin versi di sini untuk rilis boleh-ulang; kosong = latest (API-verified).
-const PIN_TAG = ''; // cth. 'autobuild-2026-08-18-12-50'
+// PIN untuk reproducibility. Tag 'latest' di BtbN ialah rolling tag yang
+// mempunyai asset digest stabil; kemas kini pin dengan sengaja sahaja
+// (verifikasi manual: muat turun zip → sha256 → padankan dengan API digest).
+const PIN_TAG = 'latest';
 const ZIP_NAME = 'ffmpeg-master-latest-win64-gpl.zip';
-const PIN_SHA256 = (process.env.FFMPEG_SHA256 || '').toLowerCase().replace(/^sha256:/, '');
+const PIN_SHA256 = (process.env.FFMPEG_SHA256 || '3e44203be3d6aaea41d720a32ef6604873c559d45e03ff43cace2b49e23e5241').toLowerCase().replace(/^sha256:/, '');
 
 const tmpZip = path.join(kioskDir, '.ffmpeg-tmp.zip');
 
@@ -105,6 +132,14 @@ fs.copyFileSync(found, ffmpegPath);
 
 fs.rmSync(tmpZip, { force: true });
 fs.rmSync(extractDir, { recursive: true, force: true });
+
+// Tulis sidecar integriti (sha256 binari EXE, bukan zip). Cache CI membaca
+// semula ini pada larian seterusnya — jika fail binari rosak/tampung, skrip
+// mengesan mismatch dan memuat turun semula, bukan mempercayai secara senyap.
+const exeSha = sha256File(ffmpegPath);
+fs.writeFileSync(sidecarPath, exeSha, 'utf8');
+console.log(`[ffmpeg] sidecar ditulis: ${exeSha.slice(0, 16)}…`);
+
 console.log(`[ffmpeg] siap: ${ffmpegPath} (${(fs.statSync(ffmpegPath).size / 1e6).toFixed(1)}MB)`);
 
 function findFile(dir, name) {

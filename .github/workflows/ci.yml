@@ -5,9 +5,16 @@ on:
     branches: [master, main]
   pull_request:
 
+# Batalkan larian CI tumpang-tindih pada branch/ref yang sama — menjimatkan
+# minit runner (push baru ke master membatalkan larian lama yang belum siap).
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   test:
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
 
@@ -47,6 +54,7 @@ jobs:
   e2e-kiosk:
     name: E2E kiosk (Windows)
     runs-on: windows-latest
+    timeout-minutes: 45
     # NON-BLOCKING: runner Windows GitHub ialah headless tanpa sesi desktop
     # interaktif — Electron GUI tersekat pada rintisan tahap terendah (proses
     # hidup, STDOUT/STDERR kosong, /api/health tidak menjawab) walaupun dengan
@@ -74,15 +82,27 @@ jobs:
 
       # Bekalkan ffmpeg sekali (cached) supaya kiosk e2e tidak memuat turun
       # ~80MB semasa runtime (menyekat server mula → health timeout di CI).
+      # Kunci cache terikat kepada pin sha256 dalam download-ffmpeg.mjs —
+      # kemas kini pin → cache miss automatik → binari baharu disahkan.
+      # Sidecar .sha256 ditulis bersama binari; skrip mengesahkan semula
+      # integriti cache pada setiap larian (cache rosak → muat semula).
       - name: Cache ffmpeg
         uses: actions/cache@v4
         with:
-          path: apps/kiosk/bin/ffmpeg.exe
-          key: ffmpeg-win-x64-v1
+          path: |
+            apps/kiosk/bin/ffmpeg.exe
+            apps/kiosk/bin/ffmpeg.exe.sha256
+          key: ffmpeg-win-x64-sha256-3e44203be3d6aaea41d720a32ef6604873c559d45e03ff43cace2b49e23e5241
+          # Fallback buat masa kini masih membenarkan larian tanpa muat turun,
+          # tetapi integriti disahkan oleh sidecar — bukan percaya buta.
+          restore-keys: |
+            ffmpeg-win-x64-sha256-
 
       - name: Download ffmpeg (if not cached)
         run: node tools/download-ffmpeg.mjs
         working-directory: apps/kiosk
+        env:
+          FFMPEG_SHA256: '3e44203be3d6aaea41d720a32ef6604873c559d45e03ff43cace2b49e23e5241'
 
       - name: E2E pairing (cloud + kiosk Electron)
         # Runner Windows headless — Electron GUI (app.whenReady) lambat mula;
@@ -100,6 +120,7 @@ jobs:
 
   build:
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
 

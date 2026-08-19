@@ -5,15 +5,43 @@ on:
     - cron: '0 */6 * * *' # every 6 hours
   workflow_dispatch:
 
+# issues: write membenarkan alert.mjs membuka/mengulas issue GitHub sebagai
+# fallback notifikasi (GITHUB_TOKEN disediakan automatik — tiada konfigurasi
+# tambahan diperlukan selain permissions ini).
+permissions:
+  issues: write
+  contents: read
+
+# Elakkan larian berlama-lama tergantung pada fetch tergantung; cancel larian
+# berurutan yang tumpang-tindih (cron + manual, atau cron berturut).
+concurrency:
+  group: smoke
+  cancel-in-progress: true
+
 jobs:
   smoke:
     runs-on: ubuntu-latest
+    timeout-minutes: 5
     steps:
       - uses: actions/checkout@v4
 
       - uses: actions/setup-node@v4
         with:
           node-version: 24
+
+      # Fail-fast: jika MASJIDTV_PROD_URL tidak ditetapkan, preflight tidak
+      # menjalankan sebarang semakan langsung — larian hijau palsu. Berhenti
+      # lebih awal dengan mesej jelas supaya masalah konfigurasi tidak
+      # terselindung di sebalik "success".
+      - name: Verify production URL is configured
+        env:
+          PREFLIGHT_URL: ${{ vars.MASJIDTV_PROD_URL }}
+        run: |
+          if [ -z "$PREFLIGHT_URL" ]; then
+            echo "::error::MASJIDTV_PROD_URL repo variable is not set — smoke test has nothing to probe. Configure it under Settings → Secrets and variables → Actions → Variables."
+            exit 1
+          fi
+          echo "Probing $PREFLIGHT_URL"
 
       - name: Run preflight against production
         id: preflight
@@ -22,15 +50,16 @@ jobs:
           PREFLIGHT_SKIP_ENV: '1' # env vars live in Vercel, not on the runner
         run: node scripts/preflight.mjs --url "$PREFLIGHT_URL"
 
-      # C4: Notifikasi kegagalan sahaja — POST ke Discord/Slack incoming-webhook
-      # (mana-mana secret yang ditetapkan; tiada secret = dry-run cetak).
+      # C4: Notifikasi kegagalan sahaja — cuba tiga saluran secara berurutan:
+      # GitHub Issue (lalai, tanpa konfigurasi tambahan), Discord, Slack.
       # if: failure() → step ini berjalan HANYA bila step sebelum gagal.
       # continue-on-error + skrip sentiasa exit 0 → alert TIDAK BOLEH
       # menggagalkan workflow itu sendiri.
-      - name: Notify on failure (Discord/Slack)
+      - name: Notify on failure (GitHub Issue / Discord / Slack)
         if: failure()
         continue-on-error: true
         env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
           SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
         run: node scripts/alert.mjs --status failure --step "Run preflight against production" || true

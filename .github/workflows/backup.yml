@@ -5,11 +5,21 @@ on:
     - cron: '30 18 * * *' # 18:30 UTC daily = 02:30 MYT
   workflow_dispatch:
 
+# issues: write untuk alert.mjs (fallback notifikasi kegagalan). contents: read
+# untuk checkout.
+permissions:
+  contents: read
+  issues: write
+
+# Backup harian — batalkan tumpang-tindih (cron + manual serentak).
+concurrency:
+  group: backup
+  cancel-in-progress: false
+
 jobs:
   backup:
     runs-on: ubuntu-latest
-    permissions:
-      contents: read
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
 
@@ -27,15 +37,34 @@ jobs:
         run: pnpm --filter @masjidtv/db build
 
       - name: Run backup
+        id: backup
         env:
           TURSO_URL: ${{ secrets.TURSO_URL }}
           TURSO_AUTH_TOKEN: ${{ secrets.TURSO_AUTH_TOKEN }}
         run: node scripts/turso-backup.mjs --out turso-backup.json
 
-      - name: Fail on empty backup
+      # Integrity gate ketat: SEMUA 7 jadual cloud mesti hadir dan bukan
+      # undefined. Backup kosong separa ( Jadual hilang = DB rosak /
+      # kebenaran hilang / skema drift) — jangan terima sebagai "success".
+      - name: Verify backup integrity (all cloud tables present)
         run: |
-          # tenants table must be present — an empty/failed dump is a red flag
-          node -e "const b=require('./turso-backup.json'); if(!b.tables.tenants) { console.error('Backup missing tenants table — aborting'); process.exit(1) } console.log('tenants:', b.tables.tenants.length, 'rows')"
+          node -e "
+            const b = require('./turso-backup.json');
+            const required = ['tenants','users','superusers','cloud_announcements','cloud_media','pairing_sessions','tv_devices'];
+            const missing = required.filter(t => !Array.isArray(b.tables?.[t]));
+            const counts = required.map(t => t + ':' + (b.tables?.[t]?.length ?? 'MISSING')).join(', ');
+            console.log('Tables: ' + counts);
+            if (missing.length) { console.error('Missing/invalid tables: ' + missing.join(', ')); process.exit(1); }
+            if (b.tables.tenants.length === 0) { console.error('tenants table is EMPTY — aborting (no tenants = nothing backed up)'); process.exit(1); }
+            console.log('Integrity OK: all ' + required.length + ' cloud tables present, tenants has ' + b.tables.tenants.length + ' rows.');
+          "
+
+      # Restore drill: pulih ke DB sementara dan sahkan dumps identik. Ini
+      # menangkap regress senyap dalam turso-restore.mjs (commit 36266a0
+      # menambah await pada createCloudClient — drill ini mengesahkannya
+      # kekal hijau pada setiap larian, bukan hanya selepas fix manual).
+      - name: Restore round-trip verification
+        run: node scripts/test/backup-restore-roundtrip.mjs
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
@@ -43,3 +72,15 @@ jobs:
           name: turso-backup-${{ github.run_id }}
           path: turso-backup.json
           retention-days: 90
+
+      # Notifikasi kegagalan sahaja — GitHub Issue (lalai) + Discord/Slack
+      # jika secret ditetapkan. continue-on-error → alert tidak boleh
+      # menggagalkan workflow.
+      - name: Notify on failure (GitHub Issue / Discord / Slack)
+        if: failure()
+        continue-on-error: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+        run: node scripts/alert.mjs --status failure --step "Cloud DB Backup" || true

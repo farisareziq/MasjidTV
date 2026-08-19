@@ -84,12 +84,18 @@ INFO oleh pentest pada setiap larian.
 4. **Tukar PIN superuser serta-merta** — PIN bootstrap dicetak dalam log
    deploy; tukar melalui `POST /api/auth/superuser/pin` atau konsol
    `https://<host>/super`.
-5. **Sandaran berkala** — workflow `Cloud DB Backup` (harian 02:30 MYT,
+ 5. **Sandaran berkala** — workflow `Cloud DB Backup` (harian 02:30 MYT,
    retensi 90 hari) memerlukan secrets `TURSO_URL` + `TURSO_AUTH_TOKEN` di
-   GitHub. Pulih: `node scripts/turso-restore.mjs <backup.json> --yes`
+   GitHub. Setiap larian mengesahkan SEMUA jadual cloud hadir (fail-loud)
+   dan menjalankan drill restore round-trip. Pulih:
+   `node scripts/turso-restore.mjs <backup.json> --yes`
    (destruktif — truncate + reinsert).
-6. **Smoke berkala** — workflow `Prod Smoke Test` (setiap 6 jam) memerlukan
-   variable `MASJIDTV_PROD_URL` di GitHub.
+ 6. **Smoke berkala** — workflow `Prod Smoke Test` (setiap 6 jam) memerlukan
+    variable `MASJIDTV_PROD_URL` di GitHub (gagal awal dengan jelas jika
+    tidak ditetapkan). Kegagalan smoke membuka/mengulas issue GitHub berlabel
+    `ci-alert` (fallback lalai — tiada konfigurasi tambahan); Discord/Slack
+    webhook (`DISCORD_WEBHOOK_URL`/`SLACK_WEBHOOK_URL` secret) sebagai
+    saluran tambahan jika ditetapkan.
 7. **Kiosk mini PC** — pasang `MasjidTV-Kiosk-Setup-x.y.z.exe` (lihat seksyen
    Kiosk di bawah); sahkan pairing, paparan, DSHOW/OBS, autostart, dan
    tahan-reboot pada peranti sebenar.

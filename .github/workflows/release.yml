@@ -10,9 +10,16 @@ on:
 permissions:
   contents: write
 
+# Elakkan rilis tumpang-tindih (tag push berganda, atau cron + manual serentak).
+# cancel-in-progress: false — rilis harus siap, bukan dibatalkan separuh jalan.
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
 jobs:
   kiosk:
     runs-on: windows-latest
+    timeout-minutes: 45
     steps:
       - uses: actions/checkout@v4
 
@@ -31,17 +38,27 @@ jobs:
 
       # ffmpeg dibundel bersama installer (resources/bin) — cache unduhan
       # supaya larian berturut tidak muat turun semula (~80MB).
+      # Kunci cache terikat kepada pin sha256 dalam download-ffmpeg.mjs —
+      # kemas kini pin → cache miss automatik → binari baharu disahkan.
+      # Sidecar .sha256 ditulis bersama binari; skrip mengesahkan semula
+      # integriti cache pada setiap larian (cache rosak → muat semula).
       - name: Cache ffmpeg
         uses: actions/cache@v4
         with:
-          path: apps/kiosk/bin/ffmpeg.exe
-          key: ffmpeg-win-x64-v1
+          path: |
+            apps/kiosk/bin/ffmpeg.exe
+            apps/kiosk/bin/ffmpeg.exe.sha256
+          key: ffmpeg-win-x64-sha256-3e44203be3d6aaea41d720a32ef6604873c559d45e03ff43cace2b49e23e5241
+          restore-keys: |
+            ffmpeg-win-x64-sha256-
 
       # download-ffmpeg.mjs mengesahkan sha256 zip (API digest / FFMPEG_SHA256)
       # sebelum pakej — tanpa pengesahan, rilis GAGAL.
       - name: Download ffmpeg (if not cached)
         run: node tools/download-ffmpeg.mjs
         working-directory: apps/kiosk
+        env:
+          FFMPEG_SHA256: '3e44203be3d6aaea41d720a32ef6604873c559d45e03ff43cace2b49e23e5241'
 
       - name: Package kiosk (electron-builder NSIS + portable)
         run: node tools/package.mjs
