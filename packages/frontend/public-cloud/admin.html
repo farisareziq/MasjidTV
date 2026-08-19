@@ -587,7 +587,9 @@
         <div class="card">
           <h3 data-i18n="liveStreams">Live streams (IP camera / ONVIF / RTSP / RTMP / HLS / WebRTC / YouTube)</h3>
           <p class="sub" id="ffmpegStatus" data-i18n="checkingFfmpeg">Checking ffmpeg…</p>
-          <p class="sub" data-i18n="streamsSub">RTSP, RTMP and ONVIF streams are converted to HLS by ffmpeg on this machine and shown in the slideshow. YouTube accepts a normal or live video URL. WebRTC uses a custom embed URL (e.g. your WebRTC gateway page).</p>
+          <!-- Varian awan: core.ts menulis semula ayat ini kepada streamsSubCloud
+               (relay kiosk) pada populateSettings — data-i18n kekal fallback. -->
+          <p class="sub" id="streamsSub" data-i18n="streamsSub">RTSP, RTMP and ONVIF streams are converted to HLS by ffmpeg on this machine and shown in the slideshow. YouTube accepts a normal or live video URL. WebRTC uses a custom embed URL (e.g. your WebRTC gateway page).</p>
           <div class="form-grid">
             <label class="span-2"><span data-i18n="ffmpegPath">ffmpeg path (for RTSP/RTMP/ONVIF)</span>
               <input type="text" id="stFfmpegPath" placeholder="ffmpeg">
@@ -620,6 +622,16 @@
             <button id="addEventBtn" class="btn primary sm" data-i18n="addEvent">+ Add event</button>
             <button id="saveEventsBtn" class="btn ghost sm" data-i18n="saveEvents">Save events</button>
           </div>
+        </div>
+
+        <!-- (awan sahaja) Pustaka media Blob — disusun oleh admin/cloud.ts -->
+        <div class="card" id="mediaCard">
+          <h3 data-i18n="mediaLibrary">Media library</h3>
+          <p class="sub" data-i18n="mediaLibrarySub">Images, videos and audio uploaded to the cloud.</p>
+          <div class="btn-row">
+            <button id="mediaRefreshBtn" class="btn ghost sm" data-i18n="loadMedia">Load media</button>
+          </div>
+          <div id="mediaList" class="announcement-list" hidden></div>
         </div>
 
         <div class="card">

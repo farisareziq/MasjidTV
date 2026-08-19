@@ -5,6 +5,15 @@
 //
 // Reconnect selamat: client boleh banding rev terakhir diterima vs rev
 // semasa melalui event 'hello' — jika tertinggal, full resync.
+//
+// BATASAN SERVERLESS (Vercel): `subs` + `revCounters` ialah in-memory —
+// sambungan SSE dan penulisan admin boleh mendarat pada instance fungsi
+// BERBEZA, jadi bumpRev mungkin tiada subscriber untuk diberitahu; had masa
+// fungsi (~60sa hobby) juga memutuskan stream. Paparan/display-core ada
+// fallback poll 10sa (bumpRev tetap menaikkan _rev yang dikesan semula),
+// jadi kelakuan DEGRADED dengan selamat: sync kekal berlaku, hanya bukan
+// "segera <2sa". Untuk instant-sync sebenar di prod, gunakan pub/sub luar
+// (cth. Turso/Redis/Ably) atau terima mod polling.
 
 import type { FastifyInstance } from 'fastify';
 import type { CloudStore } from './store.js';

@@ -1147,7 +1147,8 @@
     const loc = state.settings?.location;
     if (!state.settings?.weather?.enabled || !state.settings?.display?.showWeather || !loc) return;
     const { latitude, longitude } = loc;
-    const url = `https://api.open-meteo.com/v1/forecast?latitude=${latitude}&longitude=${longitude}&current=temperature_2m,weather_code&forecast_days=1`;
+    const unitParam = state.settings?.weather?.unit === "f" ? "&temperature_unit=fahrenheit" : "";
+    const url = `https://api.open-meteo.com/v1/forecast?latitude=${latitude}&longitude=${longitude}&current=temperature_2m,weather_code&forecast_days=1${unitParam}`;
     try {
       const ctrl = new AbortController();
       const timer = setTimeout(() => ctrl.abort(), 8e3);

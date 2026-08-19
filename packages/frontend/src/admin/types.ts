@@ -27,8 +27,19 @@ export type TvDevice = {
   // nama peranti dipetakan kepada string); kiosk lokal pula menulis
   // { name }[] ke devices.json. Medan dikecualikan kepada unknown[] supaya
   // kedua-dua bentuk boleh dilalukan oleh pembantu penukar.
-  hw?: { cameras?: { id?: string; name?: string; status?: string }[]; dshow?: unknown[]; at?: number } | null;
+  // hw.errors PILIHAN (B9): ringkasan crash kiosk yang dimuat naik secara
+  // opt-in (MASJIDTV_CRASH_UPLOAD=1) — hanya wujud pada varian awan.
+  hw?: {
+    cameras?: { id?: string; name?: string; status?: string }[];
+    dshow?: unknown[];
+    at?: number;
+    errors?: Array<{ at?: number; message?: string }>;
+  } | null;
 };
+
+// Satu baris pustaka media awan (GET /api/admin/media) — url dibina semula
+// oleh server daripada laluan blob tersimpan.
+export type MediaItem = { id: string; filename: string; kind: string; createdAt: number; url: string };
 
 // Satu pilihan dalam datalist pemilih peranti DSHOW (medan URL stream).
 // value = nilai medan sebenar ("video=<nama>"), label = teks bantuan
@@ -114,6 +125,12 @@ export interface AdminVariantConfig {
     fridayKhutbah?: boolean;
     // Awan: tukar kata laluan mengembalikan token baharu — simpan semula.
     tokenRotate?: boolean;
+    // Awan: relay stream (RTSP/RTMP/ONVIF/DSHOW + cermin FB) berlaku pada
+    // kiosk mini PC BERPASANGAN — server awan tiada ffmpeg & tiada endpoint
+    // /relay/. Menghidupkan: nota "kiosk diperlukan" pada kad stream,
+    // label status kiosk pada #ffmpegStatus, dan ayat nota overview yang
+    // sesuai untuk URL Vercel awam (bukan teks LAN/ffmpeg mesin ini).
+    kioskStreams?: boolean;
   };
 }
 
@@ -135,7 +152,8 @@ export const F = {
   blobUpload: (): boolean => !!cfg.features.blobUpload,
   headingFont: (): boolean => !!cfg.features.headingFont,
   fridayKhutbah: (): boolean => !!cfg.features.fridayKhutbah,
-  tokenRotate: (): boolean => !!cfg.features.tokenRotate
+  tokenRotate: (): boolean => !!cfg.features.tokenRotate,
+  kioskStreams: (): boolean => !!cfg.features.kioskStreams
 };
 
 // Cangkuk ciri varian — didaftarkan oleh modul ciri (cloud.ts) sebelum
@@ -153,6 +171,14 @@ export interface AdminFeatureHooks {
   // (medan kekal teks-bebas seperti biasa). Awan: kesatuan dshow[] peranti
   // terpaut; lokal: devices.json kiosk melalui /api/devices-hw.
   dshowOptions?: () => Promise<DshowOption[]>;
+  // Awan: unjur ralat laluan muat naik (cth. 'Blob tidak dikonfigurasi')
+  // kepada mesej toast yang boleh ditindak — pulang string untuk dipapar,
+  // atau null untuk kekalkan ralat asal verbatim.
+  uploadErrorMessage?: (raw: string) => string | null;
+  // Awan: jumlah peranti kiosk berpasangan (cache /api/admin/devices,
+  // TTL 5 minit — dikongsi dshowOptions) untuk label status relay jujur.
+  // Kegagalan rangkaian → null (label kembali kepada ffmpegOk pelayan).
+  pairedDeviceCount?: () => Promise<number | null>;
 }
 
 export const featureHooks: AdminFeatureHooks = {};

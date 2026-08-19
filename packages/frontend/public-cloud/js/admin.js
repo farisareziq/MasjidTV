@@ -45,7 +45,8 @@
     blobUpload: () => !!cfg.features.blobUpload,
     headingFont: () => !!cfg.features.headingFont,
     fridayKhutbah: () => !!cfg.features.fridayKhutbah,
-    tokenRotate: () => !!cfg.features.tokenRotate
+    tokenRotate: () => !!cfg.features.tokenRotate,
+    kioskStreams: () => !!cfg.features.kioskStreams
   };
   var featureHooks = {};
   function registerAdminFeatures(h) {
@@ -91,10 +92,12 @@
       copyUrl: "Copy URL",
       notes: "Notes",
       note1: "Point any screen on the network to {url} and open it fullscreen (Edge kiosk handles this automatically on the mini PC).",
+      note1Cloud: "Open {url} fullscreen on your signage player \u2014 the public cloud URL works anywhere with internet. Paired kiosks/TVs open it automatically.",
       notePassword: "\u26A0\uFE0F The default admin password file still exists at {file}. Change the password in Settings and the file is removed.",
       noteJakim: "Prayer times and hijri date come from the official JAKIM e-Solat API (selected zone), with automatic offline calculation fallback.",
       noteAudio: "\u{1F50A} Adhan/Iqamah audio is configured \u2014 the screen will call at prayer times.",
       noteStreams: "\u{1F4E1} {count} live stream(s) configured. RTSP/RTMP/ONVIF need ffmpeg on the mini PC.",
+      noteStreamsCloud: "\u{1F4E1} {count} live stream(s) configured. Camera streams (RTSP/RTMP/ONVIF/DSHOW) and the Facebook mirror are relayed by a paired kiosk mini PC \u2014 the cloud host has no ffmpeg.",
       noteEvents: "\u{1F4C5} Islamic events auto-synced from JAKIM takwim.",
       runningFor: "Running for {time} \u2022 v{version}",
       activeNow: "{n} active now",
@@ -261,6 +264,7 @@
       tickerNormal: "Normal",
       tickerFast: "Fast",
       streamsSub: "RTSP, RTMP and ONVIF streams are converted to HLS by ffmpeg on this machine and shown in the slideshow. YouTube accepts a normal or live video URL. WebRTC uses a custom embed URL (e.g. your WebRTC gateway page).",
+      streamsSubCloud: "Camera streams (RTSP/RTMP/ONVIF/DSHOW) and the Facebook mirror are relayed by a paired kiosk mini PC \u2014 this cloud host has no ffmpeg and no /relay endpoint. HLS, YouTube and WebRTC embeds play directly without a kiosk.",
       ffmpegPath: "ffmpeg path (for RTSP/RTMP/ONVIF)",
       saveFfmpeg: "Save ffmpeg path",
       addStream: "+ Add stream",
@@ -317,6 +321,7 @@
       notFound: "Not found",
       mediaUploaded: "Media uploaded",
       uploadFailed: "Upload failed",
+      uploadBlobMissing: "Uploads need Vercel Blob storage: set VERCEL_BLOB_READ_WRITE_TOKEN in the Vercel project environment variables, then redeploy.",
       logoUploaded: "Logo uploaded \u2014 click \u201CSave mosque\u201D to apply",
       azanUploaded: "Azan audio uploaded \u2014 click \u201CSave audio settings\u201D to apply",
       iqamahUploaded: "Iqamah audio uploaded \u2014 click \u201CSave audio settings\u201D to apply",
@@ -337,6 +342,8 @@
       checkingFfmpeg: "Checking ffmpeg\u2026",
       ffmpegOk: "\u2705 ffmpeg detected \u2014 RTSP/RTMP/ONVIF relays available.",
       ffmpegMissing: "\u26A0\uFE0F ffmpeg NOT found. Install ffmpeg and set its path above for RTSP/RTMP/ONVIF streams (HLS, YouTube and WebRTC embeds work without it).",
+      kioskOk: "\u2705 {n} kiosk device(s) paired \u2014 camera/mirror relays are handled by the kiosk, not this cloud host.",
+      kioskMissing: "\u26A0\uFE0F No kiosk paired. Camera streams (RTSP/RTMP/ONVIF/DSHOW) and the Facebook mirror need a paired kiosk mini PC (TV & Screens) \u2014 HLS, YouTube and WebRTC embeds work without one.",
       statusRunning: "running",
       statusStarting: "starting",
       statusReady: "ready",
@@ -390,7 +397,23 @@
       trialEnds: "Trial until {d}",
       adminBadge: "admin",
       deleteTenantConfirm: "Delete \u201C{name}\u201D? This permanently removes the mosque account, its admin user, announcements and media.",
-      userDeleteConfirm: "Remove user \u201C{name}\u201D?"
+      userDeleteConfirm: "Remove user \u201C{name}\u201D?",
+      userAdded: "User added",
+      userAddFailed: "Fill in a username and password (min 6 chars)",
+      userInactiveBadge: "inactive",
+      resetPassword: "Reset password",
+      resetPasswordPrompt: "New password for {name} (min 6 chars):",
+      resetPasswordDone: "Password reset for {name}",
+      userDeactivated: "User deactivated",
+      userActivated: "User activated",
+      crashCount: "{n} crash report(s)",
+      crashLast: "Last: {msg}",
+      mediaLibrary: "Media library",
+      mediaLibrarySub: "Images, videos and audio uploaded to the cloud.",
+      loadMedia: "Load media",
+      mediaEmpty: "No media uploaded yet.",
+      mediaDeleted: "Media deleted",
+      mediaDeleteConfirm: "Delete this media? The file is removed from cloud storage."
     },
     ms: {
       loginSub: "Urus sistem paparan masjid",
@@ -427,10 +450,12 @@
       copyUrl: "Salin URL",
       notes: "Nota",
       note1: "Arahkan mana-mana skrin pada rangkaian ke {url} dan buka skrin penuh (Edge kiosk mengendalikannya automatik pada mini PC).",
+      note1Cloud: "Buka {url} skrin penuh pada pemain paparan anda \u2014 URL awan awam ini berfungsi di mana-mana sahaja ada internet. Kiosk/TV berpasangan membukanya secara automatik.",
       notePassword: "\u26A0\uFE0F Fail kata laluan lalai masih wujud di {file}. Tukar kata laluan di Tetapan dan fail akan dipadam.",
       noteJakim: "Waktu solat dan tarikh hijrah datang dari API rasmi JAKIM e-Solat (zon terpilih), dengan fallback pengiraan tempatan automatik.",
       noteAudio: "\u{1F50A} Audio azan/iqamah dikonfigurasi \u2014 skrin akan berbunyi pada waktu solat.",
       noteStreams: "\u{1F4E1} {count} live stream dikonfigurasi. RTSP/RTMP/ONVIF memerlukan ffmpeg pada mini PC.",
+      noteStreamsCloud: "\u{1F4E1} {count} live stream dikonfigurasi. Stream kamera (RTSP/RTMP/ONVIF/DSHOW) dan cermin Facebook direlay oleh kiosk mini PC berpasangan \u2014 hos awan tiada ffmpeg.",
       noteEvents: "\u{1F4C5} Hari kebesaran Islam auto-sync dari takwim JAKIM.",
       runningFor: "Berjalan {time} \u2022 v{version}",
       activeNow: "{n} aktif sekarang",
@@ -597,6 +622,7 @@
       tickerNormal: "Normal",
       tickerFast: "Pantas",
       streamsSub: "Stream RTSP, RTMP dan ONVIF ditukar ke HLS oleh ffmpeg pada mesin ini dan dipaparkan dalam slaid. YouTube menerima URL video biasa atau live. WebRTC menggunakan URL embed tersuai (cth. halaman gateway WebRTC anda).",
+      streamsSubCloud: "Stream kamera (RTSP/RTMP/ONVIF/DSHOW) dan cermin Facebook direlay oleh kiosk mini PC berpasangan \u2014 hos awan ini tiada ffmpeg dan tiada endpoint /relay. HLS, YouTube dan embed WebRTC dimainkan terus tanpa kiosk.",
       ffmpegPath: "Laluan ffmpeg (untuk RTSP/RTMP/ONVIF)",
       saveFfmpeg: "Simpan laluan ffmpeg",
       addStream: "+ Tambah stream",
@@ -653,6 +679,7 @@
       notFound: "Tidak ditemui",
       mediaUploaded: "Media dimuat naik",
       uploadFailed: "Muat naik gagal",
+      uploadBlobMissing: "Muat naik memerlukan storan Vercel Blob: tetapkan VERCEL_BLOB_READ_WRITE_TOKEN dalam pembolehubah persekitaran projek Vercel, kemudian redeploy.",
       logoUploaded: "Logo dimuat naik \u2014 klik \u201CSimpan masjid\u201D untuk terpakai",
       azanUploaded: "Audio azan dimuat naik \u2014 klik \u201CSimpan tetapan audio\u201D untuk terpakai",
       iqamahUploaded: "Audio iqamah dimuat naik \u2014 klik \u201CSimpan tetapan audio\u201D untuk terpakai",
@@ -673,6 +700,8 @@
       checkingFfmpeg: "Menyemak ffmpeg\u2026",
       ffmpegOk: "\u2705 ffmpeg dikesan \u2014 relay RTSP/RTMP/ONVIF tersedia.",
       ffmpegMissing: "\u26A0\uFE0F ffmpeg TIDAK dijumpai. Pasang ffmpeg dan tetapkan laluannya di atas untuk stream RTSP/RTMP/ONVIF (HLS, YouTube dan embed WebRTC berfungsi tanpanya).",
+      kioskOk: "\u2705 {n} peranti kiosk terpaut \u2014 relay kamera/cermin dikendalikan oleh kiosk, bukan hos awan ini.",
+      kioskMissing: "\u26A0\uFE0F Tiada kiosk terpaut. Stream kamera (RTSP/RTMP/ONVIF/DSHOW) dan cermin Facebook memerlukan kiosk mini PC berpasangan (TV & Paparan) \u2014 HLS, YouTube dan embed WebRTC berfungsi tanpanya.",
       statusRunning: "berjalan",
       statusStarting: "bermula",
       statusReady: "sedia",
@@ -726,7 +755,23 @@
       trialEnds: "Trial hingga {d}",
       adminBadge: "admin",
       deleteTenantConfirm: "Padam \u201C{name}\u201D? Akaun masjid, pengguna admin, pengumuman dan media akan dipadam kekal.",
-      userDeleteConfirm: "Buang pengguna \u201C{name}\u201D?"
+      userDeleteConfirm: "Buang pengguna \u201C{name}\u201D?",
+      userAdded: "Pengguna ditambah",
+      userAddFailed: "Isi username dan kata laluan (min 6 aksara)",
+      userInactiveBadge: "tidak aktif",
+      resetPassword: "Reset kata laluan",
+      resetPasswordPrompt: "Kata laluan baharu untuk {name} (min 6 aksara):",
+      resetPasswordDone: "Kata laluan {name} direset",
+      userDeactivated: "Pengguna dilumpuhkan",
+      userActivated: "Pengguna diaktifkan",
+      crashCount: "{n} laporan crash",
+      crashLast: "Terakhir: {msg}",
+      mediaLibrary: "Pustaka media",
+      mediaLibrarySub: "Imej, video dan audio yang dimuat naik ke awan.",
+      loadMedia: "Muat media",
+      mediaEmpty: "Tiada media dimuat naik lagi.",
+      mediaDeleted: "Media dipadam",
+      mediaDeleteConfirm: "Padam media ini? Fail turut dibuang daripada storan awan."
     }
   };
   function i18nEntry(lang, key) {
@@ -846,6 +891,13 @@
     }
     return res.json();
   }
+  function mapUploadError(raw) {
+    if (featureHooks.uploadErrorMessage) {
+      const mapped = featureHooks.uploadErrorMessage(raw);
+      if (mapped) return mapped;
+    }
+    return raw;
+  }
   async function uploadFile(file) {
     const mime = fileMime(file);
     if (F.blobUpload()) {
@@ -872,7 +924,7 @@
       });
       if (!res2.ok) {
         const j = await res2.json().catch(() => ({}));
-        throw new Error(j.error || t("uploadFailed"));
+        throw new Error(mapUploadError(j.error || t("uploadFailed")));
       }
       return res2.json();
     }
@@ -883,7 +935,7 @@
     });
     if (!res.ok) {
       const j = await res.json().catch(() => ({}));
-      throw new Error(j.error || t("uploadFailed"));
+      throw new Error(mapUploadError(j.error || t("uploadFailed")));
     }
     return res.json();
   }
@@ -1047,6 +1099,22 @@
       </div>`;
     }).join("");
   }
+  async function renderTenantUsers(box, tenantId) {
+    const users = await api(`/api/super/tenants/${tenantId}/users`);
+    box.innerHTML = users.map((u) => `
+    <div class="roster-row">
+      <span class="day-label">${escapeHtml(u.username)} <span class="chip ${Number(u.active ?? 1) ? "ok" : "err"}">${Number(u.active ?? 1) ? t("adminBadge") : t("userInactiveBadge")}</span></span>
+      <span class="sub">${t("createdOn", { d: new Date(Number(u.createdAt || u.created_at) || String(u.createdAt || u.created_at || "")).toLocaleDateString() })}</span>
+      <button class="btn ghost sm" data-act="resetpw" data-id="${u.id}">${t("resetPassword")}</button>
+      <button class="btn ghost sm" data-act="toggleuser" data-id="${u.id}" data-active="${Number(u.active ?? 1)}">${Number(u.active ?? 1) ? t("suspend") : t("activate")}</button>
+      <button class="btn danger sm" data-act="deluser" data-id="${u.id}">${t("removeUser")}</button>
+    </div>`).join("") + `
+    <div class="form-grid" style="margin-top:10px">
+      <label><span>${t("usernameLabel")}</span><input type="text" class="su-new-user" maxlength="60"></label>
+      <label><span>${t("passwordLabel")}</span><input type="password" class="su-new-pass" autocomplete="new-password"></label>
+      <button class="btn primary sm" data-act="adduser" data-id="${tenantId}">${t("addUser")}</button>
+    </div>`;
+  }
   $("tenantList").addEventListener("click", async (e) => {
     const btn = e.target.closest("[data-act]");
     if (!btn) return;
@@ -1071,18 +1139,45 @@
           return;
         }
         box.hidden = false;
-        const users = await api(`/api/super/tenants/${id}/users`);
-        box.innerHTML = users.map((u) => `
-        <div class="roster-row">
-          <span class="day-label">${escapeHtml(u.username)} <span class="chip ok">${t("adminBadge")}</span></span>
-          <span class="sub">${t("createdOn", { d: new Date(u.created_at).toLocaleDateString() })}</span>
-          <button class="btn danger sm" data-act="deluser" data-id="${u.id}">${t("removeUser")}</button>
-        </div>`).join("");
+        await renderTenantUsers(box, String(id));
+        return;
+      } else if (act === "adduser") {
+        const item = btn.closest(".announcement-item");
+        const username = item.querySelector(".su-new-user").value.trim();
+        const password = item.querySelector(".su-new-pass").value;
+        if (!username || password.length < 6) return toast(t("userAddFailed"), "err");
+        await api(`/api/super/tenants/${id}/users`, { method: "POST", body: { username, password } });
+        toast(t("userAdded"));
+        const box = item.querySelector(".users");
+        await renderTenantUsers(box, String(id));
+        return;
+      } else if (act === "resetpw") {
+        const row = btn.closest(".roster-row");
+        const uname = row?.querySelector(".day-label")?.firstChild?.textContent || "";
+        const pw = prompt(t("resetPasswordPrompt", { name: uname.trim() }));
+        if (pw === null) return;
+        if (pw.length < 6) return toast(t("pwTooShort"), "err");
+        await api(`/api/super/users/${id}`, { method: "PATCH", body: { password: pw } });
+        toast(t("resetPasswordDone", { name: uname.trim() }));
+        return;
+      } else if (act === "toggleuser") {
+        const nextActive = btn.dataset.active !== "1";
+        await api(`/api/super/users/${id}`, { method: "PATCH", body: { active: nextActive } });
+        toast(nextActive ? t("userActivated") : t("userDeactivated"));
+        const box = btn.closest(".users");
+        const tenantId = box.dataset.users || "";
+        await renderTenantUsers(box, tenantId);
+        return;
       } else if (act === "deluser") {
-        const uname = btn.closest(".roster-row")?.querySelector(".day-label")?.textContent || "";
+        const uname = btn.closest(".roster-row")?.querySelector(".day-label")?.firstChild?.textContent || "";
         if (!confirm(t("userDeleteConfirm", { name: uname.trim() }))) return;
         await api(`/api/super/users/${id}`, { method: "DELETE" });
         toast(t("annDeleted"));
+        const box = btn.closest(".users");
+        if (box) {
+          await renderTenantUsers(box, box.dataset.users || "");
+          return;
+        }
       } else if (act === "delete") {
         const name = btn.dataset.name || "";
         if (!confirm(t("deleteTenantConfirm", { name }))) return;
@@ -1135,6 +1230,9 @@
         const dshow = d.hw?.dshow || [];
         const camLine = cams.length ? `\u{1F4F9} ${cams.map((c) => `${escapeHtml(c.name || "Kamera")}${c.status === "OK" ? "" : " \u26A0"}`).join(", ")}` : "";
         const dshowLine = dshow.length ? `\u{1F3A5} DSHOW: ${dshow.map((c) => `video=${escapeHtml(dshowDeviceName(c))}`).join(" \u2022 ")}` : "";
+        const errs = Array.isArray(d.hw?.errors) ? d.hw.errors.filter((x) => x && x.message) : [];
+        const errLine = errs.length ? `<span class="status-chip err">${t("crashCount", { n: errs.length })}</span>
+           <details style="margin-top:2px"><summary class="sub" style="font-size:11px;cursor:pointer">${t("crashLast", { msg: escapeHtml(errs[0].message || "") })}</summary>${errs.slice(0, 5).map((x) => `<p class="sub" style="font-size:11px;margin-top:2px">\u26A0\uFE0F ${x.at ? new Date(Number(x.at)).toLocaleString() : ""} \u2014 ${escapeHtml(x.message)}</p>`).join("")}</details>` : "";
         return `
       <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;padding:12px 0;border-bottom:1px solid rgba(196,220,248,0.12)">
         <div style="min-width:0">
@@ -1142,6 +1240,7 @@
           <p class="sub" style="font-size:11px;word-break:break-all">${escapeHtml(d.device_id)} \u2022 ${d.last_seen ? new Date(Number(d.last_seen) || d.last_seen).toLocaleString() : "\u2014"}</p>
           ${camLine ? `<p class="sub" style="font-size:11px;margin-top:2px">${camLine}</p>` : ""}
           ${dshowLine ? `<p class="sub" style="font-size:11px;margin-top:2px">${dshowLine}</p>` : ""}
+          ${errLine}
         </div>
         <div style="display:flex;gap:8px;flex-shrink:0">
           <button class="btn ghost sm" data-rename="${escapeHtml(d.id)}" data-name="${escapeHtml(d.name || "")}">\u270F\uFE0F ${escapeHtml(t("tvRename"))}</button>
@@ -1208,7 +1307,61 @@
     }
     return opts;
   }
-  registerAdminFeatures({ renderTv, refreshTenants, renderOverviewExtra, dshowOptions });
+  async function pairedDeviceCount() {
+    try {
+      return (await fetchDevices()).length;
+    } catch {
+      return null;
+    }
+  }
+  function uploadErrorMessage(raw) {
+    return /blob tidak dikonfigurasi/i.test(raw) ? t("uploadBlobMissing") : null;
+  }
+  registerAdminFeatures({ renderTv, refreshTenants, renderOverviewExtra, dshowOptions, pairedDeviceCount, uploadErrorMessage });
+  function renderMediaList(items) {
+    const list = $("mediaList");
+    if (!items.length) {
+      list.innerHTML = `<div class="empty-state">${escapeHtml(t("mediaEmpty"))}</div>`;
+      return;
+    }
+    list.innerHTML = items.map((m) => `
+    <div class="announcement-item" data-id="${escapeHtml(m.id)}">
+      <div>
+        <div class="ann-title">${escapeHtml(m.filename.split("/").pop() || m.filename)} <span class="chip neutral">${escapeHtml(m.kind)}</span></div>
+        <div class="ann-meta">
+          <span>${t("createdOn", { d: new Date(Number(m.createdAt)).toLocaleDateString() })}</span>
+          <a href="${escapeHtml(m.url)}" target="_blank" rel="noopener">${escapeHtml(m.url)}</a>
+        </div>
+        ${m.kind === "image" ? `<img class="img-preview" src="${escapeHtml(m.url)}" alt="" loading="lazy">` : ""}
+      </div>
+      <div class="ann-actions">
+        <button class="btn danger sm" data-media-del="${escapeHtml(m.id)}">${t("delete")}</button>
+      </div>
+    </div>`).join("");
+  }
+  $("mediaRefreshBtn").addEventListener("click", async () => {
+    const list = $("mediaList");
+    try {
+      const items = await api("/api/admin/media");
+      list.hidden = false;
+      renderMediaList(items);
+    } catch (err) {
+      toast(err.message, "err");
+    }
+  });
+  $("mediaList").addEventListener("click", async (e) => {
+    const btn = e.target.closest("[data-media-del]");
+    if (!btn) return;
+    if (!confirm(t("mediaDeleteConfirm"))) return;
+    try {
+      await api(`/api/admin/media/${btn.dataset.mediaDel}`, { method: "DELETE" });
+      toast(t("mediaDeleted"));
+      const items = await api("/api/admin/media");
+      renderMediaList(items);
+    } catch (err) {
+      toast(err.message, "err");
+    }
+  });
 
   // src/admin/core.ts
   function renderAll() {
@@ -1276,14 +1429,14 @@
     }
     $("ovScreenUrl").textContent = s.screenUrl;
     const urlHtml = `<strong>${escapeHtml(s.screenUrl)}</strong>`;
-    $("note1").innerHTML = t("note1", { url: urlHtml });
+    $("note1").innerHTML = t(F.kioskStreams() ? "note1Cloud" : "note1", { url: urlHtml });
     $("passwordNote").hidden = !s.adminPasswordFile;
     if (s.adminPasswordFile) {
       $("passwordNote").innerHTML = t("notePassword", { file: "<code>server/data/ADMIN_PASSWORD.txt</code>" });
     }
     $("audioNote").hidden = !s.audioEnabled;
     $("streamNote").hidden = s.streamCount === 0;
-    $("streamNote").innerHTML = t("noteStreams", { count: `${s.activeStreamCount}/${s.streamCount}` });
+    $("streamNote").innerHTML = t(F.kioskStreams() ? "noteStreamsCloud" : "noteStreams", { count: `${s.activeStreamCount}/${s.streamCount}` });
     $("eventsSyncNote").hidden = !s.eventsSync?.enabled;
     if (featureHooks.renderOverviewExtra) featureHooks.renderOverviewExtra();
     renderNextPrayer();
@@ -1479,6 +1632,7 @@
     renderEventsSyncStatus(s.eventsSync || {});
     renderRoster(s.roster || {});
     renderStreams();
+    if (F.kioskStreams()) $("streamsSub").textContent = t("streamsSubCloud");
     renderFfmpegStatus();
     settingsDirty = false;
   }
@@ -1623,6 +1777,37 @@
   }
   function renderFfmpegStatus() {
     const el = $("ffmpegStatus");
+    if (F.kioskStreams()) {
+      if (state.ffmpegOk !== true) {
+        el.textContent = t("kioskMissing");
+        el.style.color = "var(--danger)";
+        return;
+      }
+      el.textContent = t("checkingFfmpeg");
+      el.style.color = "";
+      const hook = featureHooks.pairedDeviceCount;
+      if (!hook) {
+        el.textContent = t("kioskOk", { n: "\u22651" });
+        el.style.color = "var(--teal)";
+        return;
+      }
+      hook().then((n) => {
+        if (n === null) {
+          el.textContent = t("kioskOk", { n: "\u22651" });
+          el.style.color = "var(--teal)";
+        } else if (n > 0) {
+          el.textContent = t("kioskOk", { n });
+          el.style.color = "var(--teal)";
+        } else {
+          el.textContent = t("kioskMissing");
+          el.style.color = "var(--danger)";
+        }
+      }).catch(() => {
+        el.textContent = t("kioskOk", { n: "\u22651" });
+        el.style.color = "var(--teal)";
+      });
+      return;
+    }
     if (state.ffmpegOk === null) {
       el.textContent = t("checkingFfmpeg");
       el.style.color = "";
@@ -2439,7 +2624,8 @@
       blobUpload: true,
       headingFont: true,
       fridayKhutbah: true,
-      tokenRotate: true
+      tokenRotate: true,
+      kioskStreams: true
     }
   });
 })();

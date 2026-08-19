@@ -91,14 +91,16 @@ function renderOverview() {
   }
   $('ovScreenUrl').textContent = s.screenUrl;
   const urlHtml = `<strong>${escapeHtml(s.screenUrl)}</strong>`;
-  $('note1').innerHTML = t('note1', { url: urlHtml });
+  // (ciri varian) Awan: nota URL awam Vercel + kiosk berpasangan; lokal
+  // kekal teks LAN/ffmpeg pada mini PC (kunci asal).
+  $('note1').innerHTML = t(F.kioskStreams() ? 'note1Cloud' : 'note1', { url: urlHtml });
   $('passwordNote').hidden = !s.adminPasswordFile;
   if (s.adminPasswordFile) {
     $('passwordNote').innerHTML = t('notePassword', { file: '<code>server/data/ADMIN_PASSWORD.txt</code>' });
   }
   $('audioNote').hidden = !s.audioEnabled;
   $('streamNote').hidden = s.streamCount === 0;
-  $('streamNote').innerHTML = t('noteStreams', { count: `${s.activeStreamCount}/${s.streamCount}` });
+  $('streamNote').innerHTML = t(F.kioskStreams() ? 'noteStreamsCloud' : 'noteStreams', { count: `${s.activeStreamCount}/${s.streamCount}` });
   $('eventsSyncNote').hidden = !(s.eventsSync?.enabled);
   if (featureHooks.renderOverviewExtra) featureHooks.renderOverviewExtra();
   renderNextPrayer();
@@ -321,6 +323,9 @@ function populateSettings(s: Partial<Settings> & Record<string, any>) {
   renderEventsSyncStatus(s.eventsSync || {});
   renderRoster(s.roster || {});
   renderStreams();
+  // (ciri varian) Ayat bantuan kad stream: awan menerangkan relay kiosk
+  // (tiada ffmpeg pada hos awan); lokal kekal ayat "ffmpeg pada mesin ini".
+  if (F.kioskStreams()) $('streamsSub').textContent = t('streamsSubCloud');
   renderFfmpegStatus();
   settingsDirty = false; // isian programatik bukan suntingan pengguna
 }
@@ -495,6 +500,42 @@ function collectStreams(): StreamRow[] {
 
 function renderFfmpegStatus() {
   const el = $('ffmpegStatus');
+  // (awan sahaja) Hos awan tiada ffmpeg — status ffmpegOk pelayan membawa
+  // maksud "ada kiosk berpasangan". Label jujur mengikut bilangan peranti
+  // berpasangan (cache cangkuk varian) dan bukan dakwaan ffmpeg mesin ini.
+  if (F.kioskStreams()) {
+    if (state.ffmpegOk !== true) {
+      el.textContent = t('kioskMissing');
+      el.style.color = 'var(--danger)';
+      return;
+    }
+    el.textContent = t('checkingFfmpeg');
+    el.style.color = '';
+    const hook = featureHooks.pairedDeviceCount;
+    if (!hook) {
+      // Cangkuk tidak didaftarkan — kekal mesej generik berdasarkan server.
+      el.textContent = t('kioskOk', { n: '≥1' });
+      el.style.color = 'var(--teal)';
+      return;
+    }
+    hook().then((n) => {
+      if (n === null) {
+        // Rangkaian gagal — kembali kepada unjuran pelayan (≥ 1 kiosk).
+        el.textContent = t('kioskOk', { n: '≥1' });
+        el.style.color = 'var(--teal)';
+      } else if (n > 0) {
+        el.textContent = t('kioskOk', { n });
+        el.style.color = 'var(--teal)';
+      } else {
+        el.textContent = t('kioskMissing');
+        el.style.color = 'var(--danger)';
+      }
+    }).catch(() => {
+      el.textContent = t('kioskOk', { n: '≥1' });
+      el.style.color = 'var(--teal)';
+    });
+    return;
+  }
   if (state.ffmpegOk === null) {
     el.textContent = t('checkingFfmpeg');
     el.style.color = '';

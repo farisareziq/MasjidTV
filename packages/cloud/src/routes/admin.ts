@@ -3,7 +3,7 @@
 
 import crypto from 'node:crypto';
 import type { FastifyInstance, FastifyRequest } from 'fastify';
-import { put, issueSignedToken, presignUrl, head } from '@vercel/blob';
+import { put, issueSignedToken, presignUrl, head, del } from '@vercel/blob';
 import {
   buildEventsPayload, syncEventsFor,
   UPLOAD_TYPES,
@@ -161,14 +161,16 @@ export function registerAdminRoutes(app: FastifyInstance, ctx: RouteContext): vo
         return jsonError(reply, 500, 'Gagal muat naik ke Blob');
       }
     }
-    return jsonError(reply, 400, 'Blob tidak dikonfigurasi');
+    // Tanpa token Blob, muat naik mustahil — beritahu admin cara membaikinya
+    // (bukan mesej kriptik); UI turut memetakan mesej ini kepada arahan i18n.
+    return jsonError(reply, 400, 'Blob tidak dikonfigurasi — tetapkan VERCEL_BLOB_READ_WRITE_TOKEN dalam pembolehubah persekitaran Vercel dan redeploy');
   });
 
   app.post('/api/admin/upload-url', async (req, reply) => {
     const tenant = await requireAdmin(store, req, reply);
     if (!tenant) return;
     const blobToken = process.env.VERCEL_BLOB_READ_WRITE_TOKEN || process.env.BLOB_READ_WRITE_TOKEN;
-    if (!blobToken) return jsonError(reply, 400, 'Blob tidak dikonfigurasi');
+    if (!blobToken) return jsonError(reply, 400, 'Blob tidak dikonfigurasi — tetapkan VERCEL_BLOB_READ_WRITE_TOKEN dalam pembolehubah persekitaran Vercel dan redeploy');
     const { contentType } = (req.body || {}) as { contentType?: string };
     const type = UPLOAD_TYPES[contentType || ''];
     if (!type) return jsonError(reply, 400, 'Jenis fail tidak disokong');
@@ -207,6 +209,42 @@ export function registerAdminRoutes(app: FastifyInstance, ctx: RouteContext): vo
     }
   });
 
+  // Pustaka media tenant (A4): baris cloud_media ditulis oleh upload &
+  // upload-confirm tetapi sebelum ini tiada laluan membacanya. Bina semula
+  // URL awam daripada laluan blob tersimpan (upload-confirm menyimpan
+  // `pathname` "media/<tenantId>/…", bukan URL penuh) melalui asal Blob
+  // yang boleh diatasi env untuk dev/emulator tempatan.
+  function blobPublicUrl(pathname: string): string {
+    if (/^https?:\/\//i.test(pathname)) return pathname; // data lama URL penuh
+    const origin = (process.env.MASJIDTV_BLOB_PUBLIC_URL || 'https://blob.vercel-storage.com').replace(/\/+$/, '');
+    return `${origin}/${pathname.replace(/^\/+/, '')}`;
+  }
+
+  app.get('/api/admin/media', async (req, reply) => {
+    const tenant = await requireAdmin(store, req, reply);
+    if (!tenant) return;
+    const rows = await store.listMedia(tenant.id);
+    reply.send(rows.map((m) => ({ ...m, url: blobPublicUrl(m.filename) })));
+  });
+
+  app.delete('/api/admin/media/:id', async (req, reply) => {
+    const tenant = await requireAdmin(store, req, reply);
+    if (!tenant) return;
+    const row = await store.getMedia(tenant.id, (req.params as { id: string }).id);
+    if (!row) return jsonError(reply, 404, 'Media tidak dijumpai');
+    // Padam baris DB dahulu (sumber kebenaran UI); pemadaman Blob
+    // best-effort selepasnya — kegagalan Blob tidak menggagalkan permintaan
+    // (blob yatim tidak lagi dirujuk oleh mana-mana respons API).
+    await store.deleteMedia(tenant.id, row.id);
+    const blobToken = process.env.VERCEL_BLOB_READ_WRITE_TOKEN || process.env.BLOB_READ_WRITE_TOKEN;
+    if (blobToken) {
+      try {
+        await del(row.filename, { token: blobToken });
+      } catch { /* abaikan — padam blob best-effort sahaja */ }
+    }
+    reply.send({ ok: true });
+  });
+
   app.post('/api/admin/events/sync', async (req, reply) => {
     const tenant = await requireAdmin(store, req, reply);
     if (!tenant) return;
@@ -224,7 +262,13 @@ export function registerAdminRoutes(app: FastifyInstance, ctx: RouteContext): vo
       status: s.enabled ? 'configured' : 'disabled',
       hlsUrl: ['rtsp', 'rtmp', 'onvif'].includes(s.type) ? `/relay/${s.id}/index.m3u8` : null
     }));
-    reply.send({ streams, ffmpegOk: true });
+    // Hos awan TIADA ffmpeg & tiada endpoint /relay — stream kamera/cermin
+    // hanya berfungsi melalui kiosk mini PC berpasangan. Laporkan ffmpegOk
+    // secara jujur sebagai proksi "ada kiosk berpasangan" supaya UI tidak
+    // mendakwa relay tersedia pada mesin ini; kioskRequired menandakan pada
+    // klien bahawa relay memerlukan kiosk (bukan ffmpeg pelayan).
+    const devices = await store.listDevices(tenant.id);
+    reply.send({ streams, ffmpegOk: devices.length > 0, kioskRequired: true });
   });
 
   app.put('/api/admin/streams', async (req, reply) => {
@@ -269,6 +313,12 @@ export function registerAdminRoutes(app: FastifyInstance, ctx: RouteContext): vo
     if (!tenant) return;
     const { code } = (req.body || {}) as { code?: string };
     const verified = verifyLicense(String(code || '').trim());
+    // Bezakan kegagalan KONFIGURASI PELAYAN (kunci awam lesen belum diset /
+    // tidak sah pada server) daripada kod salah — mesej generik "kod tidak
+    // sah" mengelirukan admin apabila puncanya LICENSE_PUBLIC_KEY tiada.
+    if (!verified.ok && (verified.reason === 'no-public-key' || verified.reason === 'key')) {
+      return jsonError(reply, 400, 'Konfigurasi lesen pelayan belum selesai — hubungi penyedia untuk mengaktifkan pengesahan lesen. (License server is not configured — LICENSE_PUBLIC_KEY missing/invalid.)', 'LICENSE_SERVER_UNCONFIGURED');
+    }
     if (!verified.ok || verified.tenantId !== tenant.id) {
       return jsonError(reply, 400, verified.ok ? 'Kod lesen tidak untuk masjid ini' : 'Kod lesen tidak sah');
     }

@@ -8,7 +8,7 @@
 // dimuat), jadi susunan import pada wrapper adalah signifikan.
 
 import { $, state, registerAdminFeatures } from './types';
-import type { DshowOption, LicenseInfo, TenantInfo, TvDevice } from './types';
+import type { DshowOption, LicenseInfo, MediaItem, TenantInfo, TvDevice } from './types';
 import { t, i18nEntry, currentAdminLang } from './i18n';
 import { escapeHtml, dshowDeviceName } from './util';
 import { api, toast } from './api';
@@ -97,6 +97,29 @@ function renderTenants() {
   }).join('');
 }
 
+// Jenis pengguna tenant yang dipulangkan GET /api/super/tenants/:id/users.
+type TenantUser = { id: string; username: string; active?: number; created_at?: string; createdAt?: number | string };
+
+// Lukis kotak "Users" tenant: senarai pengguna + tindakan setiap baris
+// (reset kata laluan, aktif/nyahaktif, padam) dan borang mini tambah
+// pengguna — dipanggil semula selepas setiap tindakan supaya status terkini.
+async function renderTenantUsers(box: HTMLElement, tenantId: string) {
+  const users: TenantUser[] = await api(`/api/super/tenants/${tenantId}/users`);
+  box.innerHTML = users.map((u) => `
+    <div class="roster-row">
+      <span class="day-label">${escapeHtml(u.username)} <span class="chip ${Number(u.active ?? 1) ? 'ok' : 'err'}">${Number(u.active ?? 1) ? t('adminBadge') : t('userInactiveBadge')}</span></span>
+      <span class="sub">${t('createdOn', { d: new Date(Number(u.createdAt || u.created_at) || String(u.createdAt || u.created_at || '')).toLocaleDateString() })}</span>
+      <button class="btn ghost sm" data-act="resetpw" data-id="${u.id}">${t('resetPassword')}</button>
+      <button class="btn ghost sm" data-act="toggleuser" data-id="${u.id}" data-active="${Number(u.active ?? 1)}">${Number(u.active ?? 1) ? t('suspend') : t('activate')}</button>
+      <button class="btn danger sm" data-act="deluser" data-id="${u.id}">${t('removeUser')}</button>
+    </div>`).join('') + `
+    <div class="form-grid" style="margin-top:10px">
+      <label><span>${t('usernameLabel')}</span><input type="text" class="su-new-user" maxlength="60"></label>
+      <label><span>${t('passwordLabel')}</span><input type="password" class="su-new-pass" autocomplete="new-password"></label>
+      <button class="btn primary sm" data-act="adduser" data-id="${tenantId}">${t('addUser')}</button>
+    </div>`;
+}
+
 $('tenantList').addEventListener('click', async (e) => {
   const btn = (e.target as HTMLElement).closest('[data-act]') as HTMLElement | null;
   if (!btn) return;
@@ -118,18 +141,43 @@ $('tenantList').addEventListener('click', async (e) => {
       const box = document.querySelector(`[data-users="${id}"]`) as HTMLElement;
       if (!box.hidden) { box.hidden = true; return; }
       box.hidden = false;
-      const users: Array<{ id: string; username: string; created_at: string }> = await api(`/api/super/tenants/${id}/users`);
-      box.innerHTML = users.map((u) => `
-        <div class="roster-row">
-          <span class="day-label">${escapeHtml(u.username)} <span class="chip ok">${t('adminBadge')}</span></span>
-          <span class="sub">${t('createdOn', { d: new Date(u.created_at).toLocaleDateString() })}</span>
-          <button class="btn danger sm" data-act="deluser" data-id="${u.id}">${t('removeUser')}</button>
-        </div>`).join('');
+      await renderTenantUsers(box, String(id));
+      return; // kekalkan kotak terbuka — jangan tutup semula tenant list
+    } else if (act === 'adduser') {
+      const item = btn.closest('.announcement-item') as HTMLElement;
+      const username = (item.querySelector('.su-new-user') as HTMLInputElement).value.trim();
+      const password = (item.querySelector('.su-new-pass') as HTMLInputElement).value;
+      // Pengesahan sisi pelanggan sama seperti borang lain (server menyemak semula).
+      if (!username || password.length < 6) return toast(t('userAddFailed'), 'err');
+      await api(`/api/super/tenants/${id}/users`, { method: 'POST', body: { username, password } });
+      toast(t('userAdded'));
+      const box = item.querySelector('.users') as HTMLElement;
+      await renderTenantUsers(box, String(id));
+      return;
+    } else if (act === 'resetpw') {
+      const row = btn.closest('.roster-row') as HTMLElement | null;
+      const uname = row?.querySelector('.day-label')?.firstChild?.textContent || '';
+      const pw = prompt(t('resetPasswordPrompt', { name: uname.trim() }));
+      if (pw === null) return; // batal
+      if (pw.length < 6) return toast(t('pwTooShort'), 'err');
+      await api(`/api/super/users/${id}`, { method: 'PATCH', body: { password: pw } });
+      toast(t('resetPasswordDone', { name: uname.trim() }));
+      return;
+    } else if (act === 'toggleuser') {
+      const nextActive = btn.dataset.active !== '1';
+      await api(`/api/super/users/${id}`, { method: 'PATCH', body: { active: nextActive } });
+      toast(nextActive ? t('userActivated') : t('userDeactivated'));
+      const box = btn.closest('.users') as HTMLElement;
+      const tenantId = (box.dataset.users || '') as string;
+      await renderTenantUsers(box, tenantId);
+      return;
     } else if (act === 'deluser') {
-      const uname = (btn.closest('.roster-row') as HTMLElement | null)?.querySelector('.day-label')?.textContent || '';
+      const uname = (btn.closest('.roster-row') as HTMLElement | null)?.querySelector('.day-label')?.firstChild?.textContent || '';
       if (!confirm(t('userDeleteConfirm', { name: uname.trim() }))) return;
       await api(`/api/super/users/${id}`, { method: 'DELETE' });
       toast(t('annDeleted'));
+      const box = btn.closest('.users') as HTMLElement;
+      if (box) { await renderTenantUsers(box, box.dataset.users || ''); return; }
     } else if (act === 'delete') {
       const name = btn.dataset.name || '';
       if (!confirm(t('deleteTenantConfirm', { name }))) return;
@@ -198,6 +246,16 @@ async function renderTv() {
       const dshowLine = dshow.length
         ? `🎥 DSHOW: ${dshow.map((c) => `video=${escapeHtml(dshowDeviceName(c))}`).join(' • ')}`
         : '';
+      // Laporan crash kiosk (B9, opt-in MASJIDTV_CRASH_UPLOAD=1) — chip merah
+      // + baris <details> boleh kembang dengan 5 ralat terkini; hanya dipapar
+      // bila laporan wujud (tiada laporan = tiada perubahan UI).
+      const errs = Array.isArray(d.hw?.errors) ? d.hw.errors.filter((x) => x && x.message) : [];
+      const errLine = errs.length
+        ? `<span class="status-chip err">${t('crashCount', { n: errs.length })}</span>
+           <details style="margin-top:2px"><summary class="sub" style="font-size:11px;cursor:pointer">${t('crashLast', { msg: escapeHtml(errs[0].message || '') })}</summary>${
+             errs.slice(0, 5).map((x) => `<p class="sub" style="font-size:11px;margin-top:2px">⚠️ ${x.at ? new Date(Number(x.at)).toLocaleString() : ''} — ${escapeHtml(x.message)}</p>`).join('')
+           }</details>`
+        : '';
       return `
       <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;padding:12px 0;border-bottom:1px solid rgba(196,220,248,0.12)">
         <div style="min-width:0">
@@ -207,6 +265,7 @@ async function renderTv() {
           }</p>
           ${camLine ? `<p class="sub" style="font-size:11px;margin-top:2px">${camLine}</p>` : ''}
           ${dshowLine ? `<p class="sub" style="font-size:11px;margin-top:2px">${dshowLine}</p>` : ''}
+          ${errLine}
         </div>
         <div style="display:flex;gap:8px;flex-shrink:0">
           <button class="btn ghost sm" data-rename="${escapeHtml(d.id)}" data-name="${escapeHtml(d.name || '')}">✏️ ${escapeHtml(t('tvRename'))}</button>
@@ -284,4 +343,77 @@ async function dshowOptions(): Promise<DshowOption[]> {
   return opts;
 }
 
-registerAdminFeatures({ renderTv, refreshTenants, renderOverviewExtra, dshowOptions });
+// ------------------------------------------------------------- status kiosk & upload
+
+// Bilangan peranti kiosk berpasangan — dipapar pada label status kad stream
+// (hos awan tiada ffmpeg; relay kamera/cermin berlaku pada kiosk). Guna cache
+// yang sama seperti dshowOptions supaya tidak menambah panggilan API.
+// Kegagalan rangkaian → null (teras kembali kepada unjuran pelayan).
+async function pairedDeviceCount(): Promise<number | null> {
+  try {
+    return (await fetchDevices()).length;
+  } catch {
+    return null;
+  }
+}
+
+// Ralat muat naik: unjur "Blob tidak dikonfigurasi" kepada arahan boleh
+// tindak; mesej lain dipapar verbatim (null = tiada pemetaan).
+function uploadErrorMessage(raw: string): string | null {
+  return /blob tidak dikonfigurasi/i.test(raw) ? t('uploadBlobMissing') : null;
+}
+
+registerAdminFeatures({ renderTv, refreshTenants, renderOverviewExtra, dshowOptions, pairedDeviceCount, uploadErrorMessage });
+
+// ------------------------------------------------------------- pustaka media (A4)
+
+// Kad "Media library" dalam view Kandungan — memuatkan senarai media Blob
+// tenant ATAS PERMINTAAN (butang "Load media"), bukan pada setiap sync, supaya
+// kitaran 10sa tidak mem-fetch endpoint baharu berulang kali. Imej dipapar
+// sebagai thumbnail; video/audio/teks dipapar sebagai baris dengan pautan.
+function renderMediaList(items: MediaItem[]) {
+  const list = $('mediaList');
+  if (!items.length) {
+    list.innerHTML = `<div class="empty-state">${escapeHtml(t('mediaEmpty'))}</div>`;
+    return;
+  }
+  list.innerHTML = items.map((m) => `
+    <div class="announcement-item" data-id="${escapeHtml(m.id)}">
+      <div>
+        <div class="ann-title">${escapeHtml(m.filename.split('/').pop() || m.filename)} <span class="chip neutral">${escapeHtml(m.kind)}</span></div>
+        <div class="ann-meta">
+          <span>${t('createdOn', { d: new Date(Number(m.createdAt)).toLocaleDateString() })}</span>
+          <a href="${escapeHtml(m.url)}" target="_blank" rel="noopener">${escapeHtml(m.url)}</a>
+        </div>
+        ${m.kind === 'image' ? `<img class="img-preview" src="${escapeHtml(m.url)}" alt="" loading="lazy">` : ''}
+      </div>
+      <div class="ann-actions">
+        <button class="btn danger sm" data-media-del="${escapeHtml(m.id)}">${t('delete')}</button>
+      </div>
+    </div>`).join('');
+}
+
+$('mediaRefreshBtn').addEventListener('click', async () => {
+  const list = $('mediaList');
+  try {
+    const items = await api<MediaItem[]>('/api/admin/media');
+    list.hidden = false;
+    renderMediaList(items);
+  } catch (err) {
+    toast((err as Error).message, 'err');
+  }
+});
+
+$('mediaList').addEventListener('click', async (e) => {
+  const btn = (e.target as HTMLElement).closest('[data-media-del]') as HTMLElement | null;
+  if (!btn) return;
+  if (!confirm(t('mediaDeleteConfirm'))) return;
+  try {
+    await api(`/api/admin/media/${btn.dataset.mediaDel}`, { method: 'DELETE' });
+    toast(t('mediaDeleted'));
+    const items = await api<MediaItem[]>('/api/admin/media');
+    renderMediaList(items);
+  } catch (err) {
+    toast((err as Error).message, 'err');
+  }
+});

@@ -228,6 +228,26 @@ export class CloudStore {
     await this.db.insert(cloudMedia).values({ id: uid(), tenantId, filename, kind, createdAt: now() }).run();
   }
 
+  // Senarai media tenant (pustaka media admin) — disusun terkini dahulu.
+  async listMedia(tenantId: string) {
+    const rows = await this.db.select({
+      id: cloudMedia.id, filename: cloudMedia.filename,
+      kind: cloudMedia.kind, createdAt: cloudMedia.createdAt
+    }).from(cloudMedia).where(eq(cloudMedia.tenantId, tenantId)).all();
+    return rows.sort((a, b) => Number(b.createdAt) - Number(a.createdAt));
+  }
+
+  // Ambil satu baris media (ditapis tenant — elak baca/padam merentas tenant).
+  async getMedia(tenantId: string, id: string) {
+    const rows = await this.db.select().from(cloudMedia)
+      .where(and(eq(cloudMedia.tenantId, tenantId), eq(cloudMedia.id, id))).all();
+    return rows[0] || null;
+  }
+
+  async deleteMedia(tenantId: string, id: string): Promise<void> {
+    await this.db.delete(cloudMedia).where(and(eq(cloudMedia.tenantId, tenantId), eq(cloudMedia.id, id))).run();
+  }
+
   async createPairingSession(code: string, deviceId: string, ttlMs: number): Promise<void> {
     const t0 = now();
     await this.db.insert(pairingSessions).values({

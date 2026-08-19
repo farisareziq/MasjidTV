@@ -10,7 +10,9 @@
 // - annReorder/annQuran: susun semula pengumuman & medan Quran harian;
 // - blobUpload: mampatan imej + muat naik Blob berpresign untuk fail besar;
 // - headingFont/fridayKhutbah: medan paparan tambahan;
-// - tokenRotate: tukar kata laluan mengembalikan token baharu.
+// - tokenRotate: tukar kata laluan mengembalikan token baharu;
+// - kioskStreams: relay kamera/cermin melalui kiosk berpasangan (bukan ffmpeg
+//   pada hos awan) — nota & label status yang jujur pada kad stream.
 import './admin/cloud';
 import { bootAdmin } from './admin/core';
 
@@ -23,6 +25,7 @@ bootAdmin({
     blobUpload: true,
     headingFont: true,
     fridayKhutbah: true,
-    tokenRotate: true
+    tokenRotate: true,
+    kioskStreams: true
   }
 });

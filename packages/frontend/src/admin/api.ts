@@ -38,6 +38,17 @@ export async function api<T = unknown>(path: string, options: ApiOptions = {}): 
   return res.json();
 }
 
+// (awan sahaja) Unjur ralat muat naik melalui cangkuk varian — cth. "Blob
+// tidak dikonfigurasi" menjadi arahan jelas (set VERCEL_BLOB_READ_WRITE_TOKEN
+// dalam Vercel). Tanpa cangkuk (lokal): mesej pelayan dipapar verbatim.
+function mapUploadError(raw: string): string {
+  if (featureHooks.uploadErrorMessage) {
+    const mapped = featureHooks.uploadErrorMessage(raw);
+    if (mapped) return mapped;
+  }
+  return raw;
+}
+
 export async function uploadFile(file: File): Promise<UploadResult> {
   const mime = fileMime(file);
   // (awan sahaja) Mampatkan imej besar & hantar video/audio/fail besar terus
@@ -69,7 +80,7 @@ export async function uploadFile(file: File): Promise<UploadResult> {
     });
     if (!res.ok) {
       const j = await res.json().catch(() => ({}));
-      throw new Error(j.error || t('uploadFailed'));
+      throw new Error(mapUploadError(j.error || t('uploadFailed')));
     }
     return res.json();
   }
@@ -80,7 +91,7 @@ export async function uploadFile(file: File): Promise<UploadResult> {
   });
   if (!res.ok) {
     const j = await res.json().catch(() => ({}));
-    throw new Error(j.error || t('uploadFailed'));
+    throw new Error(mapUploadError(j.error || t('uploadFailed')));
   }
   return res.json();
 }
