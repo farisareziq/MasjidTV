@@ -131,11 +131,45 @@ Smart App Control menyekat exe tidak ditandatangani (dilalui "Run anyway" semasa
 |---|---|---|---|
 | 1 | ~~B2: uji FB mirror~~ — DIBUANG (FB disekat) | — | — |
 | 2 | C3: code signing | bergantung dana | Tinggi pra-edaran |
-| 3 | Ujian manual updater kiosk pada peranti sebenar (B1 selesai — kod) | 1 jam | Tinggi |
-| 4 | Persediaan C4 prod: SENTRY_DSN + webhook secret | 30 min | Sederhana-Tinggi |
+| 3 | ~~Ujian updater~~ ✅ SELESAI automatik (`scripts/test-updater.mjs` 13/13) | — | — |
+| 4 | Persediaan C4 prod: SENTRY_DSN + webhook secret (preflight warn ✅) | 30 min | Sederhana-Tinggi |
 | 5 | README: seksyen kiosk Electron penuh | 1 jam | Sederhana |
 | 6 | B3/B4: Android TV SSE + laporan perkakasan | 2-3 jam | Rendah-Sederhana |
 | 7 | D: buang kod SEA legacy (refactor app.ts virtual block) | 2 jam | Rendah-Sederhana |
+
+## Sprint 2026-08-19 (malam) — penambahbaikan release UX ✅ SELESAI
+
+Commit `79fc0bd` — semua item release kecuali code signing. Fokus: kebolehgunaan
+untuk admin masjid **bukan-teknikal** (permukaan pertama yang mereka sentuh).
+
+- [x] **Halaman pairing** (pair.ts): URL admin penuh + langkah 1-2-3 dwibahasa
+  (ms/en), countdown tamat tempoh kod, notis "kod baharu dijana", mesej ralat
+  mesra (semak internet mini PC) dengan auto-retry 10sa.
+- [x] **Admin first-run checklist** (core.ts + admin.html ×2): kad panduan
+  "Lengkapkan langkah ini" — profil masjid → zon JAKIM → pengumuman → pair TV.
+  Langkah selesai ditanda ✅ + coretan; kad tersembunyi bila semua siap.
+- [x] **i18n**: kunci `noTenants` (en+ms — dahulu fallback salah ke
+  "No Islamic events yet"); baiki ms bercampur (Username→Nama pengguna,
+  Trial→Percubaan, Sync→Segerak); default bahasa admin `ms` (konsisten display).
+- [x] **Menu kiosk tersembunyi** (Ctrl+Shift+M): bahasa mudah bukan-teknikal,
+  confirm dialog sebelum Nyahpaut (elak unpair tak sengaja), ringkasan sokongan
+  satu baris (status/tenant/deviceId/cloud) + capaian internet async,
+  `/api/pair/config` pulangkan `deviceId`.
+- [x] **Display recovery** (display-core.ts): 401 → panduan re-pair boleh-tindak
+  dwibahasa (bukan ayat mati); offline → kad meyakinkan + nota auto-reconnect.
+- [x] **Harness updater automatik** (`scripts/test-updater.mjs` — 13/13 lulus):
+  pelayan GitHub Releases palsu + mock electron (CJS require cache). Sahkan
+  checksum tepat → ready+installer, checksum salah → fail-closed, .sha256 tiada
+  → fail-closed, asset tiada → langkau, portable → notis sahaja. Updater kini
+  sokong `MASJIDTV_UPDATE_DRY_RUN=1`, `checkOnce()`, `writeStatus(force)`.
+- [x] **better-sqlite3 ^11→^13** — prebuilt Node 24 (hilang fallback node:sqlite
+  + warning NODE_MODULE_VERSION setiap test run).
+- [x] **preflight env prod** (warn-only): SENTRY_DSN, MASJIDTV_PUBLIC_URL,
+  webhook smoke (DISCORD/SLACK) — bukan blocker.
+- [x] **Pengesahan**: `run-e2e.mjs --fast` 7/7 hijau (build/typecheck/lint/test
+  124/dry-run/pentest/e2e-pairing) + smoke DOM + updater 13/13.
+
+**Baki sebelum edaran meluas:** C3 code-signing (sahaja tertangguh — dana).
 
 ---
 
