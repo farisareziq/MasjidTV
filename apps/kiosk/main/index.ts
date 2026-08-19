@@ -27,6 +27,14 @@ const flagValue = (n: string) => {
 
 const PORT = Number(flagValue('--port') || process.env.PORT || 3000);
 
+// Runner CI headless (tiada GPU/display sebenar): app.whenReady() tidak
+// selesai kerana tunggu infrastruktur GUI/GPU. Matikan pecutan perkakasan
+// (→ SwiftShader) SEBELUM whenReady supaya acara 'ready' dicapai. Hanya bila
+// MASJIDTV_HEADLESS=1 / CI — tiada kesan pada pemasangan kiosk sebenar.
+if (process.env.MASJIDTV_HEADLESS === '1' || process.env.CI) {
+  try { app.disableHardwareAcceleration(); } catch { /* app belum ready */ }
+}
+
 let mainWindow: BrowserWindow | null = null;
 let powerBlockerId: number | -1 = -1;
 // Pelapor crash (C4) — diinisialisasi sebaik app ready (perlu dataDir).
