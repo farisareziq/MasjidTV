@@ -18,6 +18,14 @@ import { Readable } from 'node:stream';
 
 const FFMPEG_VERSION_TAG = 'latest';
 
+// Pin checksum sha256 PILIHAN untuk binari ffmpeg yang diekstrak, mengikut
+// platform. BtbN/FFmpeg-Builds tag "latest" adalah sasaran bergerak (hash
+// berubah setiap build), jadi pin tidak boleh dihardkod kekal. Tetapkan env
+// MASJIDTV_FFMPEG_SHA256 untuk mewajibkan padanan (fail-closed); tanpa ia,
+// hash dikira & dilog sahaja (ketersediaan diutamakan, selari postur updater
+// yang juga hanya memaksa checksum bila ia wujud).
+const EXPECTED_SHA256 = (process.env.MASJIDTV_FFMPEG_SHA256 || '').trim().toLowerCase();
+
 interface StaticBuild {
   url: string;
   /** Laluan ffmpeg DALAM arkib (zip/tar.xz), relatif kepada akar. */
@@ -186,9 +194,15 @@ export async function ensureFfmpeg(dataDir: string, log = console.log): Promise<
     if (!(await probeFfmpeg(local))) {
       throw new Error('binari dimuat turun tidak boleh dilaksanakan');
     }
+    // Sahkan integriti bila pin disediakan (W5-b) — fail-closed: binari tidak
+    // sepadan pin dibuang dan provisen gagal, bukan dilaksanakan begitu sahaja.
+    const actualHash = await sha256(local);
+    if (EXPECTED_SHA256 && actualHash !== EXPECTED_SHA256) {
+      throw new Error(`checksum ffmpeg tidak sepadan pin (dijangka ${EXPECTED_SHA256.slice(0, 12)}…, dapat ${actualHash.slice(0, 12)}…) — binari dibuang`);
+    }
     // Buang arkib selepas berjaya (ruang cakera mini PC terhad).
     fs.rmSync(archive, { force: true });
-    return { ok: true, path: local, message: `ffmpeg dimuat turun: ${local} (sha256 ${await sha256(local)})` };
+    return { ok: true, path: local, message: `ffmpeg dimuat turun: ${local} (sha256 ${actualHash}${EXPECTED_SHA256 ? ', disahkan pin' : ', tanpa pin'})` };
   } catch (err) {
     // Buang sisa gagal supaya boot seterusnya cuba semula bersih.
     fs.rmSync(archive, { force: true });

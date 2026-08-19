@@ -26,6 +26,9 @@ interface Sub {
 
 const subs = new Set<Sub>();
 const revCounters = new Map<string, number>();
+// Siling subscriber setiap instance — pada serverless, jika platform membekukan
+// fungsi tanpa 'close' bersih, Set boleh membesar tanpa had (S1-b).
+const MAX_SUBS = 500;
 
 export function bumpRev(tenantId: string): number {
   const next = (revCounters.get(tenantId) || 0) + 1;
@@ -79,6 +82,10 @@ export function registerSse(app: FastifyInstance, store: CloudStore): void {
       reply.status(401).send({ error: 'Sesi tidak sah' });
       return;
     }
+    if (subs.size >= MAX_SUBS) {
+      reply.status(503).send({ error: 'Terlalu banyak sambungan — cuba lagi' });
+      return;
+    }
 
     reply.raw.writeHead(200, {
       'content-type': 'text/event-stream',
@@ -109,9 +116,11 @@ export function registerSse(app: FastifyInstance, store: CloudStore): void {
       }
     }, 25_000);
 
-    req.raw.on('close', () => {
+    const drop = () => {
       subs.delete(sub);
       clearInterval(hb);
-    });
+    };
+    req.raw.on('close', drop);
+    reply.raw.on('error', drop);
   });
 }

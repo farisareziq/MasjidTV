@@ -235,7 +235,10 @@ export class StreamManager {
       type: stream.type,
       url: stream.url,
       duration: stream.duration,
-      enabled: stream.enabled
+      enabled: stream.enabled,
+      // Sertakan mirrorUrl — endpoint ini ADMIN-auth, dan tanpanya UI memapar
+      // medan Mirror kosong → save seterusnya memadam kunci FB Live (C1).
+      mirrorUrl: stream.mirrorUrl || ''
     };
     if (!isRelayType(stream.type)) {
       base.status = 'configured';

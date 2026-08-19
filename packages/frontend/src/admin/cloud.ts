@@ -226,6 +226,14 @@ async function fetchDevices(force = false): Promise<TvDevice[]> {
   return devicesCache;
 }
 
+// Batalkan cache peranti selepas tindakan pairing/unpair/rename — supaya
+// status kiosk (pairedDeviceCount) + datalist DSHOW segar serta-merta, bukan
+// menunggu TTL 5 minit (W3-f: admin menyangka pairing gagal).
+function invalidateDevicesCache(): void {
+  devicesCache = null;
+  devicesCacheAt = 0;
+}
+
 async function renderTv() {
   const list = $('tvDeviceList');
   if (!list) return;
@@ -285,6 +293,7 @@ $('tvPairBtn').addEventListener('click', async () => {
     await api('/api/admin/pair', { method: 'POST', body: { code } });
     toast(t('tvPairBtn') + ' ✓');
     $('tvPairCode').value = '';
+    invalidateDevicesCache();
     renderTv();
   } catch (err) {
     toast((err as Error).message, 'err');
@@ -302,6 +311,7 @@ $('tvDeviceList').addEventListener('click', async (e) => {
     try {
       await api(`/api/admin/devices/${renameBtn.dataset.rename}`, { method: 'PATCH', body: { name: clean } });
       toast(t('tvRename') + ' ✓');
+      invalidateDevicesCache();
       renderTv();
     } catch (err) {
       toast((err as Error).message, 'err');
@@ -313,6 +323,7 @@ $('tvDeviceList').addEventListener('click', async (e) => {
   try {
     await api(`/api/admin/devices/${btn.dataset.unpair}`, { method: 'DELETE' });
     toast(t('tvUnpair') + ' ✓');
+    invalidateDevicesCache();
     renderTv();
   } catch (err) {
     toast((err as Error).message, 'err');

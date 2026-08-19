@@ -556,7 +556,13 @@ function getActivePrayerEvent(now: number): ActivePrayerEvent | null {
     return { azanMs, iqMs, anchorDate: tm.date };
   };
   const list: PrayerEventEntry[] = [];
+  // Ujian penuh: hadkan senarai kepada solat sasaran SAHAJA (testMode.prayerKey)
+  // supaya aliran tamat dan paparan kembali ke slaid biasa selepas fasa jemaah
+  // — tanpa ini, tetingkap solat seterusnya dirantai dan skrin tersekat dalam
+  // mod solat/hitam sepanjang hari simulasi (W1-f).
+  const targetKey = fullTest && tm.prayerKey ? (tm.prayerKey === 'jumaah' ? 'dhuhr' : tm.prayerKey) : null;
   for (const key of ['fajr', 'dhuhr', 'asr', 'maghrib', 'isha']) {
+    if (targetKey && key !== targetKey) continue;
     const a = (state.today.prayers as Record<string, PrayerTimePayload | undefined>)[key];
     if (!a) continue;
     if (simulate) {
@@ -568,9 +574,11 @@ function getActivePrayerEvent(now: number): ActivePrayerEvent | null {
     }
   }
   const nxt = state.today.next;
+  // Ujian penuh: jangan rantai solat esok — biarkan senarai kosong selepas
+  // solat sasaran supaya getActivePrayerEvent() → null → fasa 'normal'.
   if (nxt?.tomorrow && nxt.key === 'fajr' && !simulate) {
     list.push({ key: 'fajr', azan: nxt.time.ms, iqamah: nxt.time.ms + off, tomorrow: true });
-  } else if (simulate && (state.today.prayers as Record<string, PrayerTimePayload | undefined>).fajr) {
+  } else if (simulate && !targetKey && (state.today.prayers as Record<string, PrayerTimePayload | undefined>).fajr) {
     const tomorrow = zonedMs(addDaysKey(tm.date, 1), (state.today.prayers as Record<string, PrayerTimePayload | undefined>).fajr!.time, tz());
     list.push({ key: 'fajr', azan: tomorrow, iqamah: tomorrow + off, tomorrow: true });
   }
@@ -1011,6 +1019,12 @@ function showSlide(index: number, _instant: boolean): void {
   }
   state.slideIndex = index;
   const el = $('slide');
+
+  // Kosongkan video guard tertangguh daripada slaid sebelumnya — jika tidak,
+  // selepas 'ended' biasa, guard boleh mencetus showSlide sekali lagi dan
+  // melangkau satu slaid (S1-f double-advance).
+  clearTimeout(state.videoGuardTimer);
+  state.videoGuardTimer = null;
 
   // Bersihkan pemain HLS lama
   if (state.hls) {

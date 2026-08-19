@@ -991,6 +991,9 @@ export function bootAdmin(config: AdminVariantConfig): void {
         toast(current.active ? t('annPaused') : t('annActivated'));
       } else if (action === 'edit') {
         const current = await api<Array<Announcement & { status?: string }>>('/api/admin/announcements').then((list) => list.find((x) => x.id === id));
+        // Item mungkin dipadam di tab/peranti lain — jangan buka borang
+        // "baharu" kosong (save akan cipta pendua); tunjuk ralat sepertimana toggle.
+        if (!current) throw new Error(t('notFound'));
         openAnnouncementForm(current);
         return;
       } else if ((action === 'up' || action === 'down') && F.annReorder()) {

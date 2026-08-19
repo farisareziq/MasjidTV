@@ -1886,6 +1886,7 @@
           toast(current.active ? t("annPaused") : t("annActivated"));
         } else if (action === "edit") {
           const current = await api("/api/admin/announcements").then((list) => list.find((x) => x.id === id));
+          if (!current) throw new Error(t("notFound"));
           openAnnouncementForm(current);
           return;
         } else if ((action === "up" || action === "down") && F.annReorder()) {

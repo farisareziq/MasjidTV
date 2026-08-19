@@ -1216,6 +1216,10 @@
     devicesCacheAt = Date.now();
     return devicesCache;
   }
+  function invalidateDevicesCache() {
+    devicesCache = null;
+    devicesCacheAt = 0;
+  }
   async function renderTv() {
     const list = $("tvDeviceList");
     if (!list) return;
@@ -1259,6 +1263,7 @@
       await api("/api/admin/pair", { method: "POST", body: { code } });
       toast(t("tvPairBtn") + " \u2713");
       $("tvPairCode").value = "";
+      invalidateDevicesCache();
       renderTv();
     } catch (err) {
       toast(err.message, "err");
@@ -1275,6 +1280,7 @@
       try {
         await api(`/api/admin/devices/${renameBtn.dataset.rename}`, { method: "PATCH", body: { name: clean } });
         toast(t("tvRename") + " \u2713");
+        invalidateDevicesCache();
         renderTv();
       } catch (err) {
         toast(err.message, "err");
@@ -1286,6 +1292,7 @@
     try {
       await api(`/api/admin/devices/${btn.dataset.unpair}`, { method: "DELETE" });
       toast(t("tvUnpair") + " \u2713");
+      invalidateDevicesCache();
       renderTv();
     } catch (err) {
       toast(err.message, "err");
@@ -2217,6 +2224,7 @@
           toast(current.active ? t("annPaused") : t("annActivated"));
         } else if (action === "edit") {
           const current = await api("/api/admin/announcements").then((list) => list.find((x) => x.id === id));
+          if (!current) throw new Error(t("notFound"));
           openAnnouncementForm(current);
           return;
         } else if ((action === "up" || action === "down") && F.annReorder()) {

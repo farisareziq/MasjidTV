@@ -485,7 +485,9 @@
       return { azanMs, iqMs, anchorDate: tm.date };
     };
     const list = [];
+    const targetKey = fullTest && tm.prayerKey ? tm.prayerKey === "jumaah" ? "dhuhr" : tm.prayerKey : null;
     for (const key of ["fajr", "dhuhr", "asr", "maghrib", "isha"]) {
+      if (targetKey && key !== targetKey) continue;
       const a = state.today.prayers[key];
       if (!a) continue;
       if (simulate) {
@@ -499,7 +501,7 @@
     const nxt = state.today.next;
     if (nxt?.tomorrow && nxt.key === "fajr" && !simulate) {
       list.push({ key: "fajr", azan: nxt.time.ms, iqamah: nxt.time.ms + off, tomorrow: true });
-    } else if (simulate && state.today.prayers.fajr) {
+    } else if (simulate && !targetKey && state.today.prayers.fajr) {
       const tomorrow = zonedMs(addDaysKey(tm.date, 1), state.today.prayers.fajr.time, tz());
       list.push({ key: "fajr", azan: tomorrow, iqamah: tomorrow + off, tomorrow: true });
     }
@@ -871,6 +873,8 @@
     }
     state.slideIndex = index;
     const el = $("slide");
+    clearTimeout(state.videoGuardTimer);
+    state.videoGuardTimer = null;
     if (state.hls) {
       state.hls.destroy();
       state.hls = null;

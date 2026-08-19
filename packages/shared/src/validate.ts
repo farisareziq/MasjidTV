@@ -366,9 +366,11 @@ export function applyPatch(current: Settings, patch: AnyPatch): Settings {
         duration: clampNum(s.duration, 10, 600, 30),
         enabled: s.enabled !== false,
         // Mirror ke live RTMPS (Facebook Live dsb.) — hanya untuk jenis
-        // relay; disahkan sebagai URL rtmps/rtmp sah.
+        // relay; disahkan sebagai URL rtmps/rtmp sah. Sekat aksara '|' kerana
+        // ia mengubah parsing arg 'tee' ffmpeg (W6-b) — elak misconfig muxer.
         mirrorUrl: (typeof s.mirrorUrl === 'string' && isRelayType(s.type as StreamType)
-          && /^rtmps?:\/\//.test(s.mirrorUrl.trim()) && s.mirrorUrl.length <= 1000)
+          && /^rtmps?:\/\//.test(s.mirrorUrl.trim()) && s.mirrorUrl.length <= 1000
+          && !s.mirrorUrl.includes('|'))
           ? s.mirrorUrl.trim()
           : undefined
       }));

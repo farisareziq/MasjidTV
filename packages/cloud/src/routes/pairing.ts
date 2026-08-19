@@ -23,9 +23,14 @@ export function registerPairingRoutes(app: FastifyInstance, ctx: RouteContext): 
     const { deviceId } = (req.body || {}) as { deviceId?: string };
     if (!deviceId || typeof deviceId !== 'string' || deviceId.length > 100) return jsonError(reply, 400, 'deviceId diperlukan');
     let code = '';
-    do {
+    // Had iterasi: ruang 32^6 ≈ 1.07B jadi perlanggaran hampir mustahil, tetapi
+    // gelung tak terbatas pada laluan panas wajar dihadkan (S4-b).
+    for (let attempt = 0; attempt < 10; attempt++) {
       code = Array.from({ length: 6 }, () => PAIR_CODE_CHARS[crypto.randomInt(PAIR_CODE_CHARS.length)]).join('');
-    } while (await store.getPairingSession(code));
+      if (!(await store.getPairingSession(code))) break;
+      code = '';
+    }
+    if (!code) return jsonError(reply, 503, 'Gagal menjana kod — cuba lagi');
     await store.createPairingSession(code, deviceId.slice(0, 100), 15 * 60 * 1000);
     reply.send({ code, expiresAt: Date.now() + 15 * 60 * 1000 });
   });

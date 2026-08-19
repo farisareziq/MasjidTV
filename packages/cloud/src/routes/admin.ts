@@ -23,6 +23,24 @@ function baseDisplayUrl(req: FastifyRequest): string {
   return `${req.protocol}://${req.headers.host}`;
 }
 
+// Token bucket per-tenant untuk presigned upload URL (W1-b). In-memory —
+// pada serverless setiap instance ada salinannya sendiri, jadi siling berkesan
+// ialah ~limit × instance; masih menghalang penyalahgunaan paling kasar.
+const uploadUrlRate = (() => {
+  const hits = new Map<string, { start: number; count: number }>();
+  const LIMIT = 30; // presigned URL per tenant per minit
+  return {
+    allow(tenantId: string): boolean {
+      const now = Date.now();
+      const h = hits.get(tenantId);
+      if (!h || now - h.start >= 60_000) { hits.set(tenantId, { start: now, count: 1 }); return true; }
+      if (h.count >= LIMIT) return false;
+      h.count++;
+      return true;
+    }
+  };
+})();
+
 export function registerAdminRoutes(app: FastifyInstance, ctx: RouteContext): void {
   const { store, startedAt } = ctx;
 
@@ -169,6 +187,11 @@ export function registerAdminRoutes(app: FastifyInstance, ctx: RouteContext): vo
   app.post('/api/admin/upload-url', async (req, reply) => {
     const tenant = await requireAdmin(store, req, reply);
     if (!tenant) return;
+    // Rate-limit per-tenant: token admin bocor boleh minta presigned URL 50MB
+    // tanpa had → blob yatim memenuhi storan (W1-b). Siling 30 minta/minit.
+    if (!uploadUrlRate.allow(tenant.id)) {
+      return jsonError(reply, 429, 'Terlalu banyak permintaan muat naik — cuba sebentar lagi');
+    }
     const blobToken = process.env.VERCEL_BLOB_READ_WRITE_TOKEN || process.env.BLOB_READ_WRITE_TOKEN;
     if (!blobToken) return jsonError(reply, 400, 'Blob tidak dikonfigurasi — tetapkan VERCEL_BLOB_READ_WRITE_TOKEN dalam pembolehubah persekitaran Vercel dan redeploy');
     const { contentType } = (req.body || {}) as { contentType?: string };
@@ -257,8 +280,11 @@ export function registerAdminRoutes(app: FastifyInstance, ctx: RouteContext): vo
   app.get('/api/admin/streams', async (req, reply) => {
     const tenant = await requireAdmin(store, req, reply);
     if (!tenant) return;
+    // Sertakan mirrorUrl (endpoint ADMIN-auth) — tanpanya UI memapar medan
+    // Mirror kosong → save seterusnya memadam kunci FB Live (C1).
     const streams = (tenant.settings.streams || []).map((s) => ({
       id: s.id, name: s.name, type: s.type, url: s.url, duration: s.duration, enabled: s.enabled,
+      mirrorUrl: s.mirrorUrl || '',
       status: s.enabled ? 'configured' : 'disabled',
       hlsUrl: ['rtsp', 'rtmp', 'onvif'].includes(s.type) ? `/relay/${s.id}/index.m3u8` : null
     }));
@@ -280,6 +306,7 @@ export function registerAdminRoutes(app: FastifyInstance, ctx: RouteContext): vo
     reply.send({
       streams: (updated!.streams || []).map((s) => ({
         id: s.id, name: s.name, type: s.type, url: s.url, duration: s.duration, enabled: s.enabled,
+        mirrorUrl: s.mirrorUrl || '',
         status: s.enabled ? 'configured' : 'disabled',
         hlsUrl: ['rtsp', 'rtmp', 'onvif'].includes(s.type) ? `/relay/${s.id}/index.m3u8` : null
       }))

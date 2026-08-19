@@ -163,6 +163,9 @@ export async function buildApp(opts: AppOptions): Promise<FastifyInstance> {
     const url = req.url || '';
     if (url.startsWith('/display') || url === '/') reply.header('Content-Security-Policy', CSP_DISPLAY);
     else if (url.startsWith('/admin')) reply.header('Content-Security-Policy', CSP_ADMIN);
+    // Kunci paparan dihantar melalui ?key= — halang ia bocor ke pihak ketiga
+    // melalui header Referer (cth. skrip/vendor luar) pada halaman display.
+    reply.header('Referrer-Policy', 'same-origin');
   });
 
   // Static uploads (raw file serving, no path traversal).
