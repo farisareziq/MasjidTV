@@ -63,16 +63,30 @@ jobs:
       - name: Build workspace deps
         run: pnpm --filter @masjidtv/shared --filter @masjidtv/db --filter @masjidtv/server build
 
+      # Bekalkan ffmpeg sekali (cached) supaya kiosk e2e tidak memuat turun
+      # ~80MB semasa runtime (menyekat server mula → health timeout di CI).
+      - name: Cache ffmpeg
+        uses: actions/cache@v4
+        with:
+          path: apps/kiosk/bin/ffmpeg.exe
+          key: ffmpeg-win-x64-v1
+
+      - name: Download ffmpeg (if not cached)
+        run: node tools/download-ffmpeg.mjs
+        working-directory: apps/kiosk
+
       - name: E2E pairing (cloud + kiosk Electron)
         # Runner Windows headless — Electron GUI (app.whenReady) lambat mula;
         # benarkan timeout health lebih panjang (lalai 45sa terlalu ketat di CI).
         env:
           E2E_HEALTH_TIMEOUT_S: '180'
+          FFMPEG_PATH: ${{ github.workspace }}/apps/kiosk/bin/ffmpeg.exe
         run: node scripts/e2e-pairing.mjs
 
       - name: Dry-run kiosk (simulasi hari operasi)
         env:
           E2E_HEALTH_TIMEOUT_S: '180'
+          FFMPEG_PATH: ${{ github.workspace }}/apps/kiosk/bin/ffmpeg.exe
         run: node scripts/dry-run-kiosk.mjs
 
   build:
