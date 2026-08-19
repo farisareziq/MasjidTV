@@ -17,6 +17,20 @@ import type { FastifyInstance, FastifyError } from 'fastify';
 import crypto from 'node:crypto';
 
 const REPORT_TIMEOUT_MS = 5_000; // fire-and-forget — jangan tunggu lama
+const RATE_LIMIT_PER_MIN = 20;   // siling laporan/minit — elak fetch storm semasa outage
+const rateWindow = { start: 0, count: 0 };
+
+// Token bucket ringkas dalam ingatan: benarkan sehingga RATE_LIMIT_PER_MIN
+// laporan setiap 60sa; selebihnya digugurkan senyap. Semasa error storm
+// (semua request 5xx), ini mengelakkan fetch keluar tanpa had yang menambah
+// tekanan event loop / connection pool tepat ketika sistem sudah terjejas.
+function allowReport(): boolean {
+  const now = Date.now();
+  if (now - rateWindow.start >= 60_000) { rateWindow.start = now; rateWindow.count = 0; }
+  if (rateWindow.count >= RATE_LIMIT_PER_MIN) return false;
+  rateWindow.count++;
+  return true;
+}
 
 interface DsnParts {
   endpoint: string; // URL envelope penuh
@@ -114,6 +128,8 @@ export function initErrorReporting(app: FastifyInstance): void {
     // Hanya ralat 5xx dilaporkan — 4xx ialah kesalahan pelanggan (bising).
     const status = Number(err.statusCode || 500);
     if (status < 500) return;
+    // Rate-limit: semasa outage, hanya 20 laporan/minit pertama dihantar.
+    if (!allowReport()) return;
     // Fire-and-forget: void + balutan dalaman menelan semua kegagalan.
     void reportError(dsn, err, { method: req.method, url: req.url || '' });
   });

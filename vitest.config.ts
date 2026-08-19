@@ -15,7 +15,6 @@ export default defineConfig({
       ],
       exclude: [
         '**/pages.generated.ts',
-        '**/sqlite-types.d.ts',
         'packages/server/src/main-exe.ts'
       ],
       reporter: ['text', 'json-summary']

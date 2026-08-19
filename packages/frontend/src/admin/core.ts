@@ -398,10 +398,16 @@ let dshowOpts: Array<{ value: string; label: string }> = [];
 
 // Segarkan <datalist id="dshowDevices"> daripada cangkuk varian (awan:
 // kesatuan dshow[] peranti terpaut; lokal: /api/devices-hw). Dipanggil pada
-// setiap renderStreams() supaya laporan perkakasan terkini terpakai tanpa
-// perlu muat semula halaman. Kegagalan fetch diabaikan secara senyap.
+// setiap renderStreams() TETAPI dithrottle 5 minit — laporan perkakasan hampir
+// statik; tanpa throttle, poller syncAdminData (10sa) mencetus fetch berterusan
+// sepanjang sesi admin. Langkau juga bila tab tersembunyi. Kegagalan senyap.
+let dshowLastFetch = 0;
+const DSHOW_FETCH_TTL_MS = 5 * 60 * 1000;
 async function refreshDshowDatalist(): Promise<void> {
   if (!featureHooks.dshowOptions) return;
+  if (Date.now() - dshowLastFetch < DSHOW_FETCH_TTL_MS) return;
+  if (typeof document !== 'undefined' && document.hidden) return;
+  dshowLastFetch = Date.now();
   try {
     dshowOpts = (await featureHooks.dshowOptions()) || [];
   } catch {

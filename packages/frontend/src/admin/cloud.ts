@@ -160,12 +160,29 @@ $('suCreateTenant').addEventListener('click', async () => {
 
 // ------------------------------------------------------------------ TV & Paparan (pairing)
 
+// Cache payload peranti dikongsi oleh renderTv() dan dshowOptions() — kedua-
+// duanya membaca /api/admin/devices; tanpa cache, kitaran sync 10sa menjana
+// DUA fetch endpoint yang sama. TTL 5 minit untuk pembaca datalist; renderTv
+// (tindakan pairing/unpair/rename) sentiasa fetch segar dan mengisi cache.
+let devicesCache: TvDevice[] | null = null;
+let devicesCacheAt = 0;
+const DEVICES_CACHE_TTL_MS = 5 * 60 * 1000;
+
+async function fetchDevices(force = false): Promise<TvDevice[]> {
+  if (!force && devicesCache && Date.now() - devicesCacheAt < DEVICES_CACHE_TTL_MS) {
+    return devicesCache;
+  }
+  const res = await api<{ devices?: TvDevice[] }>('/api/admin/devices');
+  devicesCache = res.devices || [];
+  devicesCacheAt = Date.now();
+  return devicesCache;
+}
+
 async function renderTv() {
   const list = $('tvDeviceList');
   if (!list) return;
   try {
-    const res = await api<{ devices?: TvDevice[] }>('/api/admin/devices');
-    const devices: TvDevice[] = res.devices || [];
+    const devices = await fetchDevices(true);
     if (!devices.length) {
       list.innerHTML = `<p class="sub">${escapeHtml(t('tvEmpty'))}</p>`;
       return;
@@ -251,8 +268,7 @@ $('tvDeviceList').addEventListener('click', async (e) => {
 // jangkakan — lihat packages/server/src/streams.ts); label = nama peranti
 // TV + nama peranti DSHOW. [] jika tiada laporan — medan kekal teks-bebas.
 async function dshowOptions(): Promise<DshowOption[]> {
-  const res = await api<{ devices?: TvDevice[] }>('/api/admin/devices');
-  const devices: TvDevice[] = res.devices || [];
+  const devices = await fetchDevices(); // cache TTL 5 minit — bukan fetch setiap panggilan
   const seen = new Set<string>();
   const opts: DshowOption[] = [];
   for (const d of devices) {

@@ -19,7 +19,7 @@ const repo = path.resolve(kioskDir, '..', '..');
 // Repo GitHub untuk self-updater (B1) — updater.json dihantar ke resources/
 // dan dibundel electron-builder melalui extraResources (sebelah exe).
 const UPDATE_REPO = 'farisareziq/MasjidTV';
-const UPDATE_BINARY_NAME = 'MasjidTV-Kiosk-Setup';
+const UPDATE_BINARY_NAME = 'MasjidTV-Kiosk';
 
 const run = (cmd, cwd) => execSync(cmd, { cwd, stdio: 'inherit' });
 

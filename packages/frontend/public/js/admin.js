@@ -1305,8 +1305,13 @@
     if ($("stTestPrayer").value === "jumaah") $("stTestDate").value = nextFridayKey();
   }
   var dshowOpts = [];
+  var dshowLastFetch = 0;
+  var DSHOW_FETCH_TTL_MS = 5 * 60 * 1e3;
   async function refreshDshowDatalist() {
     if (!featureHooks.dshowOptions) return;
+    if (Date.now() - dshowLastFetch < DSHOW_FETCH_TTL_MS) return;
+    if (typeof document !== "undefined" && document.hidden) return;
+    dshowLastFetch = Date.now();
     try {
       dshowOpts = await featureHooks.dshowOptions() || [];
     } catch {

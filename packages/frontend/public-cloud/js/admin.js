@@ -1109,12 +1109,23 @@
       toast(err.message, "err");
     }
   });
+  var devicesCache = null;
+  var devicesCacheAt = 0;
+  var DEVICES_CACHE_TTL_MS = 5 * 60 * 1e3;
+  async function fetchDevices(force = false) {
+    if (!force && devicesCache && Date.now() - devicesCacheAt < DEVICES_CACHE_TTL_MS) {
+      return devicesCache;
+    }
+    const res = await api("/api/admin/devices");
+    devicesCache = res.devices || [];
+    devicesCacheAt = Date.now();
+    return devicesCache;
+  }
   async function renderTv() {
     const list = $("tvDeviceList");
     if (!list) return;
     try {
-      const res = await api("/api/admin/devices");
-      const devices = res.devices || [];
+      const devices = await fetchDevices(true);
       if (!devices.length) {
         list.innerHTML = `<p class="sub">${escapeHtml(t("tvEmpty"))}</p>`;
         return;
@@ -1182,8 +1193,7 @@
     }
   });
   async function dshowOptions() {
-    const res = await api("/api/admin/devices");
-    const devices = res.devices || [];
+    const devices = await fetchDevices();
     const seen = /* @__PURE__ */ new Set();
     const opts = [];
     for (const d of devices) {
@@ -1525,8 +1535,13 @@
     if ($("stTestPrayer").value === "jumaah") $("stTestDate").value = nextFridayKey();
   }
   var dshowOpts = [];
+  var dshowLastFetch = 0;
+  var DSHOW_FETCH_TTL_MS = 5 * 60 * 1e3;
   async function refreshDshowDatalist() {
     if (!featureHooks.dshowOptions) return;
+    if (Date.now() - dshowLastFetch < DSHOW_FETCH_TTL_MS) return;
+    if (typeof document !== "undefined" && document.hidden) return;
+    dshowLastFetch = Date.now();
     try {
       dshowOpts = await featureHooks.dshowOptions() || [];
     } catch {

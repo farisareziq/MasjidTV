@@ -140,16 +140,19 @@ const HIDDEN_MENU_JS = `(async function () {
     location.replace('/display');
   };
   var body = document.getElementById('__kmBody');
+  // Escape sebelum innerHTML — nilai dari endpoint LAN (updater/stream/peranti)
+  // boleh dipengaruhi pihak ketiga (DNS-spoof / fail tempatan) → elak XSS.
+  function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
   try {
     var cfg = await (await fetch('/api/pair/config')).json();
     var hw = await (await fetch('/api/devices-hw')).json();
-    var cams = (hw.cameras || []).map(function (c) { return c.name + (c.status === 'OK' ? '' : ' (' + c.status + ')'); });
-    var dshow = (hw.dshow || []).map(function (c) { return 'video=' + c.name; });
+    var cams = (hw.cameras || []).map(function (c) { return esc(c.name) + (c.status === 'OK' ? '' : ' (' + esc(c.status) + ')'); });
+    var dshow = (hw.dshow || []).map(function (c) { return 'video=' + esc(c.name); });
     var streamRow = '';
     try {
       var st = await (await fetch('/api/streams-status')).json();
       streamRow = (st.streams || []).map(function (s) {
-        return '<div><b>Stream:</b> ' + s.name + ' — ' + s.status + (s.lastError ? ' <span style="color:#ff9d9d">(' + s.lastError + ')</span>' : '') + '</div>';
+        return '<div><b>Stream:</b> ' + esc(s.name) + ' — ' + esc(s.status) + (s.lastError ? ' <span style="color:#ff9d9d">(' + esc(s.lastError) + ')</span>' : '') + '</div>';
       }).join('');
     } catch (e) { /* tidak kritikal */ }
     // Status self-updater (B1) — endpoint lokal; gagal = updater tidak aktif.
@@ -157,16 +160,16 @@ const HIDDEN_MENU_JS = `(async function () {
     try {
       var upd = await (await fetch('/api/update-status')).json();
       var ustate = { idle: 'Terkini', checking: 'Menyemak…', downloading: 'Memuat turun…', ready: 'Sedia dipasang', installing: 'Memasang…', error: 'Ralat (cuba semula automatik)', available: 'Tersedia', disabled: 'Tidak aktif' }[upd.state] || upd.state;
-      var uline = '<b>Kemas kini:</b> v' + upd.currentVersion + ' — ' + ustate;
-      if (upd.availableVersion) uline += ' → <b style="color:#8fd6a8">v' + upd.availableVersion + '</b>';
+      var uline = '<b>Kemas kini:</b> v' + esc(upd.currentVersion) + ' — ' + esc(ustate);
+      if (upd.availableVersion) uline += ' → <b style="color:#8fd6a8">v' + esc(upd.availableVersion) + '</b>';
       if (upd.state === 'available' && upd.portable) uline += '<br><span style="color:#ffd28f;font-size:12px">Mod portable — muat turun manual portable exe baharu dari GitHub Releases.</span>';
-      if (upd.state === 'error' && upd.lastError) uline += ' <span style="color:#ff9d9d;font-size:12px">(' + upd.lastError + ')</span>';
+      if (upd.state === 'error' && upd.lastError) uline += ' <span style="color:#ff9d9d;font-size:12px">(' + esc(upd.lastError) + ')</span>';
       if (upd.lastCheckAt) uline += '<br><span style="color:#86a99a;font-size:12px">Semakan terakhir: ' + new Date(upd.lastCheckAt).toLocaleString() + '</span>';
       updRow = '<div style="margin-top:10px">' + uline + '</div>';
     } catch (e) { /* updater tidak aktif */ }
     body.innerHTML =
       '<div><b>Status:</b> ' + (cfg.paired ? 'Dipaut' : 'Belum dipaut') + '</div>'
-      + (cfg.paired ? '<div><b>Masjid:</b> ' + (cfg.tenantName || '-') + '<br><b>Cloud:</b> ' + cfg.cloudUrl + '</div>' : '')
+      + (cfg.paired ? '<div><b>Masjid:</b> ' + esc(cfg.tenantName || '-') + '<br><b>Cloud:</b> ' + esc(cfg.cloudUrl) + '</div>' : '')
       + '<div style="margin-top:10px"><b>Kamera (PnP):</b> ' + (cams.length ? cams.join(' • ') : 'tiada dikesan') + '</div>'
       + '<div><b>Peranti DSHOW (ffmpeg):</b> ' + (dshow.length ? dshow.join(' • ') : 'tiada — OBS: tekan Start Virtual Camera') + '</div>'
       + streamRow

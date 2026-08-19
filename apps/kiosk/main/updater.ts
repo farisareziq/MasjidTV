@@ -54,7 +54,7 @@ export interface UpdateStatus {
 
 interface UpdaterConfig {
   repo: string;       // cth. "owner/MasjidTV"
-  binaryName: string; // cth. "MasjidTV-Kiosk-Setup"
+  binaryName: string; // nama asas, cth. "MasjidTV-Kiosk" (tanpa "-Setup")
 }
 
 interface Release {
@@ -66,6 +66,21 @@ const POLL_INTERVAL_MS = 6 * 60 * 60 * 1000; // 6 jam
 const STARTUP_DELAY_MS = 60_000;             // semakan pertama ~60sa selepas mula
 const NET_TIMEOUT_MS = 15_000;               // semua panggilan rangkaian ~15sa
 const DOWNLOAD_TIMEOUT_MS = 10 * 60 * 1000;  // installer ~150MB — muat turun lebih lama
+const MAX_INSTALLER_BYTES = 400 * 1024 * 1024; // siling saiz installer (400MB)
+
+// Peta mesej ralat dalaman (mengandungi URL/IP/laluan fail) kepada enum pendek
+// selamat untuk didedahkan melalui /api/update-status tanpa-auth (LAN) —
+// mengelak kebocoran maklumat dalaman kepada klien LAN.
+function sanitizeError(msg: string): string {
+  const m = msg.toLowerCase();
+  if (m.includes('econnrefused') || m.includes('enotfound') || m.includes('etimedout')
+    || m.includes('econnreset') || m.includes('timeout') || m.includes('network')
+    || m.includes('fetch failed') || m.includes('socket') || m.includes('dns')) return 'network';
+  if (m.includes('checksum')) return 'checksum';
+  if (m.includes('http ')) return `http-${(m.match(/http (\d+)/) || [])[1] || 'error'}`;
+  if (m.includes('spawn') || m.includes('enoent') || m.includes('eacces') || m.includes('installer')) return 'spawn';
+  return 'error';
+}
 
 // Bandingkan tag semver "a.b.c" — pulangkan >0 jika a>b, <0 jika a<b, 0 jika sama.
 function compareVersions(a: string, b: string): number {
@@ -110,7 +125,7 @@ function loadConfig(): UpdaterConfig | null {
       } catch { /* fail tiada/rosak — cuba calon seterusnya */ }
     }
     // Dev/u jalur: updater.json tiada — benarkan ujian melalui env sahaja.
-    if (envRepo) return { repo: envRepo, binaryName: 'MasjidTV-Kiosk-Setup' };
+    if (envRepo) return { repo: envRepo, binaryName: 'MasjidTV-Kiosk' };
   } catch { /* app belum sedia */ }
   return null;
 }
@@ -144,15 +159,6 @@ export class KioskUpdater {
     else if (!cfg) console.log('[updater] updater.json tiada — self-update tidak aktif.');
     else console.log(`[updater] aktif — repo=${cfg.repo} versi=${this.status.currentVersion} portable=${this.portable}`);
     this.writeStatus();
-  }
-
-  getStatus(): UpdateStatus {
-    return { ...this.status };
-  }
-
-  /** Untuk ujian/hook masa hadapan — jalankan semakan segera (tidak dibalut). */
-  checkNow(): Promise<void> {
-    return this.safeCheck();
   }
 
   // Tulis status ke <dataDir>/update-status.json — dibaca /api/update-status
@@ -189,8 +195,8 @@ export class KioskUpdater {
       await this.check();
     } catch (err) {
       this.status.state = 'error';
-      this.status.lastError = err instanceof Error ? err.message : String(err);
-      console.error('[updater] semakan gagal (senyap):', this.status.lastError);
+      this.status.lastError = sanitizeError(err instanceof Error ? err.message : String(err));
+      console.error('[updater] semakan gagal (senyap):', err instanceof Error ? err.message : String(err));
       this.writeStatus();
     }
   }
@@ -204,7 +210,7 @@ export class KioskUpdater {
     this.status.lastCheckAt = Date.now();
     if (!res.ok) {
       this.status.state = 'idle';
-      this.status.lastError = `GitHub API ${res.status}`;
+      this.status.lastError = `http-${res.status}`;
       this.writeStatus();
       return;
     }
@@ -250,36 +256,50 @@ export class KioskUpdater {
     fs.mkdirSync(dir, { recursive: true });
     const dest = path.join(dir, setupName);
 
+    // Had saiz: tolak asset luar biasa besar SEBELUM muat turun — elak OOM
+    // pada mini PC low-spec (arrayBuffer menampung keseluruhan fail dalam RAM).
+    if (typeof setupAsset.size === 'number' && setupAsset.size > MAX_INSTALLER_BYTES) {
+      this.status.state = 'error';
+      this.status.lastError = 'error';
+      console.error(`[updater] asset ${setupName} ${setupAsset.size} bait melebihi siling ${MAX_INSTALLER_BYTES} — kemas kini dibatalkan.`);
+      this.writeStatus();
+      return;
+    }
+
     const dl = await fetch(setupAsset.browser_download_url, { signal: AbortSignal.timeout(DOWNLOAD_TIMEOUT_MS) });
     if (!dl.ok) {
       this.status.state = 'error';
-      this.status.lastError = `muat turun gagal: HTTP ${dl.status}`;
+      this.status.lastError = `http-${dl.status}`;
       this.writeStatus();
       return;
     }
     const buf = Buffer.from(await dl.arrayBuffer());
 
-    // Checksum sha256 WAJIB jika asset .sha256 wujud (release.yml sentiasa
-    // menguploadnya) — FAIL CLOSED: gagal muat turun/sahkan = batalkan.
+    // Checksum sha256 WAJIB — FAIL CLOSED: asset .sha256 tiada ATAU gagal
+    // disahkan = kemas kini dibatalkan. release.yml sentiasa mengupload
+    // <nama>.sha256; ketiadaannya = anomali/serangan, BUKAN keadaan normal.
     const sumAsset = release.assets.find((a) => a.name === `${setupName}.sha256`);
-    if (sumAsset) {
-      let expected: string | null = null;
-      try {
-        const sumRes = await fetch(sumAsset.browser_download_url, { signal: AbortSignal.timeout(NET_TIMEOUT_MS) });
-        if (sumRes.ok) expected = (await sumRes.text()).trim().split(/\s+/)[0].toLowerCase();
-      } catch {
-        expected = null;
-      }
-      const actual = sha256Hex(buf);
-      if (!expected || expected !== actual) {
-        this.status.state = 'error';
-        this.status.lastError = expected ? 'checksum tidak sepadan' : 'checksum gagal dimuat turun';
-        console.error(`[updater] ${this.status.lastError} — kemas kini dibatalkan.`);
-        this.writeStatus();
-        return;
-      }
-    } else {
-      console.log('[updater] AMARAN: tiada asset .sha256 — checksum dilangkau.');
+    if (!sumAsset) {
+      this.status.state = 'error';
+      this.status.lastError = 'checksum';
+      console.error('[updater] asset .sha256 tiada dalam release — kemas kini dibatalkan (fail-closed).');
+      this.writeStatus();
+      return;
+    }
+    let expected: string | null = null;
+    try {
+      const sumRes = await fetch(sumAsset.browser_download_url, { signal: AbortSignal.timeout(NET_TIMEOUT_MS) });
+      if (sumRes.ok) expected = (await sumRes.text()).trim().split(/\s+/)[0].toLowerCase();
+    } catch {
+      expected = null;
+    }
+    const actual = sha256Hex(buf);
+    if (!expected || expected !== actual) {
+      this.status.state = 'error';
+      this.status.lastError = 'checksum';
+      console.error(`[updater] checksum ${expected ? 'tidak sepadan' : 'gagal dimuat turun'} — kemas kini dibatalkan.`);
+      this.writeStatus();
+      return;
     }
 
     fs.writeFileSync(dest, buf);

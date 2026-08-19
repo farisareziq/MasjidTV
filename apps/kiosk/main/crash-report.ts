@@ -121,6 +121,7 @@ export class CrashReporter {
   private getTarget: () => CloudTarget | null;
   private uploadEnabled: boolean;
   private lastUploadedAt: number;
+  private lastPruneAt = 0;
 
   constructor(dataDir: string, getTarget: () => CloudTarget | null) {
     this.dataDir = dataDir;
@@ -152,10 +153,15 @@ export class CrashReporter {
 
   // Rekod satu kejadian crash. Sinkron & pantas — selamat dipanggil dari
   // handler uncaughtException (sebelum relaunch) & render-process-gone.
+  // pruneOldLogs DITHROTTLE 1 jam — imbasan direktori sync penuh pada setiap
+  // rekod adalah kos I/O berulang tepat ketika proses cuba pulih (crash-loop).
   record(kind: CrashEntry['kind'], message: string): void {
     const entry: CrashEntry = { at: Date.now(), kind, message: message.slice(0, MAX_MESSAGE_LEN) };
     writeLocal(this.dataDir, entry);
-    pruneOldLogs(this.dataDir);
+    if (Date.now() - this.lastPruneAt >= 60 * 60 * 1000) {
+      this.lastPruneAt = Date.now();
+      pruneOldLogs(this.dataDir);
+    }
     if (!this.uploadEnabled) return;
     const target = this.getTarget();
     if (!target) return; // belum dipaut — tiada destinasi

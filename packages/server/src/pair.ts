@@ -283,7 +283,9 @@ export function applyPairing(app: FastifyInstance, dataDir: string): void {
         currentVersion: typeof raw.currentVersion === 'string' ? raw.currentVersion : '',
         availableVersion: typeof raw.availableVersion === 'string' ? raw.availableVersion : null,
         lastCheckAt: Number(raw.lastCheckAt) || null,
-        lastError: typeof raw.lastError === 'string' ? raw.lastError : null,
+        // Had 80 aksara — updater kini menulis enum pendek (network/checksum/
+        // http-N/spawn); had ini perlindungan tambahan untuk fail tulisan luar.
+        lastError: typeof raw.lastError === 'string' ? raw.lastError.slice(0, 80) : null,
         portable: Boolean(raw.portable)
       });
     } catch {
