@@ -16,7 +16,7 @@ import {
   $, state, setCfg, featureHooks, F,
   WEEKDAYS, STREAM_TYPES, COLOR_PRESETS
 } from './types';
-import type { AdminVariantConfig, StreamRow } from './types';
+import type { AdminVariantConfig, AdminStatus, StreamRow, LicenseInfo } from './types';
 import { t, applyLang, setAdminLang, setRenderAll } from './i18n';
 import { escapeHtml, formatDuration, formatUptime, shiftTime } from './util';
 import { api, uploadFile, toast, showLogin, showApp, showPinChange, switchView } from './api';
@@ -49,17 +49,16 @@ async function loadApp() {
       switchView('masjid');
       return;
     }
-    const fetches: Promise<any>[] = [
-      api('/api/admin/status'),
-      api('/api/admin/settings'),
-      api('/api/methods'),
-      api('/api/zones'),
-      api('/api/admin/announcements'),
-      api('/api/today'),
-      api('/api/admin/streams')
-    ];
-    if (F.licenseCard()) fetches.push(api('/api/admin/license'));
-    const [status, settings, methods, zonesRes, announcements, today, streamsRes, license] = await Promise.all(fetches);
+    const [status, settings, methods, zonesRes, announcements, today, streamsRes] = await Promise.all([
+      api<AdminStatus>('/api/admin/status'),
+      api<Settings>('/api/admin/settings'),
+      api<Record<string, { label: string }>>('/api/methods'),
+      api<{ zones?: Record<string, Array<{ zone: string; label: string }>> }>('/api/zones'),
+      api<Array<Announcement & { status?: string }>>('/api/admin/announcements'),
+      api<import('@masjidtv/shared').TodayPayload>('/api/today'),
+      api<{ streams?: StreamRow[]; ffmpegOk?: boolean | null }>('/api/admin/streams')
+    ]);
+    const license = F.licenseCard() ? await api<LicenseInfo>('/api/admin/license') : undefined;
     state.status = status;
     state.methods = methods;
     state.zones = zonesRes.zones || {};
@@ -157,7 +156,7 @@ function renderAnnouncements(items: Array<Announcement & { status?: string }>) {
 }
 
 async function refreshAnnouncements() {
-  const items = await api('/api/admin/announcements');
+  const items = await api<Array<Announcement & { status?: string }>>('/api/admin/announcements');
   renderAnnouncements(items);
 }
 
@@ -189,7 +188,7 @@ function openAnnouncementForm(item: (Announcement & { status?: string }) | null)
 function toggleQuranBox() {
   const quran = $('anCategory').value === 'quran';
   $('anQuranBox').hidden = !quran;
-  if (quran && !$('anTitle').value.trim()) {
+  if (quran && !String($('anTitle').value).trim()) {
     $('anTitle').value = 'Ayat Quran Harian';
   }
 }
@@ -215,7 +214,7 @@ function setMediaPreview(imageUrl: string, videoUrl: string) {
 }
 
 async function refreshStatus() {
-  state.status = await api('/api/admin/status');
+  state.status = await api<AdminStatus>('/api/admin/status');
   renderOverview();
 }
 
@@ -344,7 +343,7 @@ function setLogoPreview(url: string) {
 // Kunci solat untuk rujukan waktu — "jumaah" menggunakan waktu Zohor
 // (aliran khutbah Jumaat menggantikan fasa jemaah Zohor pada hari Jumaat).
 const testPrayerKey = (): string => {
-  const v = $('stTestPrayer').value;
+  const v = String($('stTestPrayer').value);
   return v === 'jumaah' ? 'dhuhr' : v;
 };
 
@@ -706,9 +705,9 @@ async function syncAdminData() {
   const editing = ['INPUT', 'SELECT', 'TEXTAREA'].includes(document.activeElement?.tagName);
   try {
     const [status, today, announcements] = await Promise.all([
-      api('/api/admin/status'),
-      api('/api/today'),
-      api('/api/admin/announcements')
+      api<AdminStatus>('/api/admin/status'),
+      api<import('@masjidtv/shared').TodayPayload>('/api/today'),
+      api<Array<Announcement & { status?: string }>>('/api/admin/announcements')
     ]);
     state.status = status;
     state.today = today;
@@ -717,7 +716,7 @@ async function syncAdminData() {
     renderAnnouncements(announcements);
     if (featureHooks.renderTv) featureHooks.renderTv();
     if (!editing && !settingsDirty) {
-      const settings = await api('/api/admin/settings');
+      const settings = await api<Settings>('/api/admin/settings');
       state.settings = settings;
       populateSettings(settings);
     }
@@ -803,7 +802,7 @@ export function bootAdmin(config: AdminVariantConfig): void {
     $('loginError').hidden = true;
     try {
       if (F.login()) {
-        const username = $('loginUsername').value.trim();
+        const username = String($('loginUsername').value).trim();
         const password = $('loginPassword').value;
         const isSuper = username === 'admin';
         const res = await fetch(isSuper ? '/api/auth/superuser/login' : '/api/auth/login', {
@@ -879,7 +878,7 @@ export function bootAdmin(config: AdminVariantConfig): void {
         $('pinError').hidden = false;
         return;
       }
-      if (pin.length < 8) {
+      if (String(pin).length < 8) {
         $('pinError').textContent = t('pinTooShort');
         $('pinError').hidden = false;
         return;
@@ -939,12 +938,12 @@ export function bootAdmin(config: AdminVariantConfig): void {
     const action = btn.dataset.action;
     try {
       if (action === 'toggle') {
-        const current = await api('/api/admin/announcements').then((list: any[]) => list.find((x) => x.id === id));
+        const current = await api<Array<Announcement & { status?: string }>>('/api/admin/announcements').then((list) => list.find((x) => x.id === id));
         if (!current) throw new Error(t('notFound'));
         await api(`/api/admin/announcements/${id}`, { method: 'PUT', body: { active: !current.active } });
         toast(current.active ? t('annPaused') : t('annActivated'));
       } else if (action === 'edit') {
-        const current = await api('/api/admin/announcements').then((list: any[]) => list.find((x) => x.id === id));
+        const current = await api<Array<Announcement & { status?: string }>>('/api/admin/announcements').then((list) => list.find((x) => x.id === id));
         openAnnouncementForm(current);
         return;
       } else if ((action === 'up' || action === 'down') && F.annReorder()) {
@@ -1007,13 +1006,13 @@ export function bootAdmin(config: AdminVariantConfig): void {
   $('anImageClear').addEventListener('click', () => {
     $('anImageUrl').value = '';
     $('anImage').value = '';
-    setMediaPreview('', $('anVideoUrl').value);
+    setMediaPreview('', String($('anVideoUrl').value));
   });
 
   $('anVideoClear').addEventListener('click', () => {
     $('anVideoUrl').value = '';
     $('anImage').value = '';
-    setMediaPreview($('anImageUrl').value, '');
+    setMediaPreview(String($('anImageUrl').value), '');
   });
 
   $('anSave').addEventListener('click', async () => {
@@ -1251,7 +1250,7 @@ export function bootAdmin(config: AdminVariantConfig): void {
 
   $('saveStreamsBtn').addEventListener('click', async () => {
     try {
-      const res = await api('/api/admin/streams', { method: 'PUT', body: { streams: collectStreams() } });
+      const res = await api<{ streams?: StreamRow[]; ffmpegOk?: boolean | null }>('/api/admin/streams', { method: 'PUT', body: { streams: collectStreams() } });
       state.streamsStatus = res.streams || [];
       renderStreams();
       renderFfmpegStatus();
@@ -1288,9 +1287,9 @@ export function bootAdmin(config: AdminVariantConfig): void {
   $('syncEventsBtn').addEventListener('click', async () => {
     try {
       toast(t('syncInProgress'));
-      const result = await api('/api/admin/events/sync', { method: 'POST', body: {} });
+      const result = await api<{ ok?: boolean; message?: string; synced?: number }>('/api/admin/events/sync', { method: 'POST', body: {} });
       if (!result.ok) throw new Error(result.message || 'Sync gagal');
-      const settings = await api('/api/admin/settings');
+      const settings = await api<Settings>('/api/admin/settings');
       renderEvents(settings.events || []);
       renderEventsSyncStatus(settings.eventsSync || {});
       toast(t('syncDone', { n: result.synced }));
@@ -1302,7 +1301,7 @@ export function bootAdmin(config: AdminVariantConfig): void {
 
   $('saveEventsBtn').addEventListener('click', async () => {
     try {
-      const updated = await api('/api/admin/settings', {
+      const updated = await api<Settings>('/api/admin/settings', {
         method: 'PUT',
         body: { events: collectEvents(), eventsSync: { enabled: $('stEventsAuto').checked } }
       });
@@ -1311,9 +1310,9 @@ export function bootAdmin(config: AdminVariantConfig): void {
       toast(t('eventsSaved'));
       await refreshStatus();
       if ($('stEventsAuto').checked) {
-        const result = await api('/api/admin/events/sync', { method: 'POST', body: {} });
+        const result = await api<{ ok?: boolean; message?: string }>('/api/admin/events/sync', { method: 'POST', body: {} });
         if (!result.ok) throw new Error(result.message || 'Sync gagal');
-        const settings = await api('/api/admin/settings');
+        const settings = await api<Settings>('/api/admin/settings');
         renderEvents(settings.events || []);
         renderEventsSyncStatus(settings.eventsSync || {});
       }
@@ -1330,11 +1329,11 @@ export function bootAdmin(config: AdminVariantConfig): void {
       const section = btn.dataset.save;
       const patch = buildPatch(section);
       try {
-        const updated = await api('/api/admin/settings', { method: 'PUT', body: patch });
+        const updated = await api<Settings>('/api/admin/settings', { method: 'PUT', body: patch });
         populateSettings(updated);
         toast(t('settingsSaved'));
         if (section === 'ffmpeg') {
-          const res = await api('/api/admin/streams');
+          const res = await api<{ streams?: StreamRow[]; ffmpegOk?: boolean | null }>('/api/admin/streams');
           state.ffmpegOk = res.ffmpegOk;
           state.streamsStatus = res.streams || [];
           renderStreams();
@@ -1347,14 +1346,14 @@ export function bootAdmin(config: AdminVariantConfig): void {
   });
 
   $('pwSaveBtn').addEventListener('click', async () => {
-    const current = $('pwCurrent').value;
-    const next = $('pwNew').value;
-    const confirm = $('pwConfirm').value;
+    const current = String($('pwCurrent').value);
+    const next = String($('pwNew').value);
+    const confirm = String($('pwConfirm').value);
     if (!current || !next) return toast(t('fillPasswords'), 'err');
     if (next.length < 6) return toast(t('pwTooShort'), 'err');
     if (next !== confirm) return toast(t('pwMismatch'), 'err');
     try {
-      const data = await api('/api/admin/password', { method: 'POST', body: { currentPassword: current, newPassword: next } });
+      const data = await api<{ token?: string }>('/api/admin/password', { method: 'POST', body: { currentPassword: current, newPassword: next } });
       if (F.tokenRotate() && data.token) {
         state.token = data.token;
         localStorage.setItem('tvm_token', state.token);

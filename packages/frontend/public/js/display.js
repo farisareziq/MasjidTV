@@ -6,8 +6,9 @@
     const raw = window.AndroidBridge;
     if (!raw) return raw;
     if (typeof raw.setStreamSlot === "function") return raw;
+    const rawPm = raw;
     const send = (method) => (...args) => {
-      raw.postMessage(JSON.stringify({ method, args }));
+      rawPm.postMessage(JSON.stringify({ method, args }));
     };
     return {
       setStreamSlot: send("setStreamSlot"),

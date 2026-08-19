@@ -15,7 +15,7 @@ export interface ApiOptions {
   body?: unknown;
 }
 
-export async function api(path: string, options: ApiOptions = {}): Promise<any> {
+export async function api<T = unknown>(path: string, options: ApiOptions = {}): Promise<T> {
   const headers: Record<string, string> = { ...(options.headers || {}) };
   if (state.token) headers.Authorization = `Bearer ${state.token}`;
   if (options.body && typeof options.body !== 'string') {
@@ -86,7 +86,7 @@ export async function uploadFile(file: File): Promise<UploadResult> {
 }
 
 async function uploadToBlob(file: Blob, mime: string): Promise<UploadResult> {
-  const { presignedUrl, pathname, kind } = await api('/api/admin/upload-url', {
+  const { presignedUrl, pathname, kind } = await api<{ presignedUrl: string; pathname: string; kind: string }>('/api/admin/upload-url', {
     method: 'POST',
     body: { contentType: mime }
   });
@@ -96,7 +96,7 @@ async function uploadToBlob(file: Blob, mime: string): Promise<UploadResult> {
     body: file
   });
   if (!putRes.ok) throw new Error(`Muat naik ke Blob gagal (${putRes.status})`);
-  const { url, kind: kind2 } = await api('/api/admin/upload-confirm', {
+  const { url, kind: kind2 } = await api<{ url: string; kind?: string }>('/api/admin/upload-confirm', {
     method: 'POST',
     body: { pathname, kind }
   });

@@ -63,7 +63,7 @@ interface Slide {
 }
 
 interface DisplayState {
-  settings: (Record<string, any> & Partial<Settings>) | null;
+  settings: (Record<string, unknown> & Partial<Settings>) | null;
   today: TodayPayload | null;
   slides: Slide[];
   slidesData: SlideData | null;
@@ -78,17 +78,29 @@ interface DisplayState {
   weatherTimer: ReturnType<typeof setTimeout> | null;
 }
 
-declare const Hls: any;
+// Vendor hls.min.js dimuat sebagai skrip klasik — taip minimum yang digunakan.
+declare const Hls: {
+  new (config: Record<string, unknown>): {
+    loadSource(url: string): void;
+    attachMedia(el: HTMLMediaElement): void;
+    startLoad(startPosition?: number): void;
+    destroy(): void;
+    on(event: string, cb: (event: string, data: unknown) => void): void;
+  };
+  isSupported(): boolean;
+  Events: { ERROR: string };
+};
 // Adapter AndroidBridge dua mod (sepadan display.ts):
 // 1. Kaedah terus (rujukan Kotlin addJavascriptInterface): setStreamSlot(...) dll.
 // 2. postMessage (Flutter webview_flutter addJavaScriptChannel): hantar
 //    {"method":"...","args":[...]} melalui AndroidBridge.postMessage().
 const AndroidBridgeRef = (): AndroidBridge => {
-  const raw = (window as any).AndroidBridge;
-  if (!raw) return raw;
+  const raw = window.AndroidBridge;
+  if (!raw) return raw as AndroidBridge;
   if (typeof raw.setStreamSlot === 'function') return raw; // mod native penuh
+  const rawPm = raw as unknown as { postMessage(msg: string): void };
   const send = (method: string) => (...args: unknown[]) => {
-    raw.postMessage(JSON.stringify({ method, args }));
+    rawPm.postMessage(JSON.stringify({ method, args }));
   };
   return {
     setStreamSlot: send('setStreamSlot'),
@@ -227,7 +239,8 @@ const screenName = new URLSearchParams(location.search).get('screen') || '';
 const debugMode = new URLSearchParams(location.search).get('debug') === '1';
 const tz = (): string => (state.settings?.prayer?.timezone) || 'Asia/Kuala_Lumpur';
 const lang = (): Language => (state.settings?.display?.language) || 'ms';
-const t = (key: string): string => (I18N[lang()] as Record<string, any>)[key] ?? key;
+type I18nEntry = (typeof I18N)[Language];
+const t = (key: string): string => (I18N[lang()] as I18nEntry & Record<string, string>)[key] ?? key;
 // Mod Android TV (app hibrid): bridge untuk stream RTSP/RTMP & mute audio azan.
 const isAndroid = typeof window !== 'undefined' && typeof window.AndroidBridge !== 'undefined';
 let bridgeMuted = false;
@@ -307,7 +320,7 @@ async function api(url: string): Promise<any> {
       // KELAKUAN ANDROID TV: peranti dinyahpaut di cloud (503 DEVICE_UNPAIRED)
       // → reload; server kini mod pairing dan /display papar kod baharu.
       if (res.status === 503) {
-        const body = await res.clone().json().catch(() => null as any);
+        const body = (await res.clone().json().catch((): null => null)) as { code?: string } | null;
         if (body && body.code === 'DEVICE_UNPAIRED') {
           location.replace('/display');
           throw new Error(`${url} -> peranti dinyahpaut, memuat semula`);

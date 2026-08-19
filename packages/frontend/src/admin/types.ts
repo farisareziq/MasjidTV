@@ -55,7 +55,7 @@ export interface AdminState {
 // AndroidBridge & TVM_IDLE_MS dinyatakan dalam globals.d.ts (dikongsi).
 
 // Elemen DOM longgar (padan gaya baseline JS): HTMLElement + medan borang lazim.
-export type Elem = HTMLElement & Record<string, any>;
+export type Elem = HTMLElement & Record<string, unknown>;
 export const $ = (id: string): Elem => document.getElementById(id) as Elem;
 
 export const state: AdminState = {

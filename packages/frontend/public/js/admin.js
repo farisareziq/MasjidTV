@@ -1005,7 +1005,7 @@
         switchView("masjid");
         return;
       }
-      const fetches = [
+      const [status, settings, methods, zonesRes, announcements, today, streamsRes] = await Promise.all([
         api("/api/admin/status"),
         api("/api/admin/settings"),
         api("/api/methods"),
@@ -1013,9 +1013,8 @@
         api("/api/admin/announcements"),
         api("/api/today"),
         api("/api/admin/streams")
-      ];
-      if (F.licenseCard()) fetches.push(api("/api/admin/license"));
-      const [status, settings, methods, zonesRes, announcements, today, streamsRes, license] = await Promise.all(fetches);
+      ]);
+      const license = F.licenseCard() ? await api("/api/admin/license") : void 0;
       state.status = status;
       state.methods = methods;
       state.zones = zonesRes.zones || {};
@@ -1136,7 +1135,7 @@
   function toggleQuranBox() {
     const quran = $("anCategory").value === "quran";
     $("anQuranBox").hidden = !quran;
-    if (quran && !$("anTitle").value.trim()) {
+    if (quran && !String($("anTitle").value).trim()) {
       $("anTitle").value = "Ayat Quran Harian";
     }
   }
@@ -1266,7 +1265,7 @@
     }
   }
   var testPrayerKey = () => {
-    const v = $("stTestPrayer").value;
+    const v = String($("stTestPrayer").value);
     return v === "jumaah" ? "dhuhr" : v;
   };
   var nextFridayKey = () => {
@@ -1667,7 +1666,7 @@
       $("loginError").hidden = true;
       try {
         if (F.login()) {
-          const username = $("loginUsername").value.trim();
+          const username = String($("loginUsername").value).trim();
           const password = $("loginPassword").value;
           const isSuper = username === "admin";
           const res = await fetch(isSuper ? "/api/auth/superuser/login" : "/api/auth/login", {
@@ -1738,7 +1737,7 @@
           $("pinError").hidden = false;
           return;
         }
-        if (pin.length < 8) {
+        if (String(pin).length < 8) {
           $("pinError").textContent = t("pinTooShort");
           $("pinError").hidden = false;
           return;
@@ -1856,12 +1855,12 @@
     $("anImageClear").addEventListener("click", () => {
       $("anImageUrl").value = "";
       $("anImage").value = "";
-      setMediaPreview("", $("anVideoUrl").value);
+      setMediaPreview("", String($("anVideoUrl").value));
     });
     $("anVideoClear").addEventListener("click", () => {
       $("anVideoUrl").value = "";
       $("anImage").value = "";
-      setMediaPreview($("anImageUrl").value, "");
+      setMediaPreview(String($("anImageUrl").value), "");
     });
     $("anSave").addEventListener("click", async () => {
       const payload = {
@@ -2158,9 +2157,9 @@
       });
     });
     $("pwSaveBtn").addEventListener("click", async () => {
-      const current = $("pwCurrent").value;
-      const next = $("pwNew").value;
-      const confirm2 = $("pwConfirm").value;
+      const current = String($("pwCurrent").value);
+      const next = String($("pwNew").value);
+      const confirm2 = String($("pwConfirm").value);
       if (!current || !next) return toast(t("fillPasswords"), "err");
       if (next.length < 6) return toast(t("pwTooShort"), "err");
       if (next !== confirm2) return toast(t("pwMismatch"), "err");

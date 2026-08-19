@@ -8,7 +8,7 @@
 // dimuat), jadi susunan import pada wrapper adalah signifikan.
 
 import { $, state, registerAdminFeatures } from './types';
-import type { DshowOption, LicenseInfo, TvDevice } from './types';
+import type { DshowOption, LicenseInfo, TenantInfo, TvDevice } from './types';
 import { t, i18nEntry, currentAdminLang } from './i18n';
 import { escapeHtml, dshowDeviceName } from './util';
 import { api, toast } from './api';
@@ -37,10 +37,10 @@ function renderOverviewExtra() {
 }
 
 $('licRegisterBtn').addEventListener('click', async () => {
-  const code = $('licCodeInput').value.trim();
+  const code = String($('licCodeInput').value).trim();
   if (!code) return toast(t('licenseCodeLabel'), 'err');
   try {
-    const res = await api('/api/admin/license', { method: 'POST', body: { code } });
+    const res = await api<LicenseInfo>('/api/admin/license', { method: 'POST', body: { code } });
     state.license = res;
     $('licCodeInput').value = '';
     renderOverviewExtra();
@@ -53,7 +53,7 @@ $('licRegisterBtn').addEventListener('click', async () => {
 // ------------------------------------------------------------- superuser
 
 async function refreshTenants() {
-  state.superTenants = await api('/api/super/tenants');
+  state.superTenants = await api<TenantInfo[]>('/api/super/tenants');
   renderTenants();
 }
 
@@ -112,7 +112,7 @@ $('tenantList').addEventListener('click', async (e) => {
       await api(`/api/super/tenants/${id}`, { method: 'PATCH', body: { status: act === 'suspend' ? 'suspended' : 'licensed' } });
       toast(t('settingsSaved'));
     } else if (act === 'key') {
-      const r = await api(`/api/super/tenants/${id}/api-key`, { method: 'POST', body: {} });
+      const r = await api<{ apiKey: string }>(`/api/super/tenants/${id}/api-key`, { method: 'POST', body: {} });
       toast(`${t('apiKeyLabel')}: ${r.apiKey}`);
     } else if (act === 'users') {
       const box = document.querySelector(`[data-users="${id}"]`) as HTMLElement;
@@ -143,11 +143,11 @@ $('tenantList').addEventListener('click', async (e) => {
 });
 
 $('suCreateTenant').addEventListener('click', async () => {
-  const name = $('suTenantName').value.trim();
-  const username = $('suTenantUsername').value.trim();
-  const password = $('suTenantPassword').value;
+  const name = String($('suTenantName').value).trim();
+  const username = String($('suTenantUsername').value).trim();
+  const password = String($('suTenantPassword').value);
   try {
-    const res = await api('/api/super/tenants', { method: 'POST', body: { name, username, password } });
+    const res = await api<{ name: string; apiKey: string }>('/api/super/tenants', { method: 'POST', body: { name, username, password } });
     toast(`${res.name} — ${t('apiKeyLabel')}: ${res.apiKey}`);
     $('suTenantName').value = '';
     $('suTenantUsername').value = '';
@@ -164,7 +164,7 @@ async function renderTv() {
   const list = $('tvDeviceList');
   if (!list) return;
   try {
-    const res = await api('/api/admin/devices');
+    const res = await api<{ devices?: TvDevice[] }>('/api/admin/devices');
     const devices: TvDevice[] = res.devices || [];
     if (!devices.length) {
       list.innerHTML = `<p class="sub">${escapeHtml(t('tvEmpty'))}</p>`;
@@ -203,7 +203,7 @@ async function renderTv() {
 }
 
 $('tvPairBtn').addEventListener('click', async () => {
-  const code = $('tvPairCode').value.trim().toUpperCase();
+  const code = String($('tvPairCode').value).trim().toUpperCase();
   if (!code) return toast(t('tvPairCode'), 'err');
   try {
     await api('/api/admin/pair', { method: 'POST', body: { code } });
@@ -251,7 +251,7 @@ $('tvDeviceList').addEventListener('click', async (e) => {
 // jangkakan — lihat packages/server/src/streams.ts); label = nama peranti
 // TV + nama peranti DSHOW. [] jika tiada laporan — medan kekal teks-bebas.
 async function dshowOptions(): Promise<DshowOption[]> {
-  const res = await api('/api/admin/devices');
+  const res = await api<{ devices?: TvDevice[] }>('/api/admin/devices');
   const devices: TvDevice[] = res.devices || [];
   const seen = new Set<string>();
   const opts: DshowOption[] = [];
