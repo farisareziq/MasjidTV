@@ -40,7 +40,7 @@ try {
   tv.proc.stdout.on('data', (d) => process.stdout.write('[tv] ' + d));
   tv.proc.stderr.on('data', (d) => process.stderr.write('[tv-err] ' + d));
   const TV = tv.url;
-  await waitHealth(TV, 'TV kiosk (' + (tv.packaged ? 'packaged' : 'dev') + ')');
+  await waitHealth(TV, 'TV kiosk (' + (tv.packaged ? 'packaged' : 'dev') + ')', undefined, undefined, tv.proc);
 
   // 5) Mula pairing dari TV.
   let r = await fetch(TV + '/api/pair/start', {

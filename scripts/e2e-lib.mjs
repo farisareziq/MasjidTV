@@ -99,8 +99,9 @@ export function killOrphanFfmpeg() {
   } catch { /* tiada proses ffmpeg berjalan */ }
 }
 
-/** Tunggu endpoint /api/health sedia. */
-export async function waitHealth(url, label, tries, intervalMs = 500) {
+/** Tunggu endpoint /api/health sedia. `proc` (pilihan) ditandakan sihat supaya
+ * handler exit dalam spawnKiosk tidak mencetak diagnostik selepas kejayaan. */
+export async function waitHealth(url, label, tries, intervalMs = 500, proc) {
   // CI runner Windows headless: Electron GUI (app.whenReady) lambat mula —
   // benarkan override melalui env (saat). Lalai kekal 45sa untuk larian lokal.
   const defTries = Number(process.env.E2E_HEALTH_TIMEOUT_S || 45) * 2;
@@ -108,8 +109,13 @@ export async function waitHealth(url, label, tries, intervalMs = 500) {
   for (let i = 0; i < tries; i++) {
     try {
       const r = await fetch(url + '/api/health', { signal: AbortSignal.timeout(2000) });
-      if (r.ok) return true;
+      if (r.ok) { if (proc) proc.__healthOk = true; return true; }
     } catch { /* belum sedia */ }
+    // Kesan mati awal: jika proses sudah exit, hentikan segera (diagnostik
+    // stderr sudah dicetak oleh handler exit dalam spawnKiosk).
+    if (proc && proc.exitCode !== null) {
+      throw new Error(label + ' — proses terkeluar awal (code ' + proc.exitCode + ')');
+    }
     await sleep(intervalMs);
   }
   throw new Error(label + ' tidak sedia dalam ' + Math.round(tries * intervalMs / 1000) + 'sa');
@@ -257,8 +263,12 @@ export async function spawnKiosk({ port, dataDir } = {}) {
     ? ['--headless', '--disable-gpu', '--no-sandbox', '--disable-dev-shm-usage', '--disable-software-rasterizer']
     : [];
 
+  const electronExe = path.join(process.cwd(), 'apps', 'kiosk', 'node_modules', 'electron', 'dist', 'electron.exe');
+  console.error('[e2e] electron dev: exe=' + electronExe + ' wujud=' + fs.existsSync(electronExe)
+    + ' headless=' + headless + ' FFMPEG_PATH=' + (process.env.FFMPEG_PATH || bundledFfmpeg || '(tiada — fallback muat turun)'));
+
   const proc = spawn(
-    path.join(process.cwd(), 'apps', 'kiosk', 'node_modules', 'electron', 'dist', 'electron.exe'),
+    electronExe,
     ['.', ...headlessArgs, '--no-kiosk', '--no-autostart', '--port', String(port)],
     {
       cwd: path.join(process.cwd(), 'apps', 'kiosk'),
@@ -266,11 +276,24 @@ export async function spawnKiosk({ port, dataDir } = {}) {
         ...cleanEnv,
         MASJIDTV_DATA_DIR: dir,
         MASJIDTV_PUBLIC_DIR: path.join(process.cwd(), 'packages', 'frontend', 'public'),
-        ...(bundledFfmpeg && fs.existsSync(bundledFfmpeg) ? { FFMPEG_PATH: bundledFfmpeg } : {})
+        ...(process.env.FFMPEG_PATH
+          ? { FFMPEG_PATH: process.env.FFMPEG_PATH }
+          : (bundledFfmpeg && fs.existsSync(bundledFfmpeg) ? { FFMPEG_PATH: bundledFfmpeg } : {}))
       },
       stdio: ['ignore', 'pipe', 'pipe']
     }
   );
+
+  // Diagnostik CI: tangkap ralat spawn + exit awal + stderr buffer supaya
+  // kegagalan headless (tiada stdout) masih mendedahkan punca sebenar.
+  const errBuf = [];
+  proc.stderr.on('data', (d) => { errBuf.push(String(d)); if (errBuf.length > 50) errBuf.shift(); });
+  proc.on('error', (e) => console.error('[e2e] electron spawn error: ' + e.message));
+  proc.on('exit', (code, sig) => {
+    if (!proc.__healthOk) {
+      console.error('[e2e] electron terkeluar awal code=' + code + ' sig=' + sig + '\n[e2e] stderr:\n' + errBuf.join(''));
+    }
+  });
   return { proc, port, url: `http://localhost:${port}`, dir, packaged: false };
 }
 
