@@ -48,8 +48,8 @@ if (!assumeYes) {
   process.exit(0);
 }
 
-const client = createCloudClient(url, token);
-applySchema(client);
+const client = await createCloudClient(url, token);
+await applySchema(client);
 
 // Map a raw row (DB column names, e.g. tenant_id) to Drizzle's TS property
 // names (tenantId) using each table's column definitions.

@@ -16,7 +16,7 @@ if (!url) {
   process.exit(1);
 }
 
-const client = createCloudClient(url, token);
+const client = await createCloudClient(url, token);
 const tables = ['tenants', 'users', 'superusers', 'cloud_announcements', 'cloud_media', 'pairing_sessions', 'tv_devices'];
 const backup = { exportedAt: new Date().toISOString(), tables: {} };
 

@@ -16,8 +16,8 @@ const scripts = path.resolve(import.meta.dirname, '..');
 process.env.TURSO_URL = `file:${dbPath}`;
 
 // Seed
-const client = createCloudClient(`file:${dbPath}`, '');
-applySchema(client);
+const client = await createCloudClient(`file:${dbPath}`, '');
+await applySchema(client);
 await client.db.insert(tenants).values({ id: 't1', name: 'Drill Mosque', createdAt: 1755000000000, trialUntil: 1756000000000, status: 'trial', apiKey: 'key-1', settings: '{}' });
 await client.db.insert(users).values({ id: 'u1', tenantId: 't1', username: 'admin', passwordHash: 'x', name: 'Admin', active: 1, tokenVersion: 0, createdAt: 1755000000000 });
 console.log('[drill] seeded 1 tenant + 1 user');
@@ -27,7 +27,7 @@ client.close();
 execFileSync(process.execPath, [path.join(scripts, 'turso-backup.mjs'), '--out', b1], { env: process.env, stdio: 'inherit' });
 
 // Wipe tenant rows only (restore truncates what's in the backup anyway)
-const wipe = createCloudClient(`file:${dbPath}`, '');
+const wipe = await createCloudClient(`file:${dbPath}`, '');
 await wipe.raw.execute('DELETE FROM tenants');
 await wipe.raw.execute('DELETE FROM users');
 console.log('[drill] wiped tenants + users');
