@@ -48,7 +48,7 @@ jobs:
           path: |
             apps/kiosk/bin/ffmpeg.exe
             apps/kiosk/bin/ffmpeg.exe.sha256
-          key: ffmpeg-win-x64-sha256-3e44203be3d6aaea41d720a32ef6604873c559d45e03ff43cace2b49e23e5241
+          key: ffmpeg-win-x64-sha256-fe5a8f090b9fbc77d5e64c7d8b404b8837e05a09663ed9768ba19284cf929b20
           restore-keys: |
             ffmpeg-win-x64-sha256-
 
@@ -58,7 +58,7 @@ jobs:
         run: node tools/download-ffmpeg.mjs
         working-directory: apps/kiosk
         env:
-          FFMPEG_SHA256: '3e44203be3d6aaea41d720a32ef6604873c559d45e03ff43cace2b49e23e5241'
+          FFMPEG_SHA256: 'fe5a8f090b9fbc77d5e64c7d8b404b8837e05a09663ed9768ba19284cf929b20'
 
       - name: Package kiosk (electron-builder NSIS + portable)
         run: node tools/package.mjs

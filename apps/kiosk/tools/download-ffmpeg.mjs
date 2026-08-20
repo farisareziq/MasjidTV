@@ -55,12 +55,14 @@ function hasValidCachedBinary() {
 if (hasValidCachedBinary()) process.exit(0);
 
 const REPO = 'BtbN/FFmpeg-Builds';
-// PIN untuk reproducibility. Tag 'latest' di BtbN ialah rolling tag yang
-// mempunyai asset digest stabil; kemas kini pin dengan sengaja sahaja
-// (verifikasi manual: muat turun zip → sha256 → padankan dengan API digest).
-const PIN_TAG = 'latest';
-const ZIP_NAME = 'ffmpeg-master-latest-win64-gpl.zip';
-const PIN_SHA256 = (process.env.FFMPEG_SHA256 || '3e44203be3d6aaea41d720a32ef6604873c559d45e03ff43cace2b49e23e5241').toLowerCase().replace(/^sha256:/, '');
+// PIN untuk reproducibility. Tag autobuild-* BtbN ialah build TETAP (immutable)
+// — berbeza dengan tag 'latest' yang rolling (aset diganti setiap rebuild
+// upstream → sha256 pin lapuk setiap kali). Kemas kini pin dengan sengaja:
+// pilih tag autobuild dari https://github.com/BtbN/FFmpeg-Builds/releases,
+// padankan ZIP_NAME + sha256 dengan digest API.
+const PIN_TAG = 'autobuild-2026-08-19-19-21';
+const ZIP_NAME = 'ffmpeg-N-126217-ge1e325235e-win64-gpl.zip';
+const PIN_SHA256 = (process.env.FFMPEG_SHA256 || 'fe5a8f090b9fbc77d5e64c7d8b404b8837e05a09663ed9768ba19284cf929b20').toLowerCase().replace(/^sha256:/, '');
 
 const tmpZip = path.join(kioskDir, '.ffmpeg-tmp.zip');
 
