@@ -75,7 +75,15 @@ export function registerSse(app: FastifyInstance, store: CloudStore): void {
       try {
         const { verifyToken } = await import('./auth.js');
         const payload = verifyToken(bearer);
-        if (payload?.tid) tenantId = String(payload.tid);
+        if (payload?.role === 'admin' && payload?.tid && payload?.uid) {
+          // Sahkan pengguna masih aktif & versi token semasa — elak token lama
+          // (pengguna dilumpuhkan / kata laluan ditukar) memegang sambungan SSE.
+          const user = await store.getUserById(String(payload.uid));
+          if (user && user.tenantId === payload.tid && user.active === 1
+            && Number(user.tokenVersion || 0) === Number(payload.v || 0)) {
+            tenantId = String(payload.tid);
+          }
+        }
       } catch { /* token tidak sah */ }
     }
     if (!tenantId) {
