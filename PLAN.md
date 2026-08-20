@@ -78,6 +78,7 @@ Medan URL stream jenis DSHOW kini ada `<datalist id="dshowDevices">` — kesatua
 
 ### C1. Rilis binaan automatik (GitHub Actions) ✅ SELESAI
 `release.yml`: tag `v*` → windows-latest → build workspace → download ffmpeg (cache Actions) → `package.mjs` → upload artifact + GitHub Release + `.sha256`.
+**Job `android-tv` (tambah 2026-08-20)**: tag `v*` → ubuntu-latest → Flutter 3.32.8 (pin — MESTI memenuhi kekangan SDK `pubspec.lock` dart >=3.8.0/flutter >=3.32.0) + JDK 17 → `flutter build apk --release` (universal) → lampirkan `masjidtv-<tag>-universal.apk` + `.sha256` ke GitHub Release yang sama. APK guna debug keystore (sideload jalan luar, bukan Google Play). Sebelum ini APK tidak pernah dijana automatik — pengguna terpaksa bina manual; kini setiap tag `v*` menghasilkan APK edaran. Semakan kod: pin 3.24.5 asal (Dart 3.5.4) di bawah lantai lockfile — akan gagal `flutter pub get`; versi pubspec turut dibump 1.0.0→1.1.0 segerak root/kiosk.
 
 ### C2. Dry-run/E2E dalam CI ✅ SELESAI
 - `dry-run.mjs` + `e2e-pairing.mjs` (fallback dev binary, tanpa Windows-only packaged exe) dijalankan dalam CI ubuntu.

@@ -14,8 +14,13 @@ Prasyarat: Flutter SDK + Android SDK + JDK 17/21.
 ```bash
 cd apps/android-tv
 flutter build apk --debug     # APK ujian
-flutter build apk --release   # APK produksi (perlu tandatangan)
+flutter build apk --release   # APK produksi (debug keystore — sideload, bukan Play Store)
 ```
+
+Rilis automatik: tag `v*` → workflow `release.yml` membina APK universal
+release dan memuat naik ke GitHub Release sebagai
+`masjidtv-v<versi>-universal.apk` (+ `.sha256`). Lihat README utama
+untuk arahan pemasangan sideload.
 
 ## Architektur (Flutter, port daripada Kotlin rujukan)
 

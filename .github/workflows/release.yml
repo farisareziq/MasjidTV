@@ -94,3 +94,68 @@ jobs:
           }
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  # APK Android TV (Flutter) — sideload jalan luar, bukan Google Play.
+  # APK ditandatangani dengan debug keystore Flutter lalai (bukan keystore
+  # rasmi Google Play) — sesuai untuk edaran terhad/pelanggan masjid yang
+  # pasang manual melalui "Install unknown app". Tidak boleh dimuat naik ke
+  # Play Store. Guna JDK 17 (AGP 8.7.3 perlu JDK 17+).
+  android-tv:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      # Pin Flutter 3.32.8 — MESTI memenuhi kekangan SDK dalam pubspec.lock
+      # (dart >=3.8.0 / flutter >=3.32.0, kesatuan had bawah webview_flutter
+      # 4.13.1 dsb.). 3.32.8 ialah versi SDK tempatan yang menghasilkan
+      # lockfile ini. Kemas kini versi memerlukan ujian peranti sebenar
+      # (MiTV Android 14 armeabi-v7a).
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.32.8'
+          cache: true
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Flutter dependencies
+        run: flutter pub get
+        working-directory: apps/android-tv
+
+      # --release — bina APK produksi. signingConfig debug (lihat
+      # app/build.gradle.kts) menandatangani APK dengan debug key Flutter.
+      # APK universal (semua ABI) — saiz lebih besar tetapi satu fail
+      # untuk semua peranti (arm64-v8a, armeabi-v7a, x86_64).
+      - name: Build APK (release, universal)
+        run: flutter build apk --release
+        working-directory: apps/android-tv
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-tv-apk
+          path: apps/android-tv/build/app/outputs/flutter-apk/app-release.apk
+          retention-days: 14
+
+      - name: Attach APK to GitHub Release
+        if: startsWith(github.ref, 'refs/tags/')
+        shell: bash
+        run: |
+          set -euo pipefail
+          tag="${GITHUB_REF#refs/tags/}"
+          src="apps/android-tv/build/app/outputs/flutter-apk/app-release.apk"
+          # Namakan semula dengan tag supaya fail unik per-rilis dan
+          # sha256sum -c mengesahkan fail tepat yang dimuat turun tanpa
+          # bergantung pada lokasi/nama tempatan pengguna.
+          dst="masjidtv-${tag}-universal.apk"
+          cp "$src" "$dst"
+          sha="$(sha256sum "$dst" | awk '{print $1}')"
+          echo "${sha}  ${dst}" > "${dst}.sha256"
+          echo "APK: $dst (sha256: $sha)"
+          gh release upload "$tag" "$dst" "${dst}.sha256" --clobber || \
+            gh release create "$tag" "$dst" "${dst}.sha256" --title "MasjidTV $tag" --generate-notes
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}

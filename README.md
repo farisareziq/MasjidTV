@@ -134,6 +134,46 @@ Ciri utama kiosk:
 Rilis automatik: tag `v*` → workflow `release.yml` membina installer di
 windows-latest dan memuat naik ke GitHub Release (dengan `.sha256`).
 
+## Android TV (Flutter)
+
+App Android TV (WebView + ExoPlayer + UVC + pairing) diedarkan sebagai APK
+universal melalui GitHub Releases — **sideload jalan luar, bukan Google Play**.
+
+### Muat turun APK
+
+1. Buka halaman Releases di GitHub (tag `v*`).
+2. Muat turun `masjidtv-v<versi>-universal.apk` (universal — arm64-v8a,
+   armeabi-v7a, x86_64) dan `masjidtv-v<versi>-universal.apk.sha256`
+   yang bersebelahan.
+3. Sahkan integriti (kedua-dua fail dalam direktori sama):
+   `sha256sum -c masjidtv-v<versi>-universal.apk.sha256`
+
+### Pasang di TV (sideload)
+
+APK ditandatangani dengan debug keystore (bukan keystore Google Play) —
+pengguna pasang manual:
+
+1. **Aktifkan "Install unknown apps"** untuk pengurus fail (cth. File
+   Commander, FX) di Settings → Security → Install unknown apps.
+2. Pindahkan APK ke TV (USB / ADB / muat turun terus).
+3. Buka APK dalam pengurus fail → Install.
+4. Tetapkan MasjidTV sebagai Home app (Android 10+) untuk auto-start selepas
+   boot; aktifkan "Autostart" dalam Settings → Apps untuk TV MIUI.
+
+### Bina manual (jika perlu)
+
+```bash
+cd apps/android-tv
+flutter build apk --release   # -> build/app/outputs/flutter-apk/app-release.apk
+```
+
+### Nota signing
+
+APK guna debug keystore Flutter lalai (`signingConfig = debug` dalam
+`app/build.gradle.kts`). Sesuai untuk edaran terhad/pelanggan masjid.
+**Tidak boleh dimuat naik ke Google Play** — untuk Play Store, perlu keystore
+release rasmi + daftar developer Google Play.
+
 ### Server lokal lama (alternatif tiada-Electron)
 
 `node scripts/build-exe.mjs` masih tersedia (binari SEA tunggal ~92MB vs
