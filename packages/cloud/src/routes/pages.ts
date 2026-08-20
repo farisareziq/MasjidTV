@@ -5,7 +5,7 @@
 import type { FastifyInstance } from 'fastify';
 import { ASSETS } from '../pages.generated.js';
 
-function htmlPage(name: '/display.html' | '/admin.html'): string {
+function htmlPage(name: '/display.html' | '/admin.html' | '/guide.html'): string {
   return Buffer.from(ASSETS[name], 'base64').toString('utf8');
 }
 
@@ -46,6 +46,10 @@ export function registerPageRoutes(app: FastifyInstance): void {
 
   app.get('/admin', async (_req, reply) => {
     reply.type('text/html').send(htmlPage('/admin.html'));
+  });
+
+  app.get('/guide', async (_req, reply) => {
+    reply.type('text/html').send(htmlPage('/guide.html'));
   });
 
   // Convenience alias: the superuser console lives inside /admin (login as

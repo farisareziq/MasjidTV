@@ -112,7 +112,7 @@ export async function createCloudApp(): Promise<FastifyInstance> {
   };
   function cspFor(p: string): string {
     if (p === '/display') return CSP.display;
-    if (p === '/admin') return CSP.admin;
+    if (p === '/admin' || p === '/guide') return CSP.admin;
     if (p === '/sw.js') {
       return [
         "default-src 'self'",

@@ -154,6 +154,24 @@ label {
   color: #7d8ea5;
 }
 
+.login-guide {
+  margin-top: 18px;
+  text-align: center;
+  font-size: 13.5px;
+}
+
+.login-guide a {
+  color: #93a4ba;
+  text-decoration: none;
+  border-bottom: 1px dashed rgba(147, 164, 186, 0.5);
+  padding-bottom: 2px;
+}
+
+.login-guide a:hover {
+  color: #c99b3f;
+  border-bottom-color: #c99b3f;
+}
+
 .login-hint {
   font-size: 12px;
   color: #7d8ea5;
