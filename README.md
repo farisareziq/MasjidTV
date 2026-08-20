@@ -47,7 +47,7 @@ automatik — paparan: `http://<lan-ip>:3000/display?key=<displayKey>`.
 ## Ujian
 
 ```bash
-pnpm test                  # unit + integration (vitest, 122 ujian)
+pnpm test                  # unit + integration (vitest, 123 ujian)
 node scripts/dry-run.mjs   # E2E: API, JAKIM, keselamatan, CRUD, muat naik
 node scripts/pentest.mjs   # pentest keselamatan penuh (cloud + server lokal)
 node scripts/run-e2e.mjs   # SEMUA peringkat: build→typecheck→lint→test→
@@ -110,7 +110,7 @@ kiosk fullscreen, relay ffmpeg, pairing cloud, autostart.
 
 ```powershell
 # Bina installer (NSIS + portable) — perlu sekali:
-node apps/kiosk/tools/download-ffmpeg.mjs   # bundel ffmpeg (~160MB, sekali)
+node apps/kiosk/tools/download-ffmpeg.mjs   # bundel ffmpeg (sekali; saiz ikut upstream BtbN)
 pnpm --filter @masjidtv/kiosk package       # -> apps/kiosk/dist-kiosk/<stamp>/
 
 # Pasang: jalankan MasjidTV-Kiosk-Setup-x.y.z.exe (atau Portable).
