@@ -8,6 +8,7 @@
     { "source": "/api/(.*)", "destination": "/api/index" },
     { "source": "/display", "destination": "/api/index" },
     { "source": "/admin", "destination": "/api/index" },
+    { "source": "/guide", "destination": "/api/index" },
     { "source": "/super", "destination": "/api/index" },
     { "source": "/sw.js", "destination": "/api/index" },
     { "source": "/css/(.*)", "destination": "/api/index" },
