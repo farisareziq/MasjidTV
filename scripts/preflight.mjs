@@ -30,11 +30,18 @@ function check(name, { required = true, ok, detail = '' }) {
 if (process.env.PREFLIGHT_SKIP_ENV === '1') {
   check('env checks skipped (PREFLIGHT_SKIP_ENV=1)', { required: false, ok: true });
 } else {
-const requiredEnv = ['TURSO_URL', 'TURSO_AUTH_TOKEN', 'JWT_SECRET', 'LICENSE_PUBLIC_KEY', 'VERCEL_BLOB_READ_WRITE_TOKEN'];
+const requiredEnv = ['TURSO_URL', 'TURSO_AUTH_TOKEN', 'JWT_SECRET', 'LICENSE_PUBLIC_KEY'];
 for (const key of requiredEnv) {
   const v = env[key];
   check(`env ${key}`, { ok: !!v, detail: v ? undefined : 'missing (set in Vercel → Settings → Environment Variables)' });
 }
+// Vercel Blob — kod cloud (admin.ts) fallback kedua-dua nama; preflight
+// selari supaya tidak false-fail pada projek yang menamakan tanpa prefix.
+const blobToken = env.VERCEL_BLOB_READ_WRITE_TOKEN || env.BLOB_READ_WRITE_TOKEN;
+check('env VERCEL_BLOB_READ_WRITE_TOKEN', {
+  ok: !!blobToken,
+  detail: blobToken ? undefined : 'missing (Vercel → Settings → Environment Variables; juga terima BLOB_READ_WRITE_TOKEN)'
+});
 check('TURSO_URL is remote libsql', {
   required: false,
   ok: !env.TURSO_URL || env.TURSO_URL.startsWith('libsql://'),
