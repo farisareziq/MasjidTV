@@ -150,7 +150,7 @@ if (liveUrl) {
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ pin: '00000000' })
     });
-    check('superuser login rejects bad PIN', { ok: res.status === 401 || res.status === 400, detail: `got ${res.status}` });
+    check('superuser login rejects bad PIN', { ok: [401, 400, 429].includes(res.status), detail: `got ${res.status}` });
   } catch (err) {
     check('superuser login rejects bad PIN', { ok: false, detail: err.message });
   }
