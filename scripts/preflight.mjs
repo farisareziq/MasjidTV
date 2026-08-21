@@ -18,6 +18,12 @@ const liveUrl = (argVal('--url') || process.env.PREFLIGHT_URL || '').replace(/\/
 const pemPath = argVal('--pem') || process.env.PREFLIGHT_PEM;
 const env = process.env;
 
+// `vercel env pull` menulis nilai placeholder "[SENSITIVE***" untuk secret —
+// nilai tempatan BUKAN nilai sebenar. Sebarang semakan kandungan (kekuatan
+// JWT, padanan keystore lesen) ke atas nilai bertopeng adalah tidak sah:
+// jangan PASS palsu (nilai hadir) atau FAIL palsu (nampak pendek/salah).
+const isMasked = (v) => typeof v === 'string' && v.startsWith('[SENSITIVE');
+
 const results = [];
 function check(name, { required = true, ok, detail = '' }) {
   results.push({ name, required, ok: !!ok, detail });
@@ -33,24 +39,41 @@ if (process.env.PREFLIGHT_SKIP_ENV === '1') {
 const requiredEnv = ['TURSO_URL', 'TURSO_AUTH_TOKEN', 'JWT_SECRET', 'LICENSE_PUBLIC_KEY'];
 for (const key of requiredEnv) {
   const v = env[key];
-  check(`env ${key}`, { ok: !!v, detail: v ? undefined : 'missing (set in Vercel → Settings → Environment Variables)' });
+  // Bertopeng = variabel ADA dalam Vercel (CLI hanya menopeng nilai yang
+  // ditetapkan) — kehadiran sah, kandungan tidak boleh disemak.
+  check(`env ${key}`, {
+    ok: !!v,
+    detail: isMasked(v)
+      ? 'hadir (nilai bertopeng [SENSITIVE*** oleh vercel env pull — semakan kandungan perlu env sebenar)'
+      : v ? undefined : 'missing (set in Vercel → Settings → Environment Variables)'
+  });
 }
 // Vercel Blob — kod cloud (admin.ts) fallback kedua-dua nama; preflight
 // selari supaya tidak false-fail pada projek yang menamakan tanpa prefix.
 const blobToken = env.VERCEL_BLOB_READ_WRITE_TOKEN || env.BLOB_READ_WRITE_TOKEN;
 check('env VERCEL_BLOB_READ_WRITE_TOKEN', {
   ok: !!blobToken,
-  detail: blobToken ? undefined : 'missing (Vercel → Settings → Environment Variables; juga terima BLOB_READ_WRITE_TOKEN)'
+  detail: isMasked(blobToken)
+    ? 'hadir (nilai bertopeng [SENSITIVE***)'
+    : blobToken ? undefined : 'missing (Vercel → Settings → Environment Variables; juga terima BLOB_READ_WRITE_TOKEN)'
 });
 check('TURSO_URL is remote libsql', {
   required: false,
-  ok: !env.TURSO_URL || env.TURSO_URL.startsWith('libsql://'),
-  detail: env.TURSO_URL?.startsWith('libsql://') ? undefined : 'production should use libsql:// (Turso), not a local file'
+  ok: !env.TURSO_URL || isMasked(env.TURSO_URL) || env.TURSO_URL.startsWith('libsql://'),
+  detail: isMasked(env.TURSO_URL) || env.TURSO_URL?.startsWith('libsql://') ? undefined : 'production should use libsql:// (Turso), not a local file'
 });
 }
 
 // --- 2. JWT secret strength ----------------------------------------------
-if (env.JWT_SECRET) {
+// Nilai bertopeng [SENSITIVE*** tidak boleh dinilai — WARN (unknown), bukan
+// PASS palsu atau FAIL palsu.
+if (isMasked(env.JWT_SECRET)) {
+  check('JWT_SECRET strength (>=32 chars, non-obvious)', {
+    required: false,
+    ok: false,
+    detail: 'nilai bertopeng [SENSITIVE*** — tidak boleh dinilai secara tempatan; sahkan pada mesin dengan env sebenar'
+  });
+} else if (env.JWT_SECRET) {
   const weak = env.JWT_SECRET.length < 32 || /^(change|dev|test|secret|password)/i.test(env.JWT_SECRET);
   check('JWT_SECRET strength (>=32 chars, non-obvious)', {
     ok: !weak,
@@ -85,33 +108,51 @@ if (process.env.PREFLIGHT_SKIP_ENV !== '1') {
 // cloud LICENSE_PUBLIC_KEY — mismatch = every activation fails with
 // "Kod lesen tidak sah".
 if (pemPath && fs.existsSync(pemPath)) {
-  try {
-    const priv = crypto.createPrivateKey(fs.readFileSync(pemPath, 'utf8'));
-    const pub = crypto.createPublicKey(priv);
-    const spki = pub.export({ type: 'spki', format: 'der' }).toString('base64');
-    const cloudKey = env.LICENSE_PUBLIC_KEY;
-    const same = !!cloudKey && cloudKey.length === spki.length
-      && crypto.timingSafeEqual(Buffer.from(spki), Buffer.from(String(cloudKey)));
+  if (isMasked(env.LICENSE_PUBLIC_KEY)) {
+    // Nilai tempatan bertopeng — perbandingan tidak sah. WAJIB gagal:
+    // go-live dengan keystore tidak sepadan mematikan SEMUA pengaktifan
+    // lesen pelanggan. (Jangan PASS palsu hanya kerana nilai hadir.)
     check('license keypair matches LICENSE_PUBLIC_KEY', {
-      ok: same,
-      detail: same || !cloudKey ? (cloudKey ? undefined : 'LICENSE_PUBLIC_KEY not set; cannot compare') : 'cloud key differs from the PEM — activations will fail with "Kod lesen tidak sah"'
+      ok: false,
+      detail: 'LICENSE_PUBLIC_KEY tempatan bertopeng [SENSITIVE*** — jalankan preflight ini dengan env sebenar (bukan vercel env pull) untuk mengesahkan padanan keystore'
     });
-  } catch (err) {
-    check('license keypair matches LICENSE_PUBLIC_KEY', { ok: false, detail: `cannot load PEM: ${err.message}` });
+  } else {
+    try {
+      const priv = crypto.createPrivateKey(fs.readFileSync(pemPath, 'utf8'));
+      const pub = crypto.createPublicKey(priv);
+      const spki = pub.export({ type: 'spki', format: 'der' }).toString('base64');
+      const cloudKey = env.LICENSE_PUBLIC_KEY;
+      const same = !!cloudKey && cloudKey.length === spki.length
+        && crypto.timingSafeEqual(Buffer.from(spki), Buffer.from(String(cloudKey)));
+      check('license keypair matches LICENSE_PUBLIC_KEY', {
+        ok: same,
+        detail: same || !cloudKey ? (cloudKey ? undefined : 'LICENSE_PUBLIC_KEY not set; cannot compare') : 'cloud key differs from the PEM — activations will fail with "Kod lesen tidak sah"'
+      });
+    } catch (err) {
+      check('license keypair matches LICENSE_PUBLIC_KEY', { ok: false, detail: `cannot load PEM: ${err.message}` });
+    }
   }
 } else if (env.LICENSE_PUBLIC_KEY) {
-  try {
-    crypto.createPublicKey({ key: Buffer.from(env.LICENSE_PUBLIC_KEY, 'base64'), format: 'der', type: 'spki' });
-    check('LICENSE_PUBLIC_KEY is a valid Ed25519 SPKI key', { ok: true });
-  } catch {
-    check('LICENSE_PUBLIC_KEY is a valid Ed25519 SPKI key', { ok: false, detail: 'run: node tools/license-gen.mjs keygen' });
-  }
-  if (!pemPath) {
-    check('license private key provided for match test (--pem)', {
+  if (isMasked(env.LICENSE_PUBLIC_KEY)) {
+    check('LICENSE_PUBLIC_KEY is a valid Ed25519 SPKI key', {
       required: false,
       ok: false,
-      detail: 'optional but recommended pre-go-live: preflight --pem masjidtv-license-ed25519.pem'
+      detail: 'nilai bertopeng [SENSITIVE*** — tidak boleh disahkan secara tempatan'
     });
+  } else {
+    try {
+      crypto.createPublicKey({ key: Buffer.from(env.LICENSE_PUBLIC_KEY, 'base64'), format: 'der', type: 'spki' });
+      check('LICENSE_PUBLIC_KEY is a valid Ed25519 SPKI key', { ok: true });
+    } catch {
+      check('LICENSE_PUBLIC_KEY is a valid Ed25519 SPKI key', { ok: false, detail: 'run: node tools/license-gen.mjs keygen' });
+    }
+    if (!pemPath) {
+      check('license private key provided for match test (--pem)', {
+        required: false,
+        ok: false,
+        detail: 'optional but recommended pre-go-live: preflight --pem masjidtv-license-ed25519.pem'
+      });
+    }
   }
 }
 

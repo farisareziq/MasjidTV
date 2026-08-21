@@ -1,6 +1,6 @@
 "use strict";
 (() => {
-  // src/display-core.ts
+  // packages/frontend/src/display-core.ts
   var cfg = { features: {} };
   var AndroidBridgeRef = () => {
     const raw = window.AndroidBridge;
@@ -1347,7 +1347,7 @@
     refresh();
   }
 
-  // src/display-cloud.ts
+  // packages/frontend/src/display-cloud.ts
   bootDisplay({
     features: {
       metaKey: true,

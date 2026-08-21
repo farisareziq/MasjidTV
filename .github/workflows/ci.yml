@@ -4,6 +4,7 @@ on:
   push:
     branches: [master, main]
   pull_request:
+  workflow_dispatch:
 
 # Batalkan larian CI tumpang-tindih pada branch/ref yang sama — menjimatkan
 # minit runner (push baru ke master membatalkan larian lama yang belum siap).
@@ -55,15 +56,19 @@ jobs:
     name: E2E kiosk (Windows)
     runs-on: windows-latest
     timeout-minutes: 45
-    # NON-BLOCKING: runner Windows GitHub ialah headless tanpa sesi desktop
+    # MANUAL SAHAJA: runner Windows GitHub ialah headless tanpa sesi desktop
     # interaktif — Electron GUI tersekat pada rintisan tahap terendah (proses
     # hidup, STDOUT/STDERR kosong, /api/health tidak menjawab) walaupun dengan
     # --disable-gpu / disableHardwareAcceleration / --in-process-gpu /
     # ELECTRON_ENABLE_LOGGING. Ini batasan persekitaran runner yang direkodkan,
     # BUKAN kelemahan kod — e2e-pairing + dry-run-kiosk LULUS sepenuhnya pada
     # peranti Windows sebenar (server naik ~2sa, pairing, SSE, dshow, unpair).
-    # Ujian kiosk kekal wajib dijalankan MANUAL di mini PC sebelum rilis.
-    continue-on-error: true
+    # Dulu continue-on-error pada setiap push → X merah kekal pada setiap
+    # larian (kabus isyarat) + membazir minit runner Windows (~10min/push).
+    # Kini: workflow_dispatch sahaja (Actions → CI → Run workflow) — untuk
+    # perubahan kiosk besar, jalankan manual sebagai semakan tambahan; ujian
+    # kiosk kekal WAJIB manual di mini PC sebelum rilis.
+    if: github.event_name == 'workflow_dispatch'
     steps:
       - uses: actions/checkout@v4
 

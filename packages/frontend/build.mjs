@@ -26,6 +26,12 @@ for (const [entry, outfile] of targets) {
     target: 'es2022',
     bundle: true,
     sourcemap: false,
-    logLevel: 'info'
+    logLevel: 'info',
+    // DETERMINISM: esbuild derives its "// src/..." banner comments from cwd.
+    // Building from repo root (Vercel, pnpm -r) vs package dir produced
+    // byte-different-but-equivalent output ("packages/frontend/src/x.ts" vs
+    // "src/x.ts") — churn in pages.generated.ts and public/js diffs on every
+    // rebuild. Pin cwd to the REPO ROOT to match the committed baseline.
+    absWorkingDir: path.resolve(__dirname, '..', '..')
   });
 }

@@ -9,7 +9,7 @@
 | Kiosk Electron mini PC | ✅ Stabil — pairing Android TV, SSE <2sa, OBS DSHOW, autostart, hidden menu |
 | Server lokal (legacy zip/SEA) | ⚠️ Masih disokong tapi usang berbanding kiosk (alternatif tiada-Electron) |
 | Android TV (Flutter) | ✅ Berjalan (tiada SSE/DSHOW — ExoPlayer native) |
-| Ujian | ✅ 122/122 unit, E2E + pentest + dry-run 8 peringkat hijau (`node scripts/run-e2e.mjs`) |
+| Ujian | ✅ 123/123 unit, E2E + pentest + dry-run 8 peringkat hijau (`node scripts/run-e2e.mjs`) |
 | CI | ✅ Trigger master+main, typecheck semua pakej termasuk kiosk, e2e dalam CI |
 
 **Sprint 2026-08-19 selesai:**

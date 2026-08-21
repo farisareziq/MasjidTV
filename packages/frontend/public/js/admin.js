@@ -1,6 +1,6 @@
 "use strict";
 (() => {
-  // src/admin/types.ts
+  // packages/frontend/src/admin/types.ts
   var $ = (id) => document.getElementById(id);
   var state = {
     token: localStorage.getItem("tvm_token") || "",
@@ -53,7 +53,7 @@
     Object.assign(featureHooks, h);
   }
 
-  // src/admin/util.ts
+  // packages/frontend/src/admin/util.ts
   function escapeHtml(str) {
     return String(str ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#39;");
   }
@@ -112,7 +112,7 @@
     return EXT_MIME[ext] || "application/octet-stream";
   }
 
-  // src/admin/local.ts
+  // packages/frontend/src/admin/local.ts
   async function dshowOptions() {
     const res = await fetch("/api/devices-hw");
     if (!res.ok) return [];
@@ -122,7 +122,7 @@
   }
   registerAdminFeatures({ dshowOptions });
 
-  // src/admin/i18n.ts
+  // packages/frontend/src/admin/i18n.ts
   var ADMIN_LANG_KEY = "tvm_admin_lang";
   var adminLang = localStorage.getItem(ADMIN_LANG_KEY) || "ms";
   var I18N = {
@@ -889,7 +889,7 @@
     applyLang();
   }
 
-  // src/admin/api.ts
+  // packages/frontend/src/admin/api.ts
   async function api(path, options = {}) {
     const headers = { ...options.headers || {} };
     if (state.token) headers.Authorization = `Bearer ${state.token}`;
@@ -1050,7 +1050,7 @@
     if (name === "tv" && featureHooks.renderTv) featureHooks.renderTv();
   }
 
-  // src/admin/core.ts
+  // packages/frontend/src/admin/core.ts
   function renderAll() {
     if (!state.status) return;
     renderOverview();
@@ -2330,7 +2330,7 @@
   }
   var pinChangeFromApp = false;
 
-  // src/admin.ts
+  // packages/frontend/src/admin.ts
   bootAdmin({
     features: {}
   });

@@ -21,6 +21,16 @@ function run(cmd, cwd) {
   execSync(cmd, { cwd, stdio: 'inherit' });
 }
 
+// Match directories under `base` matching `pattern` (simple prefix glob,
+// e.g. 'better-sqlite3@*') and append `tail` — for pnpm .pnpm store lookups.
+function globResolve(base, pattern, tail) {
+  if (!fs.existsSync(base)) return [];
+  const prefix = pattern.replace(/\*$/, '');
+  return fs.readdirSync(base)
+    .filter((n) => n.startsWith(prefix))
+    .map((n) => path.join(base, n, tail));
+}
+
 function copyDir(src, dest, { filter } = {}) {
   fs.mkdirSync(dest, { recursive: true });
   for (const entry of fs.readdirSync(src, { withFileTypes: true })) {
@@ -100,14 +110,25 @@ fs.writeFileSync(path.join(out, 'server', 'node_modules', '@masjidtv', 'shared',
 // --ignore-scripts was dropped so optional native deps (@libsql/win32-x64-msvc)
 // install via their own prebuilt-download scripts. better-sqlite3 also builds
 // or downloads its binding during npm install; verify and fall back to the
-// workspace build if needed.
+// workspace binding if needed.
+// Fallback resolution order (pnpm hoists bindings into the .pnpm store —
+// the old single hardcoded path packages/server/node_modules/@masjidtv/db/…
+// breaks when pnpm symlinks to the store instead of nesting):
+//   1. require.resolve from @masjidtv/db in the live workspace
+//   2. node_modules/.pnpm/better-sqlite3@*/node_modules/better-sqlite3/build
 const bsqlDst = path.join(out, 'server', 'node_modules', 'better-sqlite3', 'build');
 if (!fs.existsSync(path.join(bsqlDst, 'Release', 'better_sqlite3.node'))) {
-  const bsqlSrc = path.join(root, 'packages', 'server', 'node_modules', '@masjidtv', 'db', 'node_modules', 'better-sqlite3', 'build');
-  if (fs.existsSync(path.join(bsqlSrc, 'Release', 'better_sqlite3.node'))) {
+  const candidates = [
+    // (legacy layout, kept for pnpm configs that nest)
+    path.join(root, 'packages', 'server', 'node_modules', '@masjidtv', 'db', 'node_modules', 'better-sqlite3', 'build'),
+    // pnpm store layout: node_modules/.pnpm/better-sqlite3@x.y.z/node_modules/better-sqlite3/build
+    ...globResolve(path.join(root, 'node_modules', '.pnpm'), 'better-sqlite3@*', path.join('node_modules', 'better-sqlite3', 'build')),
+  ];
+  const bsqlSrc = candidates.find((c) => fs.existsSync(path.join(c, 'Release', 'better_sqlite3.node')));
+  if (bsqlSrc) {
     copyDir(bsqlSrc, bsqlDst);
   } else {
-    throw new Error('better_sqlite3.node not found in workspace — run pnpm install first');
+    throw new Error('better_sqlite3.node not found (workspace install atau .pnpm store) — run pnpm install first');
   }
 }
 
