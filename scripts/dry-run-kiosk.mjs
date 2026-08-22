@@ -25,6 +25,7 @@ async function main() {
   // ===== 1. Cloud dummy =====
   const cloud = await bootCloud();
   reg.add(cloud.proc);
+  reg.addTempDir(cloud.dir);
   const CLOUD = cloud.url;
   cloud.proc.stderr.on('data', (d) => process.stderr.write('[cloud-err] ' + d));
   await waitHealth(CLOUD, 'cloud');
@@ -47,6 +48,7 @@ async function main() {
   // ===== 2. Kiosk packaged =====
   const tv = await spawnKiosk();
   reg.add(tv.proc);
+  reg.addTempDir(tv.dir);
   const TV = tv.url;
   tv.proc.stdout.on('data', (d) => process.stdout.write('[tv] ' + d));
   tv.proc.stderr.on('data', (d) => process.stderr.write('[tv-err] ' + d));

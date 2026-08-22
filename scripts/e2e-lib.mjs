@@ -298,17 +298,36 @@ export async function spawnKiosk({ port, dataDir } = {}) {
   return { proc, port, url: `http://localhost:${port}`, dir, packaged: false };
 }
 
-/** Manager proses ringkas — daftar proses, bersihkan semua pada exit. */
+/**
+ * Manager proses ringkas — daftar proses + direktori sementara, bersihkan
+ * semua pada exit.
+ *
+ * Setiap larian e2e/pentest mencipta direktori data sementara di os.tmpdir()
+ * (pentest-tv-*, e2e-cloud-*, e2e-tv-*). Cleanup perlu membuangnya juga,
+ * BUKAN hanya membunuh proses — jika tidak %TEMP% dipenuhi artefak pada setiap
+ * larian. Daftarkan direktori dengan `reg.addTempDir(dir)`.
+ */
 export function procRegistry() {
   const procs = [];
+  const tempDirs = [];
   const reg = {
     add(p) { procs.push(p); return p; },
+    /** Daftarkan direktori sementara untuk dibuang pada cleanup. */
+    addTempDir(dir) { if (dir) tempDirs.push(dir); return dir; },
+    removeTempDirs() {
+      for (const dir of tempDirs) {
+        try { fs.rmSync(dir, { recursive: true, force: true }); }
+        catch { /* fail selamat: mungkin dikunci Windows — dibuang pada larian seterusnya */ }
+      }
+      tempDirs.length = 0;
+    },
     async cleanup() {
       for (const p of procs) killTree(p);
       killOrphanFfmpeg();
+      this.removeTempDirs();
     },
     installExitHooks() {
-      const bye = () => { for (const p of procs) killTree(p); killOrphanFfmpeg(); };
+      const bye = () => { for (const p of procs) killTree(p); killOrphanFfmpeg(); reg.removeTempDirs(); };
       process.on('exit', bye);
       process.on('SIGINT', () => { bye(); process.exit(130); });
       process.on('SIGTERM', () => { bye(); process.exit(143); });

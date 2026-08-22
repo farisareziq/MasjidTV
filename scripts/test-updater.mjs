@@ -63,6 +63,22 @@ function makeReleaseServer({ tamper = false, omitChecksum = false, omitSetup = f
 // bukan ESM loader.
 // ---------------------------------------------------------------------------
 const work = fs.mkdtempSync(path.join(os.tmpdir(), 'masjidtv-upd-'));
+// Direktori sementara untuk dibuang pada penghujung (elak %TEMP% dipenuhi).
+const tempDirs = [work];
+const cleanup = () => {
+  for (const dir of tempDirs) {
+    try { fs.rmSync(dir, { recursive: true, force: true }); } catch { /* dikunci Windows — buang kemudian */ }
+  }
+  // Installer palsu yang ditulis updater ke %TEMP%\masjidtv-kiosk-update.
+  // BUANG fail spesifik ujian sahaja — jangan padam folder kongsi (juga
+  // digunakan oleh updater sebenar semasa kemas kini produksi).
+  const updateDir = path.join(os.tmpdir(), 'masjidtv-kiosk-update');
+  try {
+    for (const f of [`MasjidTV-Kiosk-Setup-${NEW_VERSION}.exe`, `MasjidTV-Kiosk-Setup-${NEW_VERSION}.exe.sha256`]) {
+      fs.rmSync(path.join(updateDir, f), { force: true });
+    }
+  } catch { /* dikunci Windows — buang kemudian */ }
+};
 const updaterPath = path.join(ROOT, 'apps', 'kiosk', 'dist', 'updater.js');
 fs.writeFileSync(path.join(work, 'run.cjs'), `
 const Module = require('node:module');
@@ -101,6 +117,7 @@ async function runScenario(label, serverOpts, envExtra = {}) {
   const server = await makeReleaseServer(serverOpts);
   const port = server.address().port;
   const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), 'masjidtv-upddata-'));
+  tempDirs.push(dataDir);
   const env = {
     ...process.env,
     MASJIDTV_UPDATE_HOST: `http://127.0.0.1:${port}`,
@@ -171,4 +188,5 @@ await new Promise((resolve, reject) => {
 }
 
 console.log(`\n════════ RINGKASAN: ${passed} lulus, ${failed} gagal ════════`);
+cleanup();
 process.exit(failed ? 1 : 0);

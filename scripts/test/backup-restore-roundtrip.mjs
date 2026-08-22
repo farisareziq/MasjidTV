@@ -8,6 +8,9 @@ import os from 'node:os';
 import { execFileSync } from 'node:child_process';
 
 const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'masjidtv-rt-'));
+const cleanup = () => {
+  try { fs.rmSync(tmp, { recursive: true, force: true }); } catch { /* dikunci Windows — buang kemudian */ }
+};
 const dbPath = path.join(tmp, 'drill.db').replaceAll('\\', '/');
 const b1 = path.join(tmp, 'b1.json');
 const b2 = path.join(tmp, 'b2.json');
@@ -46,6 +49,8 @@ console.log(`[drill] round-trip identical: ${same}`);
 if (!same) {
   console.error('before:', JSON.stringify(d1.tables, null, 2).slice(0, 2000));
   console.error('after: ', JSON.stringify(d2.tables, null, 2).slice(0, 2000));
+  cleanup();
   process.exit(1);
 }
 console.log('[drill] OK');
+cleanup();

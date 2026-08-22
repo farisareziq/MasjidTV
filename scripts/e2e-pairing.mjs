@@ -18,6 +18,7 @@ try {
   // 1) Boot cloud lokal dari sumber (tsx) — port bebas automatik.
   const cloud = await bootCloud();
   reg.add(cloud.proc);
+  reg.addTempDir(cloud.dir);
   cloud.proc.stdout.on('data', (d) => process.stdout.write('[cloud] ' + d));
   cloud.proc.stderr.on('data', (d) => process.stderr.write('[cloud-err] ' + d));
   await waitHealth(cloud.url, 'cloud');
@@ -37,6 +38,7 @@ try {
   // 4) Boot TV — kiosk packaged (win-unpacked baharu) ATAU electron dev.
   const tv = await spawnKiosk();
   reg.add(tv.proc);
+  reg.addTempDir(tv.dir);
   tv.proc.stdout.on('data', (d) => process.stdout.write('[tv] ' + d));
   tv.proc.stderr.on('data', (d) => process.stderr.write('[tv-err] ' + d));
   const TV = tv.url;
