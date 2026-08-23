@@ -70,9 +70,14 @@ export function restoreRev(tenantId: string, rev: number): void {
 
 export function registerSse(app: FastifyInstance, store: CloudStore): void {
   app.get('/api/events', async (req, reply) => {
-    // SSE dimatikan (pengurangan kos Hobby) — paparan jatuh ke poll 10sa.
+    // SSE dimatikan (pengurangan kos Hobby) — paparan jatuh ke poll.
+    // PENTING: balas 204 (bukan 503). Mengikut spec EventSource, status 204
+    // memberitahu klien BERHENTI menyambung semula — klien lama (tab/kiosk/TV
+    // yang masih pegang JS lama) tidak akan cuba lagi. 503 pula mencetus
+    // auto-reconnect tanpa henti (~1.3sa sekali) → banjir 5xx + invokasi yang
+    // mencetuskan alert Vercel. 204 kos hampir sifar dan sunyi.
     if (SSE_DISABLED) {
-      reply.status(503).send({ error: 'SSE dilumpuhkan — guna polling' });
+      reply.status(204).send();
       return;
     }
     // Auth sama seperti API paparan: x-device-token / x-tenant-key / Bearer.
