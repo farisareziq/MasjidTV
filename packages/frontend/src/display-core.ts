@@ -37,9 +37,15 @@ export interface DisplayVariantConfig {
     videoGuard?: boolean;
     // SSE /api/events untuk sync segera. Lalai true. Varian awan menetapkan
     // false untuk mengurangkan kos Vercel (serverless membilas GB-saat sementara
-    // sambungan terbuka) — paparan jatuh ke poll 10sa yang sudah berjalan.
+    // sambungan terbuka) — paparan jatuh ke poll yang sudah berjalan.
     // Pastikan MASJIDTV_DISABLE_SSE=1 di pelayan seiring supaya tiada reconnect.
     sseEnabled?: boolean;
+    // Selang poll sync (ms). Lalai SYNC_INTERVAL_MS (10sa). Varian awan
+    // menaikkannya (30sa) untuk kurangkan invokasi fungsi Vercel — setiap poll
+    // memicu 3 panggilan API (/api/settings + /api/today + /api/slides).
+    // Pertukaran: perubahan kandungan muncul pada paparan dalam tempoh selang
+    // ini (bukan 10sa). Hanya bermakna bila SSE dimatikan.
+    syncIntervalMs?: number;
   };
 }
 
@@ -1558,7 +1564,12 @@ export function bootDisplay(config: DisplayVariantConfig): void {
   setInterval(tickAudio, 1000);
   setInterval(tickPrayerMode, 1000);
   setInterval(tickDebug, 2000);
-  setInterval(sync, SYNC_INTERVAL_MS);
+  // Selang poll sync — boleh dikonfigurasi sevarian (awan: 30sa untuk kurangkan
+  // invokasi Vercel; lokal & lalai: 10sa). Hanya diambil jika nombor positif.
+  const syncInterval = (typeof cfg.features.syncIntervalMs === 'number' && cfg.features.syncIntervalMs > 0)
+    ? cfg.features.syncIntervalMs
+    : SYNC_INTERVAL_MS;
+  setInterval(sync, syncInterval);
   setInterval(loadWeather, 900000);
 
   // SSE /api/events di-skip bila varian set sseEnabled:false (pengurangan kos

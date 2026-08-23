@@ -101,7 +101,8 @@ Smart App Control menyekat exe tidak ditandatangani (dilalui "Run anyway" semasa
 Keperluan: akaun percuma Vercel maksimum sehingga deployment dipause. Strategi 3-lapis:
 - **Aset statik keluar fungsi** — `build.mjs` kini menyalin `/css /js /assets /icons /vendor /manifest.webmanifest` ke `.vercel/output/static/` (dihidangkan dari CDN, sifar invokasi fungsi). `gen-pages.mjs` hanya benamkan halaman HTML + sw.js (bundle lebih kecil, cold-start pantas). Rewrite aset dibuang dari `vercel.json`; sw.js kekal dalam fungsi + header `Cache-Control: no-cache`.
 - **Memori fungsi 1024→256MB** — memotong GB-saat ~4x (Hobby bilik pada memori-saat). `packages/cloud/.vc-config.json` (dihasilkan `build.mjs`).
-- **SSE dimatikan pada awan** — varian paparan awan set `sseEnabled:false` (display-core skip EventSource; tiada reconnect churn) dan pelayan sokong `MASJIDTV_DISABLE_SSE=1` → `/api/events` balas 503; paparan jatuh ke poll 10sa yang sedia berjalan (sync kekal, bukan "segera <2sa"). `MASJIDTV_SSE_MAX_AGE_MS` (lalai 30min) hadkan hayat sambungan terbuka.
+- **SSE dimatikan pada awan** — varian paparan awan set `sseEnabled:false` (display-core skip EventSource; tiada reconnect churn) dan pelayan sokong `MASJIDTV_DISABLE_SSE=1` → `/api/events` balas 503; paparan jatuh ke poll yang sedia berjalan (sync kekal, bukan "segera <2sa"). `MASJIDTV_SSE_MAX_AGE_MS` (lalai 30min) hadkan hayat sambungan terbuka.
+- **Poll sync dilanjutkan 10sa→30sa pada awan** — `syncIntervalMs:30000` pada varian awan (display-core baca `features.syncIntervalMs`, lalai 10sa). Setiap poll = 3 invokasi fungsi (/api/settings + /api/today + /api/slides); 30sa memotong jumlah invokasi ~3x. Pertukaran: perubahan kandungan muncul pada paparan dalam ≤30sa. Varian lokal kekal 10sa.
 Untuk sync segera (<2sa), set `sseEnabled:true` pada varian awan DAN jangan tetapkan `MASJIDTV_DISABLE_SSE`.
 
 ---

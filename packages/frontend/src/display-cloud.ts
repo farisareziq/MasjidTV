@@ -11,9 +11,12 @@
 // - videoGuard: jaring keselamatan slaid video — jika acara 'ended' tidak
 //   tercetus (video tersekat), tukar slaid selepas tempoh munasabah.
 // - sseEnabled:false: matikan SSE /api/events pada Vercel untuk kurangkan kos
-//   serverless (GB-saat) — paparan sync melalui poll 10sa yang sudah berjalan.
+//   serverless (GB-saat) — paparan sync melalui poll yang sudah berjalan.
 //   Untuk sync segera, set true DAN pastikan MASJIDTV_DISABLE_SSE tidak
 //   ditetapkan di Vercel.
+// - syncIntervalMs:30000: poll sync setiap 30sa (bukan 10sa) untuk kurangkan
+//   invokasi fungsi Vercel. Setiap poll = 3 panggilan API. Pertukaran: perubahan
+//   kandungan muncul pada paparan dalam masa ≤30sa.
 import { bootDisplay } from './display-core';
 
 bootDisplay({
@@ -21,6 +24,7 @@ bootDisplay({
     metaKey: true,
     recoverMissingKey: true,
     videoGuard: true,
-    sseEnabled: false
+    sseEnabled: false,
+    syncIntervalMs: 30000
   }
 });

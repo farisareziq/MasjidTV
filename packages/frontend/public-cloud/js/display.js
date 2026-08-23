@@ -1309,7 +1309,8 @@
     setInterval(tickAudio, 1e3);
     setInterval(tickPrayerMode, 1e3);
     setInterval(tickDebug, 2e3);
-    setInterval(sync, SYNC_INTERVAL_MS);
+    const syncInterval = typeof cfg.features.syncIntervalMs === "number" && cfg.features.syncIntervalMs > 0 ? cfg.features.syncIntervalMs : SYNC_INTERVAL_MS;
+    setInterval(sync, syncInterval);
     setInterval(loadWeather, 9e5);
     if (cfg.features.sseEnabled !== false) {
       try {
@@ -1355,7 +1356,8 @@
       metaKey: true,
       recoverMissingKey: true,
       videoGuard: true,
-      sseEnabled: false
+      sseEnabled: false,
+      syncIntervalMs: 3e4
     }
   });
 })();
