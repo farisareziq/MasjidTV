@@ -10,12 +10,17 @@
 //   semula sekali (had 5 minit) untuk pulih sendiri apabila API balas 401.
 // - videoGuard: jaring keselamatan slaid video — jika acara 'ended' tidak
 //   tercetus (video tersekat), tukar slaid selepas tempoh munasabah.
+// - sseEnabled:false: matikan SSE /api/events pada Vercel untuk kurangkan kos
+//   serverless (GB-saat) — paparan sync melalui poll 10sa yang sudah berjalan.
+//   Untuk sync segera, set true DAN pastikan MASJIDTV_DISABLE_SSE tidak
+//   ditetapkan di Vercel.
 import { bootDisplay } from './display-core';
 
 bootDisplay({
   features: {
     metaKey: true,
     recoverMissingKey: true,
-    videoGuard: true
+    videoGuard: true,
+    sseEnabled: false
   }
 });

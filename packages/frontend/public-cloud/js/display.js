@@ -1311,30 +1311,32 @@
     setInterval(tickDebug, 2e3);
     setInterval(sync, SYNC_INTERVAL_MS);
     setInterval(loadWeather, 9e5);
-    try {
-      const es = new EventSource("/api/events");
-      if (cfg.features.sseHello) {
-        es.addEventListener("hello", () => {
-          sseAlive = true;
-        });
-        es.addEventListener("sync", () => {
-          sseAlive = true;
-          sync().catch(() => {
+    if (cfg.features.sseEnabled !== false) {
+      try {
+        const es = new EventSource("/api/events");
+        if (cfg.features.sseHello) {
+          es.addEventListener("hello", () => {
+            sseAlive = true;
           });
-        });
-        es.addEventListener("unpaired", () => {
-          location.replace("/display");
-        });
-        es.onerror = () => {
-          sseAlive = false;
-        };
-      } else {
-        es.addEventListener("sync", () => {
-          sync().catch(() => {
+          es.addEventListener("sync", () => {
+            sseAlive = true;
+            sync().catch(() => {
+            });
           });
-        });
+          es.addEventListener("unpaired", () => {
+            location.replace("/display");
+          });
+          es.onerror = () => {
+            sseAlive = false;
+          };
+        } else {
+          es.addEventListener("sync", () => {
+            sync().catch(() => {
+            });
+          });
+        }
+      } catch {
       }
-    } catch {
     }
     const style = document.createElement("style");
     style.textContent = `
@@ -1352,7 +1354,8 @@
     features: {
       metaKey: true,
       recoverMissingKey: true,
-      videoGuard: true
+      videoGuard: true,
+      sseEnabled: false
     }
   });
 })();

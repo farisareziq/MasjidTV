@@ -30,6 +30,19 @@ const revCounters = new Map<string, number>();
 // fungsi tanpa 'close' bersih, Set boleh membesar tanpa had (S1-b).
 const MAX_SUBS = 500;
 
+// Pengurangan kos Hobby: tetapkan MASJIDTV_DISABLE_SSE=1 untuk mematikan SSE
+// sepenuhnya pada Vercel dan bergantung pada fallback poll paparan (10sa).
+// Paparan masih sync — cuma bukan "segera <2sa" (lihat PLAN.md nota SSE).
+// Semasa disable, /api/events membalas 503 serta-merta; varian paparan awan
+// dengan sseEnabled:false tidak membuka EventSource langsung (tiada reconnect
+// churn), jadi poll 10sa mengambil alih secara senyap.
+const SSE_DISABLED = process.env.MASJIDTV_DISABLE_SSE === '1';
+
+// Hayat maksimum sambungan SSE per sub — elak sambungan terbuka tanpa had yang
+// membakar GB-saat pada Hobby (serverless membilas setiap saat sementara fungsi
+// hidup). Paparan auto-reconnect selepas putus; rev catch-up menutup jurang.
+const MAX_SUB_AGE_MS = Number(process.env.MASJIDTV_SSE_MAX_AGE_MS || 30 * 60 * 1000);
+
 export function bumpRev(tenantId: string): number {
   const next = (revCounters.get(tenantId) || 0) + 1;
   revCounters.set(tenantId, next);
@@ -57,6 +70,11 @@ export function restoreRev(tenantId: string, rev: number): void {
 
 export function registerSse(app: FastifyInstance, store: CloudStore): void {
   app.get('/api/events', async (req, reply) => {
+    // SSE dimatikan (pengurangan kos Hobby) — paparan jatuh ke poll 10sa.
+    if (SSE_DISABLED) {
+      reply.status(503).send({ error: 'SSE dilumpuhkan — guna polling' });
+      return;
+    }
     // Auth sama seperti API paparan: x-device-token / x-tenant-key / Bearer.
     const h = req.headers;
     let tenantId: string | null = null;
@@ -127,8 +145,20 @@ export function registerSse(app: FastifyInstance, store: CloudStore): void {
     const drop = () => {
       subs.delete(sub);
       clearInterval(hb);
+      clearTimeout(maxAge);
     };
     req.raw.on('close', drop);
     reply.raw.on('error', drop);
+
+    // Had hayat sambungan — tutup selepas MAX_SUB_AGE_MS supaya tiada sub yang
+    // tersangkut terbuka tanpa had (GB-saat pada serverless). Paparan
+    // auto-reconnect dan rev catch-up menyambung tanpa kehilangan data.
+    const maxAge = setTimeout(() => {
+      try {
+        reply.raw.write('event: hello\ndata: {}\n\n');
+      } catch { /* ditutup sudah */ }
+      drop();
+    }, MAX_SUB_AGE_MS);
+    maxAge.unref?.();
   });
 }

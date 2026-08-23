@@ -10,12 +10,12 @@
     { "source": "/admin", "destination": "/api/index" },
     { "source": "/guide", "destination": "/api/index" },
     { "source": "/super", "destination": "/api/index" },
-    { "source": "/sw.js", "destination": "/api/index" },
-    { "source": "/css/(.*)", "destination": "/api/index" },
-    { "source": "/js/(.*)", "destination": "/api/index" },
-    { "source": "/vendor/(.*)", "destination": "/api/index" },
-    { "source": "/assets/(.*)", "destination": "/api/index" },
-    { "source": "/icons/(.*)", "destination": "/api/index" },
-    { "source": "/manifest.webmanifest", "destination": "/api/index" }
+    { "source": "/sw.js", "destination": "/api/index" }
+  ],
+  "headers": [
+    {
+      "source": "/sw.js",
+      "headers": [{ "key": "Cache-Control", "value": "no-cache, no-store" }]
+    }
   ]
 }

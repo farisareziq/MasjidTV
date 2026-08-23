@@ -35,6 +35,11 @@ export interface DisplayVariantConfig {
     // Awan: jaring keselamatan slaid video — jika acara 'ended' tidak tercetus
     // (video tersekat), tukar slaid selepas tempoh munasabah.
     videoGuard?: boolean;
+    // SSE /api/events untuk sync segera. Lalai true. Varian awan menetapkan
+    // false untuk mengurangkan kos Vercel (serverless membilas GB-saat sementara
+    // sambungan terbuka) — paparan jatuh ke poll 10sa yang sudah berjalan.
+    // Pastikan MASJIDTV_DISABLE_SSE=1 di pelayan seiring supaya tiada reconnect.
+    sseEnabled?: boolean;
   };
 }
 
@@ -1556,22 +1561,26 @@ export function bootDisplay(config: DisplayVariantConfig): void {
   setInterval(sync, SYNC_INTERVAL_MS);
   setInterval(loadWeather, 900000);
 
-  try {
-    const es = new EventSource('/api/events');
-    if (cfg.features.sseHello) {
-      es.addEventListener('hello', () => { sseAlive = true; });
-      es.addEventListener('sync', () => { sseAlive = true; sync().catch(() => {}); });
-      es.addEventListener('unpaired', () => { location.replace('/display'); });
-      es.onerror = () => {
-        // SSE putus (server restart / legacy) — EventSource auto-reconnect;
-        // jika tiada sokongan, poll 10sa mengambil alih secara senyap.
-        sseAlive = false;
-      };
-    } else {
-      es.addEventListener('sync', () => { sync().catch(() => {}); });
+  // SSE /api/events di-skip bila varian set sseEnabled:false (pengurangan kos
+  // awan) — poll 10sa yang sudah berjalan kekal sebagai pengganti selamat.
+  if (cfg.features.sseEnabled !== false) {
+    try {
+      const es = new EventSource('/api/events');
+      if (cfg.features.sseHello) {
+        es.addEventListener('hello', () => { sseAlive = true; });
+        es.addEventListener('sync', () => { sseAlive = true; sync().catch(() => {}); });
+        es.addEventListener('unpaired', () => { location.replace('/display'); });
+        es.onerror = () => {
+          // SSE putus (server restart / legacy) — EventSource auto-reconnect;
+          // jika tiada sokongan, poll 10sa mengambil alih secara senyap.
+          sseAlive = false;
+        };
+      } else {
+        es.addEventListener('sync', () => { sync().catch(() => {}); });
+      }
+    } catch {
+      /* pelayar tanpa EventSource — poll sahaja */
     }
-  } catch {
-    /* pelayar tanpa EventSource — poll sahaja */
   }
 
   const style = document.createElement('style');

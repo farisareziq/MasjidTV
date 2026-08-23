@@ -67,7 +67,29 @@ await build({
 // 3. Assemble Build Output API layout.
 fs.rmSync(outRoot, { recursive: true, force: true });
 
-// (No static dir — see config note below.)
+// Static assets: everything in frontend/public-cloud EXCEPT the HTML pages and
+// sw.js (which stay in the function — /display needs server-side meta injection
+// + CSP, and sw.js needs Cache-Control: no-cache, no-store). Serving CSS/JS/
+// images/vendor/manifest from .vercel/output/static keeps them on Vercel's CDN
+// and OUT of the serverless function — zero function invocations for assets.
+const staticRoot = path.join(outRoot, 'static');
+fs.mkdirSync(staticRoot, { recursive: true });
+const KEEP_IN_FUNC = new Set(['admin.html', 'display.html', 'guide.html', 'sw.js']);
+function copyStatic(srcDir, rel = '') {
+  for (const e of fs.readdirSync(srcDir, { withFileTypes: true })) {
+    const src = path.join(srcDir, e.name);
+    const relPath = rel ? `${rel}/${e.name}` : e.name;
+    if (e.isDirectory()) copyStatic(src, relPath);
+    else if (KEEP_IN_FUNC.has(e.name)) continue; // served by the function
+    else {
+      const dest = path.join(staticRoot, relPath);
+      fs.mkdirSync(path.dirname(dest), { recursive: true });
+      fs.copyFileSync(src, dest);
+    }
+  }
+}
+copyStatic(path.join(pkgRoot, '..', 'frontend', 'public-cloud'));
+console.log('[cloud-build] static assets emitted to .vercel/output/static/');
 
 // function
 const funcDir = path.join(outRoot, 'functions', 'api', 'index.func');
@@ -132,7 +154,10 @@ fs.writeFileSync(path.join(funcDir, '.vc-config.json'), JSON.stringify({
   runtime: 'nodejs20.x',
   handler: 'index.cjs',
   maxDuration: 30,
-  memory: 1024
+  // 256MB cuts GB-hours ~4x vs 1024 — plenty for this Fastify handler now that
+  // static assets no longer run through the function (Hobby plan is billed on
+  // memory-seconds, so lowering memory is the cheapest win).
+  memory: 256
 }, null, 2));
 
 // config: default routing (function auto-served at /api/index). Path
