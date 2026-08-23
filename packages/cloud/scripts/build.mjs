@@ -163,8 +163,17 @@ fs.writeFileSync(path.join(funcDir, '.vc-config.json'), JSON.stringify({
 // config: default routing (function auto-served at /api/index). Path
 // rewrites (/api/*, /, /display...) come from vercel.json which Vercel
 // merges into the build output config.
+//
+// /api/events: jawab 204 TERUS di edge — JANGAN invoke fungsi. Klien lama
+// (kiosk/TV yang masih pegang JS lama) memanggil /api/events setiap ~1.3sa dan
+// mengabaikan 204 (EventSource WebView lama tak patuh spec stop-on-204). Melayan
+// di edge menjadikan banjir ini PERCUMA (sifar invokasi fungsi). Laluan ini
+// diletak dahulu supaya ia menang sebelum rewrite /api/(.*) → fungsi.
 fs.writeFileSync(path.join(outRoot, 'config.json'), JSON.stringify({
-  version: 3
+  version: 3,
+  routes: [
+    { src: '^/api/events/?$', status: 204, headers: { 'Cache-Control': 'no-store', 'X-Accel-Buffering': 'no' } }
+  ]
 }, null, 2));
 
 console.log('[cloud-build] build output assembled at', outRoot);
