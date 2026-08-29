@@ -6,7 +6,7 @@ import { zonedDateTime } from './prayers.js';
 import type { Announcement, AnnouncementCategory } from './types.js';
 
 export const ANNOUNCEMENT_CATEGORIES: AnnouncementCategory[] = [
-  'general', 'event', 'announcement', 'welcome', 'tabung', 'quran'
+  'general', 'event', 'announcement', 'welcome', 'tabung', 'quran', 'doa'
 ];
 
 export function sanitizeCategory(v: unknown): AnnouncementCategory {
@@ -65,6 +65,7 @@ export function sanitizeAnnouncementCreate(input: Record<string, unknown>): Anno
     image: typeof input.image === 'string' ? input.image.slice(0, 300) : null,
     video: typeof input.video === 'string' ? input.video.slice(0, 300) : null,
     quranDaily: input.quranDaily !== false,
+    doaDaily: input.doaDaily !== false,
     arabic: String(input.arabic || '').trim().slice(0, 2000),
     translationMs: String(input.translationMs || '').trim().slice(0, 2000),
     translationEn: String(input.translationEn || '').trim().slice(0, 2000),
@@ -89,6 +90,7 @@ export function applyAnnouncementPatch(item: Announcement, input: Record<string,
   if (typeof input.image === 'string') item.image = input.image.slice(0, 300) || null;
   if (typeof input.video === 'string') item.video = input.video.slice(0, 300) || null;
   if (typeof input.quranDaily === 'boolean') item.quranDaily = input.quranDaily;
+  if (typeof input.doaDaily === 'boolean') item.doaDaily = input.doaDaily;
   if (typeof input.arabic === 'string') item.arabic = input.arabic.trim().slice(0, 2000);
   if (typeof input.translationMs === 'string') item.translationMs = input.translationMs.trim().slice(0, 2000);
   if (typeof input.translationEn === 'string') item.translationEn = input.translationEn.trim().slice(0, 2000);

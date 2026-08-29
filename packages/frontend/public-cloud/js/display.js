@@ -774,8 +774,8 @@
     }
     document.body.classList.remove("banner-mode");
     const streamSlides = (state.settings?.streams || []).filter((s) => s.enabled).map((s) => ({ kind: "stream", stream: s }));
-    const annSlides = (data.announcements || []).map((a) => ({
-      kind: a.category === "quran" ? "quran" : a.video ? "video" : a.category === "tabung" ? "tabung" : "announcement",
+    const mapped = (data.announcements || []).map((a) => ({
+      kind: a.category === "quran" ? "quran" : a.category === "doa" ? "doa" : a.video ? "video" : a.category === "tabung" ? "tabung" : "announcement",
       category: a.category,
       title: a.title,
       message: a.message,
@@ -785,6 +785,11 @@
       image: a.image,
       video: a.video
     }));
+    const annSlides = [
+      ...mapped.filter((s) => s.kind === "quran"),
+      ...mapped.filter((s) => s.kind === "doa"),
+      ...mapped.filter((s) => s.kind !== "quran" && s.kind !== "doa")
+    ];
     const builtin = streamSlides.length || annSlides.length ? [] : data.builtin.map((b) => ({
       kind: b.type,
       category: b.type,
@@ -885,7 +890,7 @@
     el.classList.remove("visible", "stream-wrap", "tabung-card", "media-slide");
     if (slide.kind === "stream") el.classList.add("stream-wrap");
     if (slide.kind === "tabung") el.classList.add("tabung-card");
-    if (slide.kind === "quran") el.classList.add("quran-slide");
+    if (slide.kind === "quran" || slide.kind === "doa") el.classList.add("quran-slide");
     if (slide.kind === "video" || slide.kind === "announcement" && slide.image || slide.kind === "tabung" && slide.image) {
       el.classList.add("media-slide");
     }
@@ -899,6 +904,19 @@
     if (cfg.features.videoGuard) scheduleVideoGuard(slide);
     syncNativeStream(slide);
   }
+  function messageLinesHtml(message) {
+    if (!message) return "";
+    const lines = String(message).replace(/\r\n?/g, "\n").split("\n").map((l) => l.trim());
+    const collapsed = [];
+    for (const line of lines) {
+      if (!line && (collapsed.length === 0 || collapsed[collapsed.length - 1] === "")) continue;
+      collapsed.push(line);
+    }
+    while (collapsed.length && collapsed[collapsed.length - 1] === "") collapsed.pop();
+    if (!collapsed.length) return "";
+    const cls = collapsed.filter((l) => l).length > 6 ? " slide-msgs many" : " slide-msgs";
+    return `<div class="${cls.trim()}">${collapsed.map((line) => line ? `<p class="slide-msg">${escapeHtml(line)}</p>` : '<p class="slide-msg blank"></p>').join("")}</div>`;
+  }
   function slideHtml(slide) {
     if (slide.kind === "stream") return streamHtml(slide.stream);
     if (slide.kind === "video") {
@@ -908,9 +926,9 @@
       if (slide.image) return mediaHtml(slide.image, "image", slide);
       return `
       ${slide.title ? `<div class="slide-title">${escapeHtml(slide.title)}</div>` : ""}
-      ${slide.message ? `<p class="slide-msg">${escapeHtml(slide.message)}</p>` : ""}`;
+      ${messageLinesHtml(slide.message)}`;
     }
-    if (slide.kind === "quran") {
+    if (slide.kind === "quran" || slide.kind === "doa") {
       return `
       ${slide.title ? `<div class="slide-title">${escapeHtml(slide.title)}</div>` : ""}
       ${slide.arabic ? `<div class="slide-arabic">${escapeHtml(slide.arabic)}</div>` : ""}
@@ -921,7 +939,7 @@
       if (slide.image) return mediaHtml(slide.image, "image", slide);
       return `
       ${slide.title ? `<div class="slide-title">${escapeHtml(slide.title)}</div>` : ""}
-      ${slide.message ? `<p class="slide-msg">${escapeHtml(slide.message)}</p>` : ""}`;
+      ${messageLinesHtml(slide.message)}`;
     }
     return `
     ${slide.arabic ? `<div class="slide-arabic">${escapeHtml(slide.arabic)}</div>` : ""}
@@ -933,7 +951,7 @@
     <div class="media-fill">
       ${kind === "video" ? `<video class="slide-video" src="${escapeHtml(src)}" autoplay muted playsinline></video>` : `<img class="slide-img" src="${escapeHtml(src)}" alt="">`}
       <div class="media-overlay">
-        ${slide.message ? `<p class="slide-msg">${escapeHtml(slide.message)}</p>` : ""}
+        ${messageLinesHtml(slide.message)}
       </div>
     </div>`;
   }
@@ -1121,9 +1139,10 @@
         (l) => `<span class="ticker-item">${escapeHtml(l.trim())}</span>`
       );
     } else {
-      items = data.announcements.map(
-        (a) => `<span class="ticker-item"><span class="tick-title">${escapeHtml(a.title)}</span>${a.message ? "\u2014 " + escapeHtml(a.message) : ""}</span>`
-      );
+      items = data.announcements.filter((a) => a.category !== "doa").map((a) => {
+        const flat = String(a.message || "").replace(/\s*\r?\n\s*/g, " \u2014 ").trim();
+        return `<span class="ticker-item"><span class="tick-title">${escapeHtml(a.title)}</span>${flat ? "\u2014 " + escapeHtml(flat) : ""}</span>`;
+      });
     }
     if (!items.length) {
       items.push(`<span class="ticker-item">${escapeHtml(t("welcome"))}</span>`);

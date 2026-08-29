@@ -117,6 +117,8 @@ export interface AdminVariantConfig {
     annReorder?: boolean;
     // Awan: medan Quran harian dalam borang pengumuman (kategori 'quran').
     annQuran?: boolean;
+    // Awan: medan Doa harian dalam borang pengumuman (kategori 'doa').
+    annDoa?: boolean;
     // Awan: mampatan imej + muat naik Blob berpresign untuk fail besar.
     blobUpload?: boolean;
     // Awan: medan font tajuk (stHeadingFont) + preset membawa font.
@@ -149,6 +151,7 @@ export const F = {
   licenseCard: (): boolean => !!cfg.features.licenseCard,
   annReorder: (): boolean => !!cfg.features.annReorder,
   annQuran: (): boolean => !!cfg.features.annQuran,
+  annDoa: (): boolean => !!cfg.features.annDoa,
   blobUpload: (): boolean => !!cfg.features.blobUpload,
   headingFont: (): boolean => !!cfg.features.headingFont,
   fridayKhutbah: (): boolean => !!cfg.features.fridayKhutbah,

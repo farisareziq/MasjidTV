@@ -652,6 +652,34 @@ body::after {
   max-width: 46ch;
 }
 
+/* Mesej berbilang baris — satu <p> setiap baris (baris baharu admin). */
+.slide .slide-msgs .slide-msg,
+.media-overlay .slide-msgs .slide-msg {
+  margin: 0;
+}
+
+.slide .slide-msgs .slide-msg + .slide-msg,
+.media-overlay .slide-msgs .slide-msg + .slide-msg {
+  margin-top: clamp(4px, 0.9vh, 12px);
+}
+
+.slide .slide-msgs .slide-msg.blank,
+.media-overlay .slide-msgs .slide-msg.blank {
+  min-height: clamp(6px, 1.2vh, 16px);
+}
+
+/* Banyak baris (>6): kecilkan fon supaya muat dalam slaid. */
+.slide .slide-msgs.many .slide-msg,
+.media-overlay .slide-msgs.many .slide-msg {
+  font-size: clamp(13px, 2vh, 23px);
+  line-height: 1.35;
+}
+
+.slide .slide-msgs.many .slide-msg + .slide-msg,
+.media-overlay .slide-msgs.many .slide-msg + .slide-msg {
+  margin-top: clamp(2px, 0.5vh, 8px);
+}
+
 .slide .slide-ref {
   margin-top: clamp(10px, 1.8vh, 22px);
   font-size: clamp(12px, 1.8vh, 21px);

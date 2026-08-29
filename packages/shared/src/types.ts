@@ -201,6 +201,7 @@ export interface Announcement {
   image: string | null;
   video: string | null;
   quranDaily: boolean;
+  doaDaily: boolean;
   arabic: string;
   translationMs: string;
   translationEn: string;
@@ -214,7 +215,7 @@ export interface Announcement {
   updatedAt: string;
 }
 
-export type AnnouncementCategory = 'general' | 'event' | 'announcement' | 'welcome' | 'tabung' | 'quran';
+export type AnnouncementCategory = 'general' | 'event' | 'announcement' | 'welcome' | 'tabung' | 'quran' | 'doa';
 
 export interface PrayerTimePayload {
   time: string;

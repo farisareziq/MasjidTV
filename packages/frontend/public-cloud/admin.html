@@ -168,13 +168,16 @@
                 <option value="welcome" data-i18n="catWelcome">Welcome</option>
                 <option value="tabung" data-i18n="catTabung">Tabung / Collection</option>
                 <option value="quran" data-i18n="catQuran">Quran — daily verse</option>
+                <option value="doa" data-i18n="catDoa">Doa — daily supplication</option>
               </select>
             </label>
             <label class="span-2"><span data-i18n="message">Message</span>
               <textarea id="anMessage" rows="3" maxlength="2000" placeholder="Details shown on screen…"></textarea>
+              <small class="hint" data-i18n="messageHint">Each new line is displayed as a separate line on the TV.</small>
             </label>
-            <div id="anQuranBox" class="form-grid span-2 quran-box" hidden>
-              <label class="checkbox-label span-2"><input type="checkbox" id="anQuranDaily" checked> <span data-i18n="quranDaily">Daily Quran verse (auto-rotates every day)</span></label>
+            <div id="anDailyBox" class="form-grid span-2 quran-box" hidden>
+              <label class="checkbox-label span-2" id="anQuranDailyRow"><input type="checkbox" id="anQuranDaily" checked> <span data-i18n="quranDaily">Daily Quran verse (auto-rotates every day)</span></label>
+              <label class="checkbox-label span-2" id="anDoaDailyRow" hidden><input type="checkbox" id="anDoaDaily" checked> <span data-i18n="doaDaily">Daily doa (auto-rotates every day of the month)</span></label>
               <label class="span-2"><span data-i18n="quranArabic">Arabic text (optional — override daily pick)</span>
                 <textarea id="anArabic" rows="2" maxlength="2000" dir="rtl"></textarea>
               </label>

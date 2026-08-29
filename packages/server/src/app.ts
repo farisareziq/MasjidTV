@@ -6,7 +6,7 @@ import path from 'node:path';
 import Fastify, { type FastifyInstance, type FastifyRequest, type FastifyReply } from 'fastify';
 import {
   METHODS, getZonesGrouped, buildEventsPayload, syncEventsFor, dateKeyInZone,
-  resolveQuranAnnouncements, content as builtinContent,
+  resolveQuranAnnouncements, resolveDoaAnnouncements, content as builtinContent,
   UPLOAD_TYPES,
   publicSettings as buildPublicSettings, publicStream, buildTodayPayload,
   isAnnouncementActive,
@@ -276,7 +276,10 @@ export async function buildApp(opts: AppOptions): Promise<FastifyInstance> {
   app.get('/api/slides', { preHandler: requireDisplayKey }, async (_req, reply) => {
     if (await handleCloudSync(reply, opts.dataDir, '/api/slides', true)) return;
     const active = announcements.listActive(new Date(), tz());
-    const resolved = resolveQuranAnnouncements(active, dateKeyInZone(new Date(), tz()));
+    const resolved = resolveDoaAnnouncements(
+      resolveQuranAnnouncements(active, dateKeyInZone(new Date(), tz())),
+      dateKeyInZone(new Date(), tz())
+    );
     reply.send({ announcements: resolved, builtin: resolved.length ? [] : builtinContent });
   });
 

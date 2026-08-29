@@ -478,6 +478,14 @@ label {
   accent-color: var(--gold);
 }
 
+.hint {
+  display: block;
+  margin-top: 5px;
+  font-size: 12px;
+  font-weight: 400;
+  color: var(--muted);
+}
+
 /* ----------------------------------------------------------------- buttons */
 
 .btn {
@@ -646,6 +654,7 @@ label {
   font-size: 13px;
   margin-top: 6px;
   grid-column: 1;
+  white-space: pre-line;
 }
 
 .ann-actions {

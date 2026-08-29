@@ -5,6 +5,7 @@ import { getZone, getZonesGrouped, ZONES } from '../src/zones.js';
 import { hijriForDateKey } from '../src/hijri.js';
 import { formatTime, dateKeyInZone, zonedDateTime, METHODS } from '../src/prayers.js';
 import { quranVerseForDate } from '../src/quran.js';
+import { DOAS, doaForDate, resolveDoaAnnouncements } from '../src/doa.js';
 import { isSafeStreamUrl, applyPatch, DEFAULT_SETTINGS } from '../src/validate.js';
 
 describe('Unit Testing / zones', () => {
@@ -84,6 +85,67 @@ describe('Unit Testing / daily Quran verse', () => {
     expect(a.ref).not.toBe(b.ref);
   });
 });
+
+describe('Unit Testing / daily doa (kitaran bulanan)', () => {
+  it('has 31 doa — satu setiap haribulan', () => {
+    expect(DOAS).toHaveLength(31);
+    for (const d of DOAS) {
+      expect(d.arabic.trim()).toBeTruthy();
+      expect(d.text_ms.trim()).toBeTruthy();
+      expect(d.text_en.trim()).toBeTruthy();
+      expect(d.ref.trim()).toBeTruthy();
+    }
+  });
+
+  it('picks the doa by day of month (1 haribulan = doa #1)', () => {
+    expect(doaForDate('2026-08-01')).toEqual(DOAS[0]);
+    expect(doaForDate('2026-08-15')).toEqual(DOAS[14]);
+    expect(doaForDate('2026-08-31')).toEqual(DOAS[30]);
+  });
+
+  it('auto-renews on the 1st of the next month', () => {
+    expect(doaForDate('2026-08-01')).toEqual(doaForDate('2026-09-01'));
+    expect(doaForDate('2026-08-01').arabic).not.toBe(doaForDate('2026-08-02').arabic);
+  });
+
+  it('falls back to the first doa for malformed dates', () => {
+    expect(doaForDate('not-a-date')).toEqual(DOAS[0]);
+  });
+
+  it('fills empty doa announcement fields but honours overrides', () => {
+    const base = {
+      id: 'x', title: 'Doa Harian', message: '', category: 'doa' as const,
+      image: null, video: null, quranDaily: true, doaDaily: true,
+      arabic: '', translationMs: '', translationEn: '', ref: '',
+      sortOrder: 1, start: null, end: null, active: true, priority: 0,
+      createdAt: '', updatedAt: ''
+    };
+    const today = '2026-08-05';
+    const [filled] = resolveDoaAnnouncements([base], today);
+    expect(filled.arabic).toBe(DOAS[4].arabic);
+    expect(filled.translationMs).toBe(DOAS[4].text_ms);
+    expect(filled.ref).toBe(DOAS[4].ref);
+
+    const custom = { ...base, arabic: 'دُعَاءٌ خَاصٌّ', ref: 'Custom' };
+    const [kept] = resolveDoaAnnouncements([custom], today);
+    expect(kept.arabic).toBe('دُعَاءٌ خَاصٌّ');
+    expect(kept.ref).toBe('Custom');
+    expect(kept.translationMs).toBe(DOAS[4].text_ms); // medan kosong tetap diisi
+  });
+
+  it('leaves non-doa announcements untouched', () => {
+    const base = {
+      id: 'x', title: 'Tazkirah', message: 'hi', category: 'announcement' as const,
+      image: null, video: null, quranDaily: true, doaDaily: true,
+      arabic: '', translationMs: '', translationEn: '', ref: '',
+      sortOrder: 1, start: null, end: null, active: true, priority: 0,
+      createdAt: '', updatedAt: ''
+    };
+    const [same] = resolveDoaAnnouncements([base], '2026-08-05');
+    expect(same).toEqual(base);
+  });
+});
+
 
 describe('Unit Testing / SSRF stream URL guard', () => {
   it('allows LAN rtsp camera and https hls', () => {

@@ -42,6 +42,7 @@
     licenseCard: () => !!cfg.features.licenseCard,
     annReorder: () => !!cfg.features.annReorder,
     annQuran: () => !!cfg.features.annQuran,
+    annDoa: () => !!cfg.features.annDoa,
     blobUpload: () => !!cfg.features.blobUpload,
     headingFont: () => !!cfg.features.headingFont,
     fridayKhutbah: () => !!cfg.features.fridayKhutbah,
@@ -188,6 +189,7 @@
       title: "Title",
       category: "Category",
       message: "Message",
+      messageHint: "Each new line is displayed as a separate line on the TV.",
       startDate: "Start date (optional)",
       endDate: "End date (optional)",
       priority: "Priority (0\u201310)",
@@ -203,7 +205,9 @@
       catWelcome: "Welcome",
       catTabung: "Tabung / Collection",
       catQuran: "Quran \u2014 daily verse",
+      catDoa: "Doa \u2014 daily supplication",
       quranDaily: "Daily Quran verse (auto-rotates every day)",
+      doaDaily: "Daily doa (auto-rotates every day of the month)",
       quranArabic: "Arabic text (optional \u2014 override daily pick)",
       quranTranslationMs: "Translation \u2014 Malay",
       quranTranslationEn: "Translation \u2014 English",
@@ -555,6 +559,7 @@
       title: "Tajuk",
       category: "Kategori",
       message: "Mesej",
+      messageHint: "Setiap baris baharu dipaparkan sebagai baris berasingan pada TV.",
       startDate: "Tarikh mula (pilihan)",
       endDate: "Tarikh tamat (pilihan)",
       priority: "Keutamaan (0\u201310)",
@@ -570,7 +575,9 @@
       catWelcome: "Selamat Datang",
       catTabung: "Tabung / Kutipan",
       catQuran: "Quran \u2014 Ayat Harian",
+      catDoa: "Doa \u2014 Doa Harian",
       quranDaily: "Ayat Quran pilihan harian (auto-tukar setiap hari)",
+      doaDaily: "Doa harian (auto-tukar mengikut hari dalam bulan)",
       quranArabic: "Teks Arab (pilihan \u2014 ganti ayat harian)",
       quranTranslationMs: "Terjemahan \u2014 Melayu",
       quranTranslationEn: "Terjemahan \u2014 Inggeris",
@@ -1224,6 +1231,9 @@
       $("anTranslationEn").value = item?.translationEn || "";
       $("anRef").value = item?.ref || "";
     }
+    if (F.annDoa()) {
+      $("anDoaDaily").checked = item ? item.doaDaily !== false : true;
+    }
     $("anStart").value = item?.start || "";
     $("anEnd").value = item?.end || "";
     $("anPriority").value = item?.priority ?? 0;
@@ -1231,15 +1241,22 @@
     $("anImageUrl").value = item?.image || "";
     $("anVideoUrl").value = item?.video || "";
     setMediaPreview(item?.image || "", item?.video || "");
-    if (F.annQuran()) toggleQuranBox();
+    if (F.annQuran() || F.annDoa()) toggleDailyBox();
     $("announcementForm").hidden = false;
     $("announcementForm").scrollIntoView({ behavior: "smooth", block: "start" });
   }
-  function toggleQuranBox() {
-    const quran = $("anCategory").value === "quran";
-    $("anQuranBox").hidden = !quran;
-    if (quran && !String($("anTitle").value).trim()) {
-      $("anTitle").value = "Ayat Quran Harian";
+  function toggleDailyBox() {
+    const cat = $("anCategory").value;
+    const quran = cat === "quran";
+    const doa = cat === "doa";
+    $("anDailyBox").hidden = !quran && !doa;
+    const qRow = document.getElementById("anQuranDailyRow");
+    if (qRow) qRow.hidden = !quran;
+    const dRow = document.getElementById("anDoaDailyRow");
+    if (dRow) dRow.hidden = !doa;
+    if (!String($("anTitle").value).trim()) {
+      if (quran) $("anTitle").value = "Ayat Quran Harian";
+      else if (doa) $("anTitle").value = "Doa Harian";
     }
   }
   function setMediaPreview(imageUrl, videoUrl) {
@@ -1968,7 +1985,7 @@
       $("announcementForm").hidden = true;
       state.editingId = null;
     });
-    if (F.annQuran()) $("anCategory").addEventListener("change", toggleQuranBox);
+    if (F.annQuran() || F.annDoa()) $("anCategory").addEventListener("change", toggleDailyBox);
     $("anImage").addEventListener("change", async (e) => {
       const file = e.target.files[0];
       if (!file) return;
@@ -2010,8 +2027,9 @@
         image: $("anImageUrl").value || null,
         video: $("anVideoUrl").value || null
       };
-      if (F.annQuran()) {
-        payload.quranDaily = $("anQuranDaily").checked;
+      if (F.annQuran() || F.annDoa()) {
+        if (F.annQuran()) payload.quranDaily = $("anQuranDaily").checked;
+        if (F.annDoa()) payload.doaDaily = $("anDoaDaily").checked;
         payload.arabic = $("anArabic").value;
         payload.translationMs = $("anTranslationMs").value;
         payload.translationEn = $("anTranslationEn").value;

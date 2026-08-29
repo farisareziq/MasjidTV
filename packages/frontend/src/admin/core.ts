@@ -216,6 +216,9 @@ function openAnnouncementForm(item: (Announcement & { status?: string }) | null)
     $('anTranslationEn').value = item?.translationEn || '';
     $('anRef').value = item?.ref || '';
   }
+  if (F.annDoa()) {
+    $('anDoaDaily').checked = item ? item.doaDaily !== false : true;
+  }
   $('anStart').value = item?.start || '';
   $('anEnd').value = item?.end || '';
   $('anPriority').value = item?.priority ?? 0;
@@ -223,16 +226,25 @@ function openAnnouncementForm(item: (Announcement & { status?: string }) | null)
   $('anImageUrl').value = item?.image || '';
   $('anVideoUrl').value = item?.video || '';
   setMediaPreview(item?.image || '', item?.video || '');
-  if (F.annQuran()) toggleQuranBox();
+  if (F.annQuran() || F.annDoa()) toggleDailyBox();
   $('announcementForm').hidden = false;
   $('announcementForm').scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
 
-function toggleQuranBox() {
-  const quran = $('anCategory').value === 'quran';
-  $('anQuranBox').hidden = !quran;
-  if (quran && !String($('anTitle').value).trim()) {
-    $('anTitle').value = 'Ayat Quran Harian';
+// Kotak medan harian (Quran/Doa): papar bila kategori 'quran' atau 'doa';
+// checkbox harian yang sepadan sah ditunjukkan.
+function toggleDailyBox() {
+  const cat = $('anCategory').value;
+  const quran = cat === 'quran';
+  const doa = cat === 'doa';
+  $('anDailyBox').hidden = !quran && !doa;
+  const qRow = document.getElementById('anQuranDailyRow');
+  if (qRow) qRow.hidden = !quran;
+  const dRow = document.getElementById('anDoaDailyRow');
+  if (dRow) dRow.hidden = !doa;
+  if (!String($('anTitle').value).trim()) {
+    if (quran) $('anTitle').value = 'Ayat Quran Harian';
+    else if (doa) $('anTitle').value = 'Doa Harian';
   }
 }
 
@@ -1067,7 +1079,7 @@ export function bootAdmin(config: AdminVariantConfig): void {
     state.editingId = null;
   });
 
-  if (F.annQuran()) $('anCategory').addEventListener('change', toggleQuranBox);
+  if (F.annQuran() || F.annDoa()) $('anCategory').addEventListener('change', toggleDailyBox);
 
   $('anImage').addEventListener('change', async (e) => {
     const file = (e.target as HTMLInputElement).files![0];
@@ -1113,8 +1125,9 @@ export function bootAdmin(config: AdminVariantConfig): void {
       image: $('anImageUrl').value || null,
       video: $('anVideoUrl').value || null
     };
-    if (F.annQuran()) {
-      payload.quranDaily = $('anQuranDaily').checked;
+    if (F.annQuran() || F.annDoa()) {
+      if (F.annQuran()) payload.quranDaily = $('anQuranDaily').checked;
+      if (F.annDoa()) payload.doaDaily = $('anDoaDaily').checked;
       payload.arabic = $('anArabic').value;
       payload.translationMs = $('anTranslationMs').value;
       payload.translationEn = $('anTranslationEn').value;

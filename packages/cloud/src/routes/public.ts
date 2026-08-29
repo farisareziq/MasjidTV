@@ -4,7 +4,7 @@
 import type { FastifyInstance } from 'fastify';
 import {
   METHODS, getZonesGrouped, buildEventsPayload, dateKeyInZone,
-  resolveQuranAnnouncements, content as builtinContent,
+  resolveQuranAnnouncements, resolveDoaAnnouncements, content as builtinContent,
   publicSettings as buildPublicSettings, publicStream, buildTodayPayload,
   sortAnnouncements, isAnnouncementActive,
   type Settings, type Stream
@@ -49,7 +49,7 @@ export function registerPublicRoutes(app: FastifyInstance, ctx: RouteContext): v
     const tz = tenant.settings.prayer.timezone;
     const todayKey = dateKeyInZone(nowDate, tz);
     const active = sortAnnouncements(all.filter((a) => isAnnouncementActive(a, nowDate, tz)));
-    const announcements = resolveQuranAnnouncements(active, todayKey);
+    const announcements = resolveDoaAnnouncements(resolveQuranAnnouncements(active, todayKey), todayKey);
     reply.send({ announcements, builtin: announcements.length ? [] : builtinContent });
   });
 

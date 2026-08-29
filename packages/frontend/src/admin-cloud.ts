@@ -7,7 +7,7 @@
 // Ciri khusus awan (hosting cloud berbilang masjid):
 // - login 'username' (+ aliran PIN superuser, konsol masjid & TV pairing);
 // - licenseCard: kad lesen pada overview + borang daftar lesen;
-// - annReorder/annQuran: susun semula pengumuman & medan Quran harian;
+// - annReorder/annQuran/annDoa: susun semula pengumuman & medan Quran/Doa harian;
 // - blobUpload: mampatan imej + muat naik Blob berpresign untuk fail besar;
 // - headingFont/fridayKhutbah: medan paparan tambahan;
 // - tokenRotate: tukar kata laluan mengembalikan token baharu;
@@ -22,6 +22,7 @@ bootAdmin({
     licenseCard: true,
     annReorder: true,
     annQuran: true,
+    annDoa: true,
     blobUpload: true,
     headingFont: true,
     fridayKhutbah: true,
