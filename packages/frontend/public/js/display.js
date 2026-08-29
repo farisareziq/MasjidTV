@@ -505,11 +505,13 @@
       const tomorrow = zonedMs(addDaysKey(tm.date, 1), state.today.prayers.fajr.time, tz());
       list.push({ key: "fajr", azan: tomorrow, iqamah: tomorrow + off, tomorrow: true });
     }
+    let active = null;
     for (const e of list) {
       const fEnd = e.key === "dhuhr" && isFriday() ? fullTest ? e.iqamah + jDur : fridayJemaahEndMs() : null;
       const end = fEnd ? Math.max(fEnd, e.iqamah + jDur) : e.iqamah + jDur;
-      if (now >= e.azan - lead && now < end) return { ...e, lead, off, jDur, end };
+      if (now >= e.azan - lead && now < end) active = { e, end };
     }
+    if (active) return { ...active.e, lead, off, jDur, end: active.end };
     return null;
   }
   function addDaysKey(dateKey, days) {

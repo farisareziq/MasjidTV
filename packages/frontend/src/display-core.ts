@@ -593,6 +593,11 @@ function getActivePrayerEvent(now: number): ActivePrayerEvent | null {
     const tomorrow = zonedMs(addDaysKey(tm.date, 1), (state.today.prayers as Record<string, PrayerTimePayload | undefined>).fajr!.time, tz());
     list.push({ key: 'fajr', azan: tomorrow, iqamah: tomorrow + off, tomorrow: true });
   }
+  // Tetingkap solat bertindih (cth. jemaah Maghrib melampaui lead azan Isyak
+  // bila iqamah ditetapkan lewat / tempoh jemaah panjang): solat LATER baharu
+  // mengutamakan — countdown azan Isyak mesti muncul tepat pada masanya
+  // walaupun fasa jemaah Maghrib belum tamat. "Last match wins", bukan first.
+  let active: { e: PrayerEventEntry; end: number } | null = null;
   for (const e of list) {
     // Ujian penuh: fasa khutbah Jumaat turut dimampatkan kepada 1 fasa
     // (masa tetap sebenar 13:55 tidak boleh dicapai dalam simulasi 1 minit).
@@ -600,8 +605,9 @@ function getActivePrayerEvent(now: number): ActivePrayerEvent | null {
       ? (fullTest ? e.iqamah + jDur : fridayJemaahEndMs())
       : null;
     const end = fEnd ? Math.max(fEnd, e.iqamah + jDur) : e.iqamah + jDur;
-    if (now >= e.azan - lead && now < end) return { ...e, lead, off, jDur, end };
+    if (now >= e.azan - lead && now < end) active = { e, end };
   }
+  if (active) return { ...active.e, lead, off, jDur, end: active.end };
   return null;
 }
 

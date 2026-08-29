@@ -8,7 +8,9 @@
     "build": "node scripts/gen-pages.mjs && tsc -p tsconfig.json",
     "typecheck": "node scripts/gen-pages.mjs && tsc -p tsconfig.json --noEmit",
     "vercel-build": "node scripts/build.mjs",
-    "dev": "node --import tsx src/dev.ts"
+    "build:vps": "node scripts/build-vps.mjs",
+    "start": "node dist/server.js",
+    "dev": "node --import tsx src/server.ts"
   },
   "dependencies": {
     "@libsql/client": "^0.17.4",

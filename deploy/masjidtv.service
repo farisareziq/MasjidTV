@@ -1,0 +1,19 @@
+[Unit]
+Description=MasjidTV Cloud (VPS)
+After=network.target
+
+[Service]
+Type=simple
+User=masjidtv
+Group=masjidtv
+WorkingDirectory=/opt/masjidtv/global/packages/cloud
+EnvironmentFile=/opt/masjidtv/global/packages/cloud/.env
+ExecStart=/usr/bin/node dist/server.js
+Restart=on-failure
+RestartSec=5
+
+# Optional: resource limits
+MemoryMax=512M
+
+[Install]
+WantedBy=multi-user.target

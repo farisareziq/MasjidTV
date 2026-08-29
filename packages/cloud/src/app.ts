@@ -6,6 +6,8 @@
 // nota pada setiap blok) supaya gelagat tidak berubah.
 
 import Fastify, { type FastifyInstance } from 'fastify';
+import fs from 'node:fs';
+import path from 'node:path';
 import { UPLOAD_TYPES } from '@masjidtv/shared';
 import { createCloudClient, applySchema } from '@masjidtv/db';
 import { CloudStore } from './store.js';
@@ -22,7 +24,7 @@ import { registerSuperRoutes } from './routes/super.js';
 import { registerPairingRoutes } from './routes/pairing.js';
 import { registerDeviceRoutes } from './routes/device.js';
 
-export async function createCloudApp(): Promise<FastifyInstance> {
+export async function createCloudApp(opts?: { staticDir?: string }): Promise<FastifyInstance> {
   // Fail-fast: tanpa TURSO_URL di produksi, fallback fail tempatan akan 500
   // untuk setiap permintaan — lebih baik mati semasa init dengan mesej jelas.
   const isProd = process.env.NODE_ENV === 'production' || !!process.env.VERCEL;
@@ -40,7 +42,11 @@ export async function createCloudApp(): Promise<FastifyInstance> {
   // trustProxy: di Vercel, socket remote adalah IP LB dalaman — tanpa ini
   // semua pelanggan berkongsi bucket rate-limit yang sama (30 kegagalan
   // merata melumpuhkan login seluruh platform selama 15 minit).
-  const app = Fastify({ logger: false, bodyLimit: 1024 * 1024, trustProxy: true });
+  const app = Fastify({
+    logger: !isProd ? true : (!process.env.VERCEL && process.env.MASJIDTV_LOG !== 'false'),
+    bodyLimit: Number(process.env.MASJIDTV_BODY_LIMIT) || (process.env.VERCEL ? 1024 * 1024 : 50 * 1024 * 1024),
+    trustProxy: true
+  });
   const startedAt = Date.now();
   const ctx: RouteContext = { db: db.db, store, startedAt };
 
@@ -139,6 +145,14 @@ export async function createCloudApp(): Promise<FastifyInstance> {
     if (urlPath.endsWith('.svg')) return 'image/svg+xml';
     if (urlPath.endsWith('.js')) return 'application/javascript';
     if (urlPath.endsWith('.css')) return 'text/css';
+    if (urlPath.endsWith('.mp4')) return 'video/mp4';
+    if (urlPath.endsWith('.webm')) return 'video/webm';
+    if (urlPath.endsWith('.mp3')) return 'audio/mpeg';
+    if (urlPath.endsWith('.wav')) return 'audio/wav';
+    if (urlPath.endsWith('.ogg')) return 'audio/ogg';
+    if (urlPath.endsWith('.jpg') || urlPath.endsWith('.jpeg')) return 'image/jpeg';
+    if (urlPath.endsWith('.gif')) return 'image/gif';
+    if (urlPath.endsWith('.webp')) return 'image/webp';
     return 'application/octet-stream';
   }
 
@@ -150,6 +164,63 @@ export async function createCloudApp(): Promise<FastifyInstance> {
     reply.header('Cache-Control', 'no-cache');
     reply.type(contentTypeFor(urlPath)).send(Buffer.from(b64, 'base64'));
   });
+
+  // Static file serving (VPS only — on Vercel, static assets are served from
+  // CDN via .vercel/output/static/). Serves CSS/JS/images/vendor/manifest from
+  // the filesystem directory specified by opts.staticDir.
+  const staticDir = opts?.staticDir || process.env.MASJIDTV_STATIC_DIR;
+  if (staticDir && !process.env.VERCEL) {
+    const absStatic = path.resolve(staticDir);
+    app.addHook('onRequest', async (req, reply) => {
+      const urlPath = req.url.split('?')[0];
+      if (ASSETS[urlPath]) return; // already handled by the hook above
+      if (urlPath.startsWith('/api/') || urlPath.startsWith('/uploads/')) return;
+      const filePath = path.join(absStatic, urlPath);
+      const rel = path.relative(absStatic, filePath);
+      if (rel.startsWith('..') || path.isAbsolute(rel)) return;
+      try {
+        if (!fs.existsSync(filePath) || fs.statSync(filePath).isDirectory()) return;
+      } catch { return; }
+      reply.header('Cache-Control', 'public, max-age=86400');
+      reply.type(contentTypeFor(urlPath));
+      // BUKAN createReadStream: reply.send(stream) daripada hook onRequest
+      // melontar FST_ERR_REP_INVALID_PAYLOAD_TYPE (500 untuk setiap aset).
+      // Aset statik kecil (css/js/ikon) — Buffer langsung adalah selamat.
+      reply.send(fs.readFileSync(filePath));
+    });
+
+    // Serve uploaded files from local filesystem (VPS only).
+    const uploadsDir = process.env.MASJIDTV_UPLOADS_DIR;
+    if (uploadsDir) {
+      const absUploads = path.resolve(uploadsDir);
+      const uploadsRoute = process.env.MASJIDTV_UPLOADS_PATH || '/uploads';
+      app.get(`${uploadsRoute}/*`, async (req, reply) => {
+        const urlPath = req.url.split('?')[0];
+        const relPath = urlPath.slice(uploadsRoute.length + 1);
+        const filePath = path.join(absUploads, relPath);
+        const rel = path.relative(absUploads, filePath);
+        if (rel.startsWith('..') || path.isAbsolute(rel)) {
+          return reply.status(403).send({ error: 'Forbidden' });
+        }
+        try {
+          if (!fs.existsSync(filePath) || fs.statSync(filePath).isDirectory()) {
+            return reply.status(404).send({ error: 'Not found' });
+          }
+        } catch { return reply.status(404).send({ error: 'Not found' }); }
+        reply.header('Cache-Control', 'public, max-age=86400');
+        reply.type(contentTypeFor(relPath));
+        // Media boleh besar (video) — jangan buffer keseluruhan dalam RAM;
+        // hijack reply dan pipe terus ke socket HTTP.
+        reply.hijack();
+        reply.raw.writeHead(200, {
+          'Cache-Control': 'public, max-age=86400',
+          'Content-Type': contentTypeFor(relPath),
+          'Content-Length': fs.statSync(filePath).size
+        });
+        fs.createReadStream(filePath).pipe(reply.raw);
+      });
+    }
+  }
 
   // --- route registration (susunan mengikut app.ts asal) -----------------
 

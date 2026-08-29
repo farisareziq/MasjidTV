@@ -3,7 +3,6 @@
 
 import crypto from 'node:crypto';
 import type { FastifyInstance, FastifyRequest } from 'fastify';
-import { put, issueSignedToken, presignUrl, head, del } from '@vercel/blob';
 import {
   buildEventsPayload, syncEventsFor,
   UPLOAD_TYPES,
@@ -12,6 +11,7 @@ import {
 } from '@masjidtv/shared';
 import { signToken, comparePassword } from '../auth.js';
 import { verifyLicense, licenseStatus } from '../license.js';
+import { getStorage } from '../storage.js';
 import { jsonError, requireAdmin, type TenantReq } from './helpers.js';
 import type { RouteContext } from './context.js';
 
@@ -43,6 +43,7 @@ const uploadUrlRate = (() => {
 
 export function registerAdminRoutes(app: FastifyInstance, ctx: RouteContext): void {
   const { store, startedAt } = ctx;
+  const storage = getStorage();
 
   app.get('/api/admin/status', async (req, reply) => {
     const tenant = await requireAdmin(store, req, reply);
@@ -168,20 +169,17 @@ export function registerAdminRoutes(app: FastifyInstance, ctx: RouteContext): vo
     const buffer = Buffer.isBuffer(req.body) ? req.body : Buffer.from('');
     if (!buffer.length) return jsonError(reply, 400, 'Tiada data');
     if (!type.magic(buffer)) return jsonError(reply, 400, `Fail bukan ${type.kind} sah`);
-    const filename = `${Date.now()}-${crypto.randomBytes(4).toString('hex')}.${type.ext}`;
-    const blobToken = process.env.VERCEL_BLOB_READ_WRITE_TOKEN || process.env.BLOB_READ_WRITE_TOKEN;
-    if (blobToken) {
-      try {
-        const { url } = await put(filename, buffer, { access: 'public', token: blobToken });
-        await store.addMedia(tenant.id, { filename, kind: type.kind });
-        return reply.send({ url, kind: type.kind });
-      } catch {
-        return jsonError(reply, 500, 'Gagal muat naik ke Blob');
-      }
+    const filename = `media/${tenant.id}/${Date.now()}-${crypto.randomBytes(4).toString('hex')}.${type.ext}`;
+    if (!storage.isConfigured()) {
+      return jsonError(reply, 400, 'Storan tidak dikonfigurasi — tetapkan MASJIDTV_UPLOADS_DIR atau VERCEL_BLOB_READ_WRITE_TOKEN');
     }
-    // Tanpa token Blob, muat naik mustahil — beritahu admin cara membaikinya
-    // (bukan mesej kriptik); UI turut memetakan mesej ini kepada arahan i18n.
-    return jsonError(reply, 400, 'Blob tidak dikonfigurasi — tetapkan VERCEL_BLOB_READ_WRITE_TOKEN dalam pembolehubah persekitaran Vercel dan redeploy');
+    try {
+      const { url } = await storage.put(filename, buffer);
+      await store.addMedia(tenant.id, { filename, kind: type.kind });
+      return reply.send({ url, kind: type.kind });
+    } catch {
+      return jsonError(reply, 500, 'Gagal muat naik fail');
+    }
   });
 
   app.post('/api/admin/upload-url', async (req, reply) => {
@@ -192,38 +190,37 @@ export function registerAdminRoutes(app: FastifyInstance, ctx: RouteContext): vo
     if (!uploadUrlRate.allow(tenant.id)) {
       return jsonError(reply, 429, 'Terlalu banyak permintaan muat naik — cuba sebentar lagi');
     }
-    const blobToken = process.env.VERCEL_BLOB_READ_WRITE_TOKEN || process.env.BLOB_READ_WRITE_TOKEN;
-    if (!blobToken) return jsonError(reply, 400, 'Blob tidak dikonfigurasi — tetapkan VERCEL_BLOB_READ_WRITE_TOKEN dalam pembolehubah persekitaran Vercel dan redeploy');
+    const storage_ = getStorage();
+    if (!storage_.isConfigured()) {
+      return jsonError(reply, 400, 'Storan tidak dikonfigurasi — tetapkan MASJIDTV_UPLOADS_DIR atau VERCEL_BLOB_READ_WRITE_TOKEN');
+    }
     const { contentType } = (req.body || {}) as { contentType?: string };
     const type = UPLOAD_TYPES[contentType || ''];
     if (!type) return jsonError(reply, 400, 'Jenis fail tidak disokong');
     const pathname = `media/${tenant.id}/${Date.now()}-${crypto.randomBytes(4).toString('hex')}.${type.ext}`;
-    try {
-      const signedToken = await issueSignedToken({
-        token: blobToken, pathname, operations: ['put'],
-        allowedContentTypes: [contentType!], maximumSizeInBytes: 50 * 1024 * 1024
-      });
-      const { presignedUrl } = await presignUrl(signedToken, {
-        operation: 'put', pathname, access: 'public', allowedContentTypes: [contentType!], addRandomSuffix: false
-      });
-      reply.send({ presignedUrl, pathname, kind: type.kind });
-    } catch {
-      jsonError(reply, 500, 'Gagal sediakan muat naik');
+    if (storage_.presignUpload) {
+      try {
+        const result = await storage_.presignUpload(pathname, contentType!);
+        if (result) return reply.send({ presignedUrl: result.presignedUrl, pathname: result.pathname, kind: type.kind });
+      } catch {
+        return jsonError(reply, 500, 'Gagal sediakan muat naik');
+      }
     }
+    // Local storage: no presigned URL — frontend falls back to direct upload.
+    return jsonError(reply, 400, 'Presigned URL tidak tersedia — gunakan muat naik terus');
   });
 
   app.post('/api/admin/upload-confirm', async (req, reply) => {
     const tenant = await requireAdmin(store, req, reply);
     if (!tenant) return;
-    const blobToken = process.env.VERCEL_BLOB_READ_WRITE_TOKEN || process.env.BLOB_READ_WRITE_TOKEN;
+    const storage_ = getStorage();
     const { pathname, kind } = (req.body || {}) as { pathname?: string; kind?: string };
-    // Laluan mesti dalam ruang nama tenant (media/<tenantId>/…) supaya satu
-    // tenant tidak boleh mendaftar blob tenant lain ke akaunnya.
-    if (!blobToken || !/^[\w./-]+$/.test(String(pathname || '')) || !String(pathname).startsWith(`media/${tenant.id}/`)) {
+    if (!storage_.isConfigured() || !/^[\w./-]+$/.test(String(pathname || '')) || !String(pathname).startsWith(`media/${tenant.id}/`)) {
       return jsonError(reply, 400, 'Parameter tidak sah');
     }
     try {
-      const blob = await head(String(pathname), { token: blobToken });
+      const blob = await storage_.head(String(pathname));
+      if (!blob) return jsonError(reply, 404, 'Fail tidak dijumpai');
       const mediaKind = ['image', 'video', 'audio'].includes(kind || '') ? kind : 'video';
       await store.addMedia(tenant.id, { filename: String(pathname), kind: mediaKind! });
       reply.send({ url: blob.url, kind: mediaKind });
@@ -232,22 +229,11 @@ export function registerAdminRoutes(app: FastifyInstance, ctx: RouteContext): vo
     }
   });
 
-  // Pustaka media tenant (A4): baris cloud_media ditulis oleh upload &
-  // upload-confirm tetapi sebelum ini tiada laluan membacanya. Bina semula
-  // URL awam daripada laluan blob tersimpan (upload-confirm menyimpan
-  // `pathname` "media/<tenantId>/…", bukan URL penuh) melalui asal Blob
-  // yang boleh diatasi env untuk dev/emulator tempatan.
-  function blobPublicUrl(pathname: string): string {
-    if (/^https?:\/\//i.test(pathname)) return pathname; // data lama URL penuh
-    const origin = (process.env.MASJIDTV_BLOB_PUBLIC_URL || 'https://blob.vercel-storage.com').replace(/\/+$/, '');
-    return `${origin}/${pathname.replace(/^\/+/, '')}`;
-  }
-
   app.get('/api/admin/media', async (req, reply) => {
     const tenant = await requireAdmin(store, req, reply);
     if (!tenant) return;
     const rows = await store.listMedia(tenant.id);
-    reply.send(rows.map((m) => ({ ...m, url: blobPublicUrl(m.filename) })));
+    reply.send(rows.map((m) => ({ ...m, url: storage.publicUrl(m.filename) })));
   });
 
   app.delete('/api/admin/media/:id', async (req, reply) => {
@@ -259,11 +245,8 @@ export function registerAdminRoutes(app: FastifyInstance, ctx: RouteContext): vo
     // best-effort selepasnya — kegagalan Blob tidak menggagalkan permintaan
     // (blob yatim tidak lagi dirujuk oleh mana-mana respons API).
     await store.deleteMedia(tenant.id, row.id);
-    const blobToken = process.env.VERCEL_BLOB_READ_WRITE_TOKEN || process.env.BLOB_READ_WRITE_TOKEN;
-    if (blobToken) {
-      try {
-        await del(row.filename, { token: blobToken });
-      } catch { /* abaikan — padam blob best-effort sahaja */ }
+    if (storage.isConfigured()) {
+      try { await storage.del(row.filename); } catch { /* best-effort */ }
     }
     reply.send({ ok: true });
   });
