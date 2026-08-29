@@ -4,7 +4,7 @@ import { describe, it, expect } from 'vitest';
 import { getZone, getZonesGrouped, ZONES } from '../src/zones.js';
 import { hijriForDateKey } from '../src/hijri.js';
 import { formatTime, dateKeyInZone, zonedDateTime, METHODS } from '../src/prayers.js';
-import { quranVerseForDate } from '../src/quran.js';
+import { VERSES, quranVerseForDate } from '../src/quran.js';
 import { DOAS, doaForDate, resolveDoaAnnouncements } from '../src/doa.js';
 import { isSafeStreamUrl, applyPatch, DEFAULT_SETTINGS } from '../src/validate.js';
 
@@ -74,15 +74,34 @@ describe('Unit Testing / timezone helpers', () => {
   });
 });
 
-describe('Unit Testing / daily Quran verse', () => {
+describe('Unit Testing / daily Quran verse (kitaran bulanan)', () => {
+  it('has 31 verses — satu setiap haribulan', () => {
+    expect(VERSES).toHaveLength(31);
+    for (const v of VERSES) {
+      expect(v.arabic.trim()).toBeTruthy();
+      expect(v.text_ms.trim()).toBeTruthy();
+      expect(v.text_en.trim()).toBeTruthy();
+      expect(v.ref.trim()).toBeTruthy();
+    }
+  });
+
+  it('picks the verse by day of month (1 haribulan = ayat #1)', () => {
+    expect(quranVerseForDate('2026-08-01')).toEqual(VERSES[0]);
+    expect(quranVerseForDate('2026-08-15')).toEqual(VERSES[14]);
+    expect(quranVerseForDate('2026-08-31')).toEqual(VERSES[30]);
+  });
+
+  it('auto-renews on the 1st of the next month', () => {
+    expect(quranVerseForDate('2026-08-01')).toEqual(quranVerseForDate('2026-09-01'));
+    expect(quranVerseForDate('2026-08-01').arabic).not.toBe(quranVerseForDate('2026-08-02').arabic);
+  });
+
   it('picks a verse deterministically per date', () => {
     expect(quranVerseForDate('2026-08-15')).toEqual(quranVerseForDate('2026-08-15'));
   });
 
-  it('changes the verse between dates', () => {
-    const a = quranVerseForDate('2026-08-15');
-    const b = quranVerseForDate('2026-08-16');
-    expect(a.ref).not.toBe(b.ref);
+  it('falls back to the first verse for malformed dates', () => {
+    expect(quranVerseForDate('not-a-date')).toEqual(VERSES[0]);
   });
 });
 
