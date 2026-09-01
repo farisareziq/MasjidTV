@@ -91,6 +91,16 @@ function copyStatic(srcDir, rel = '') {
 copyStatic(path.join(pkgRoot, '..', 'frontend', 'public-cloud'));
 console.log('[cloud-build] static assets emitted to .vercel/output/static/');
 
+// /api/health sebagai fail statik CDN (sifar invokasi fungsi). Kontrak MESTI
+// kekal: 200 + body JSON {ok:true,...} — preflight.mjs & uptime monitor
+// menghurai body (ruta edge status-200 kosong melanggar kontrak ini).
+const pkgVersion = JSON.parse(fs.readFileSync(path.join(pkgRoot, 'package.json'), 'utf8')).version;
+fs.mkdirSync(path.join(staticRoot, 'api'), { recursive: true });
+fs.writeFileSync(
+  path.join(staticRoot, 'api', 'health.json'),
+  JSON.stringify({ ok: true, service: 'masjidtv-cloud', version: pkgVersion, static: true })
+);
+
 // function
 const funcDir = path.join(outRoot, 'functions', 'api', 'index.func');
 fs.mkdirSync(funcDir, { recursive: true });
@@ -171,14 +181,15 @@ fs.writeFileSync(path.join(funcDir, '.vc-config.json'), JSON.stringify({
 // di edge menjadikan banjir ini PERCUMA (sifar invokasi fungsi). Laluan ini
 // diletak dahulu supaya ia menang sebelum rewrite /api/(.*) → fungsi.
 //
-// /api/health: jawab 200 TERUS di edge — uptime monitor (UptimeRobot dsb.)
-// memanggil ini setiap 1-5 minit; melayan di edge menjadikan setiap ping
-// PERCUMA (sifar invokasi fungsi).
+// /api/health: tulis semula ke fail statik CDN (api/health.json) — uptime
+// monitor (UptimeRobot dsb.) memanggil ini setiap 1-5 minit; melayan dari
+// CDN menjadikan setiap ping PERCUMA (sifar invokasi fungsi) sambil kekal
+// memulangkan body {ok:true} yang dihurai preflight/monitor.
 fs.writeFileSync(path.join(outRoot, 'config.json'), JSON.stringify({
   version: 3,
   routes: [
     { src: '^/api/events/?$', status: 204, headers: { 'Cache-Control': 'no-store', 'X-Accel-Buffering': 'no' } },
-    { src: '^/api/health/?$', status: 200, headers: { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' } }
+    { src: '^/api/health/?$', dest: '/api/health.json', headers: { 'Cache-Control': 'no-store' } }
   ]
 }, null, 2));
 
