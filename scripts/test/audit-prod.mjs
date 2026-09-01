@@ -8,10 +8,12 @@ const check = (name, cond, detail = '') => {
   else fail++;
 };
 
-// 1. Health & identity
+// 1. Health & identity (versi dibaca daripada package.json — jangan hardcode)
+import fs from 'node:fs';
+const pkgVersion = JSON.parse(fs.readFileSync(new URL('../../package.json', import.meta.url), 'utf8')).version;
 let r = await fetch(base + '/api/health');
 let h = await r.json();
-check('health 200 + ok:true + version 1.1.2', r.status === 200 && h.ok === true && h.version === '1.1.2', JSON.stringify(h));
+check(`health 200 + ok:true + version ${pkgVersion}`, r.status === 200 && h.ok === true && h.version === pkgVersion, JSON.stringify(h));
 
 // 2. Public endpoints
 r = await fetch(base + '/api/methods');
