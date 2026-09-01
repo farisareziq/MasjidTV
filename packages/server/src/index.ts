@@ -25,7 +25,7 @@ const PORT = Number(process.env.PORT) || 3000;
 startServer({ dataDir: DATA_DIR, publicDir: PUBLIC_DIR, port: PORT })
   .then(() => {
     console.log('');
-    console.log('  MasjidTV 1.1.1 — mosque signage server');
+    console.log('  MasjidTV 1.1.2 — mosque signage server');
     console.log(`  Display screen : http://localhost:${PORT}/display`);
     console.log(`  Admin dashboard: http://localhost:${PORT}/admin`);
     console.log(`  Data dir       : ${DATA_DIR}`);
@@ -37,7 +37,7 @@ startServer({ dataDir: DATA_DIR, publicDir: PUBLIC_DIR, port: PORT })
     const installDir = process.env.MASJIDTV_UPDATE_DIR;
     const binaryName = process.env.MASJIDTV_UPDATE_BINARY;
     if (repo && installDir && binaryName) {
-      new Updater({ repo, currentVersion: '1.1.1', installDir, binaryName }).start();
+      new Updater({ repo, currentVersion: '1.1.2', installDir, binaryName }).start();
       console.log(`  Self-updater   : enabled (${repo})`);
     }
   })

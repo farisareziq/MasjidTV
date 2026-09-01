@@ -16,7 +16,7 @@ export function registerPublicRoutes(app: FastifyInstance, ctx: RouteContext): v
   const { store, startedAt } = ctx;
 
   app.get('/api/health', async (_req, reply) => {
-    reply.send({ ok: true, service: 'masjidtv-cloud', version: '1.1.1', uptime: (Date.now() - startedAt) / 1000, now: new Date().toISOString() });
+    reply.send({ ok: true, service: 'masjidtv-cloud', version: '1.1.2', uptime: (Date.now() - startedAt) / 1000, now: new Date().toISOString() });
   });
 
   // --- display (tenant key) ---------------------------------------------

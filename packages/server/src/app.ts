@@ -21,7 +21,7 @@ import { applyPairing, PAIR_PAGE_HTML_SRC } from './pair.js';
 import { ensureFfmpeg } from './ensure-ffmpeg.js';
 
 const SESSION_TTL_MS = 12 * 60 * 60 * 1000;
-const VERSION = '1.1.1';
+const VERSION = '1.1.2';
 
 const CSP_DISPLAY = [
   "default-src 'self'",

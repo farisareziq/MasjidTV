@@ -57,7 +57,7 @@ export function registerAdminRoutes(app: FastifyInstance, ctx: RouteContext): vo
     const activeCount = all.filter((a) => isAnnouncementActive(a, nowDate, tz)).length;
     const events = buildEventsPayload(settings.events || [], nowDate, tz);
     reply.send({
-      version: '1.1.1',
+      version: '1.1.2',
       uptime: (Date.now() - startedAt) / 1000,
       startedAt: new Date(startedAt).toISOString(),
       screenUrl: `${baseDisplayUrl(req)}/display?key=${tenant.apiKey}`,
@@ -260,7 +260,7 @@ export function registerAdminRoutes(app: FastifyInstance, ctx: RouteContext): vo
     const activeCount = all.filter((a) => isAnnouncementActive(a, nowDate, tz)).length;
     const events = buildEventsPayload(settings.events || [], nowDate, tz);
     const status = {
-      version: '1.1.1',
+      version: '1.1.2',
       uptime: (Date.now() - startedAt) / 1000,
       startedAt: new Date(startedAt).toISOString(),
       screenUrl: `${baseDisplayUrl(req)}/display?key=${tenant.apiKey}`,

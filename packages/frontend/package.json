@@ -1,6 +1,6 @@
 {
   "name": "@masjidtv/frontend",
-  "version": "1.1.1",
+  "version": "1.1.2",
   "type": "module",
   "description": "MasjidTV display + admin frontend (TypeScript sources compiled to public*/js by esbuild)",
   "scripts": {
