@@ -37,7 +37,13 @@ export async function createCloudApp(opts?: { staticDir?: string }): Promise<Fas
   );
   await applySchema(db);
   const store = new CloudStore(db.db);
-  await store.seedSuperuser();
+  // seedSuperuser does a DB round-trip on every cold start. After the first
+  // deploy, the superuser row persists in Turso — set MASJIDTV_SKIP_SEED=1
+  // in Vercel env vars to skip this check and shave ~1 DB round-trip per cold
+  // start. Leave unset for first deploy / local dev / VPS.
+  if (process.env.MASJIDTV_SKIP_SEED !== '1') {
+    await store.seedSuperuser();
+  }
 
   // trustProxy: di Vercel, socket remote adalah IP LB dalaman — tanpa ini
   // semua pelanggan berkongsi bucket rate-limit yang sama (30 kegagalan
@@ -64,7 +70,12 @@ export async function createCloudApp(opts?: { staticDir?: string }): Promise<Fas
   // SYNC SEGERA: setiap laluan TULIS /api/admin/* yang berjaya (2xx) untuk
   // sebuah tenant → bumpRev → SSE 'sync' kepada paparan. Hook onResponse
   // tunggal menggantikan bump manual pada setiap laluan (minimum damage).
+  // Apabila SSE dimatikan (MASJIDTV_DISABLE_SSE=1, lihat sse.ts), tiada
+  // subscriber — langkau sepenuhnya untuk elak DB query sia-sia selepas
+  // setiap tulisan admin.
+  const sseDisabled = process.env.MASJIDTV_DISABLE_SSE === '1';
   app.addHook('onResponse', async (req, reply) => {
+    if (sseDisabled) return;
     const m = req.method;
     if (m !== 'PUT' && m !== 'POST' && m !== 'PATCH' && m !== 'DELETE') return;
     if (!(req.url || '').startsWith('/api/admin/')) return;

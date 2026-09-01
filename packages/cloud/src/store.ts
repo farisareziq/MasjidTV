@@ -61,6 +61,73 @@ function rowToTenant(row: TenantSelect): TenantRow {
 export class CloudStore {
   constructor(private db: CloudDatabase) {}
 
+  // In-memory tenant cache (30s TTL). Eliminates the Turso round-trip on the
+  // hot poll path — display polls every 30s with the same API key. Writes bust
+  // the cache so admin changes are visible on the next poll (max 30s stale).
+  private _tenantCache = new Map<string, TenantRow>();
+  private _tenantCacheExpiry = new Map<string, number>();
+  private static readonly CACHE_TTL = 30_000;
+
+  private _cacheTenant(row: TenantRow): TenantRow {
+    const exp = now() + CloudStore.CACHE_TTL;
+    this._tenantCache.set(`id:${row.id}`, row);
+    this._tenantCache.set(`key:${row.apiKey}`, row);
+    this._tenantCacheExpiry.set(`id:${row.id}`, exp);
+    this._tenantCacheExpiry.set(`key:${row.apiKey}`, exp);
+    return row;
+  }
+
+  private _bustTenant(tenantId: string): void {
+    const row = this._tenantCache.get(`id:${tenantId}`);
+    this._tenantCache.delete(`id:${tenantId}`);
+    this._tenantCacheExpiry.delete(`id:${tenantId}`);
+    if (row) {
+      this._tenantCache.delete(`key:${row.apiKey}`);
+      this._tenantCacheExpiry.delete(`key:${row.apiKey}`);
+    }
+  }
+
+  private _cached(key: string): TenantRow | null {
+    const row = this._tenantCache.get(key);
+    if (!row) return null;
+    const exp = this._tenantCacheExpiry.get(key);
+    if (!exp || now() > exp) {
+      this._tenantCache.delete(key);
+      this._tenantCacheExpiry.delete(key);
+      return null;
+    }
+    return row;
+  }
+
+  // Device-token cache (30s TTL). Eliminates the tvDevices lookup DB
+  // round-trip on kiosk polls. The throttled lastSeen write still fires
+  // based on the cached lastSeen value.
+  private _deviceCache = new Map<string, { tenantId: string; lastSeen: number }>();
+  private _deviceCacheExpiry = new Map<string, number>();
+
+  private _cacheDevice(token: string, tenantId: string, lastSeen: number): void {
+    const exp = now() + CloudStore.CACHE_TTL;
+    this._deviceCache.set(`dev:${token}`, { tenantId, lastSeen });
+    this._deviceCacheExpiry.set(`dev:${token}`, exp);
+  }
+
+  private _cachedDevice(token: string): { tenantId: string; lastSeen: number } | null {
+    const dev = this._deviceCache.get(`dev:${token}`);
+    if (!dev) return null;
+    const exp = this._deviceCacheExpiry.get(`dev:${token}`);
+    if (!exp || now() > exp) {
+      this._deviceCache.delete(`dev:${token}`);
+      this._deviceCacheExpiry.delete(`dev:${token}`);
+      return null;
+    }
+    return dev;
+  }
+
+  private _bustDevice(token: string): void {
+    this._deviceCache.delete(`dev:${token}`);
+    this._deviceCacheExpiry.delete(`dev:${token}`);
+  }
+
   async seedSuperuser(): Promise<void> {
     // PIN bootstrap RAWAK (bukan 00000000 tetap) — ditulis ke fail setempat
     // sekali sahaja supaya tiada tetingkat masa untuk perebutan akaun pada
@@ -118,13 +185,17 @@ export class CloudStore {
   }
 
   async getTenant(id: string): Promise<TenantRow | null> {
+    const cached = this._cached(`id:${id}`);
+    if (cached) return cached;
     const rows = await this.db.select().from(tenants).where(eq(tenants.id, id)).all();
-    return rows[0] ? rowToTenant(rows[0]) : null;
+    return rows[0] ? this._cacheTenant(rowToTenant(rows[0])) : null;
   }
 
   async getTenantByApiKey(key: string): Promise<TenantRow | null> {
+    const cached = this._cached(`key:${key}`);
+    if (cached) return cached;
     const rows = await this.db.select().from(tenants).where(eq(tenants.apiKey, key)).all();
-    return rows[0] ? rowToTenant(rows[0]) : null;
+    return rows[0] ? this._cacheTenant(rowToTenant(rows[0])) : null;
   }
 
   async listTenants(): Promise<TenantRow[]> {
@@ -143,6 +214,7 @@ export class CloudStore {
       const col = mapping[k];
       if (col) set[col] = v;
     }
+    this._bustTenant(id);
     if (Object.keys(set).length > 0) {
       await this.db.update(tenants).set(set as never).where(eq(tenants.id, id)).run();
     }
@@ -289,14 +361,27 @@ export class CloudStore {
   }
 
   async getTenantByDeviceToken(token: string): Promise<TenantRow | null> {
-    const rows = await this.db.select().from(tvDevices).where(eq(tvDevices.token, token)).all();
-    const dev = rows[0];
-    if (!dev) return null;
-    // Throttle kemas kini lastSeen (≥1 minit) — elak tulisan DB setiap poll 10sa.
-    if (now() - Number(dev.lastSeen || 0) > 60000) {
-      await this.db.update(tvDevices).set({ lastSeen: now() }).where(eq(tvDevices.token, token)).run();
+    const cached = this._cachedDevice(token);
+    let tenantId: string;
+    let lastSeen: number;
+    if (cached) {
+      tenantId = cached.tenantId;
+      lastSeen = cached.lastSeen;
+    } else {
+      const rows = await this.db.select().from(tvDevices).where(eq(tvDevices.token, token)).all();
+      const dev = rows[0];
+      if (!dev) return null;
+      tenantId = dev.tenantId;
+      lastSeen = Number(dev.lastSeen || 0);
+      this._cacheDevice(token, tenantId, lastSeen);
     }
-    return this.getTenant(dev.tenantId);
+    // Throttle kemas kini lastSeen (≥1 minit) — elak tulisan DB setiap poll.
+    if (now() - lastSeen > 60000) {
+      const newLastSeen = now();
+      await this.db.update(tvDevices).set({ lastSeen: newLastSeen }).where(eq(tvDevices.token, token)).run();
+      this._cacheDevice(token, tenantId, newLastSeen);
+    }
+    return this.getTenant(tenantId);
   }
 
   async listDevices(tenantId: string) {
@@ -317,6 +402,8 @@ export class CloudStore {
     const json = JSON.stringify(report).slice(0, 4000);
     await this.db.update(tvDevices).set({ hwReport: json, lastSeen: now() })
       .where(eq(tvDevices.token, token)).run();
+    const cached = this._deviceCache.get(`dev:${token}`);
+    if (cached) this._cacheDevice(token, cached.tenantId, now());
   }
 
   async deleteDevice(tenantId: string, id: string): Promise<void> {
@@ -328,10 +415,12 @@ export class CloudStore {
   }
 
   async deleteDeviceByToken(tenantId: string, token: string): Promise<void> {
+    this._bustDevice(token);
     await this.db.delete(tvDevices).where(and(eq(tvDevices.tenantId, tenantId), eq(tvDevices.token, token))).run();
   }
 
   async deleteTenant(id: string): Promise<void> {
+    this._bustTenant(id);
     await this.db.delete(tenants).where(eq(tenants.id, id)).run();
     await this.db.delete(users).where(eq(users.tenantId, id)).run();
     await this.db.delete(cloudAnnouncements).where(eq(cloudAnnouncements.tenantId, id)).run();

@@ -41,8 +41,8 @@ export interface DisplayVariantConfig {
     // Pastikan MASJIDTV_DISABLE_SSE=1 di pelayan seiring supaya tiada reconnect.
     sseEnabled?: boolean;
     // Selang poll sync (ms). Lalai SYNC_INTERVAL_MS (10sa). Varian awan
-    // menaikkannya (30sa) untuk kurangkan invokasi fungsi Vercel — setiap poll
-    // memicu 3 panggilan API (/api/settings + /api/today + /api/slides).
+    // menaikkannya (60sa) untuk kurangkan invokasi fungsi Vercel — setiap poll
+    // memicu 1 panggilan API (/api/sync).
     // Pertukaran: perubahan kandungan muncul pada paparan dalam tempoh selang
     // ini (bukan 10sa). Hanya bermakna bila SSE dimatikan.
     syncIntervalMs?: number;
@@ -1440,11 +1440,7 @@ function renderEverything(): void {
 
 async function refresh(): Promise<void> {
   try {
-    const [settings, today, slides] = await Promise.all([
-      api('/api/settings'),
-      api('/api/today'),
-      api('/api/slides')
-    ]);
+    const { settings, today, slides } = await api('/api/sync');
     state.settings = settings;
     state.today = today;
     state.slidesData = slides;
@@ -1491,11 +1487,7 @@ async function refresh(): Promise<void> {
 // Sync latar: kemas kini hanya bahagian yang benar-benar berubah.
 async function sync(): Promise<void> {
   try {
-    const [settings, today, slides] = await Promise.all([
-      api('/api/settings'),
-      api('/api/today'),
-      api('/api/slides')
-    ]);
+    const { settings, today, slides } = await api('/api/sync');
     const settingsChanged = JSON.stringify(settings) !== dataCache.settings;
     const todayChanged = JSON.stringify(stableToday(today)) !== dataCache.today;
     const slidesChanged = JSON.stringify(slides) !== dataCache.slides;

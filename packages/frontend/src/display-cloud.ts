@@ -14,7 +14,7 @@
 //   menjawab 204 (MASJIDTV_DISABLE_SSE=1) — EventSource berhenti menyambung
 //   semula secara kekal sisi spesifikasi, jadi kos serverless kekal rendah.
 //   Pada VPS (proses panjang), SSE memberi sync segera <2sa admin->TV.
-// - syncIntervalMs:30000: poll fallback setiap 30sa. Dengan SSE hidup, poll
+// - syncIntervalMs:60000: poll fallback setiap 60sa. Dengan SSE hidup, poll
 //   hanya keselamatan jaring; pada Vercel (SSE mati) ia kadar utama.
 import { bootDisplay } from './display-core';
 
@@ -24,6 +24,6 @@ bootDisplay({
     recoverMissingKey: true,
     videoGuard: true,
     sseEnabled: true,
-    syncIntervalMs: 30000
+    syncIntervalMs: 60000
   }
 });

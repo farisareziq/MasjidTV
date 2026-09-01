@@ -47,7 +47,8 @@
     headingFont: () => !!cfg.features.headingFont,
     fridayKhutbah: () => !!cfg.features.fridayKhutbah,
     tokenRotate: () => !!cfg.features.tokenRotate,
-    kioskStreams: () => !!cfg.features.kioskStreams
+    kioskStreams: () => !!cfg.features.kioskStreams,
+    syncIntervalMs: () => typeof cfg.features.syncIntervalMs === "number" && cfg.features.syncIntervalMs > 0 ? cfg.features.syncIntervalMs : 1e4
   };
   var featureHooks = {};
   function registerAdminFeatures(h) {
@@ -1733,13 +1734,10 @@
   async function syncAdminData() {
     if (!state.token) return;
     if (F.login() && state.role === "superuser") return;
+    if (typeof document !== "undefined" && document.hidden) return;
     const editing = ["INPUT", "SELECT", "TEXTAREA"].includes(document.activeElement?.tagName);
     try {
-      const [status, today, announcements] = await Promise.all([
-        api("/api/admin/status"),
-        api("/api/today"),
-        api("/api/admin/announcements")
-      ]);
+      const { status, today, announcements } = await api("/api/admin/sync");
       state.status = status;
       state.today = today;
       state.announcements = announcements;
@@ -2332,7 +2330,7 @@
         toast(err.message, "err");
       }
     });
-    setInterval(syncAdminData, 1e4);
+    setInterval(syncAdminData, F.syncIntervalMs());
     if (state.token) {
       loadApp().then(() => resetIdleTimer()).catch(() => showLogin());
     } else {

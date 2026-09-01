@@ -4,7 +4,7 @@
 import crypto from 'node:crypto';
 import type { FastifyInstance, FastifyRequest } from 'fastify';
 import {
-  buildEventsPayload, syncEventsFor,
+  buildEventsPayload, syncEventsFor, buildTodayPayload,
   UPLOAD_TYPES,
   sanitizeAnnouncementCreate, applyAnnouncementPatch,
   sortAnnouncements, isAnnouncementActive
@@ -55,7 +55,7 @@ export function registerAdminRoutes(app: FastifyInstance, ctx: RouteContext): vo
     const activeCount = all.filter((a) => isAnnouncementActive(a, nowDate, tz)).length;
     const events = buildEventsPayload(settings.events || [], nowDate, tz);
     reply.send({
-      version: '1.1.0',
+      version: '1.1.1',
       uptime: (Date.now() - startedAt) / 1000,
       startedAt: new Date(startedAt).toISOString(),
       screenUrl: `${baseDisplayUrl(req)}/display?key=${tenant.apiKey}`,
@@ -157,6 +157,46 @@ export function registerAdminRoutes(app: FastifyInstance, ctx: RouteContext): vo
       await store.updateAnnouncement(tenant.id, a.id, a);
     }
     reply.send({ ok: true });
+  });
+
+  // Combined admin sync — returns status + today + announcements in ONE
+  // response. Replaces 3 separate function invocations per admin poll cycle.
+  app.get('/api/admin/sync', async (req, reply) => {
+    const tenant = await requireAdmin(store, req, reply);
+    if (!tenant) return;
+    const settings = tenant.settings;
+    const nowDate = new Date();
+    const tz = settings.prayer.timezone;
+    const all = await store.listAnnouncements(tenant.id);
+    const activeCount = all.filter((a) => isAnnouncementActive(a, nowDate, tz)).length;
+    const events = buildEventsPayload(settings.events || [], nowDate, tz);
+    const status = {
+      version: '1.1.1',
+      uptime: (Date.now() - startedAt) / 1000,
+      startedAt: new Date(startedAt).toISOString(),
+      screenUrl: `${baseDisplayUrl(req)}/display?key=${tenant.apiKey}`,
+      adminUrl: `${baseDisplayUrl(req)}/admin`,
+      counts: { announcements: all.length, activeAnnouncements: activeCount },
+      mosque: settings.mosque.name,
+      language: settings.display.language,
+      prayerMethod: settings.prayer.method,
+      prayerSource: settings.prayer.source,
+      prayerZone: settings.prayer.zone,
+      eventsSync: settings.eventsSync,
+      audioEnabled: settings.audio.enabled,
+      streamCount: (settings.streams || []).length,
+      activeStreamCount: (settings.streams || []).filter((s) => s.enabled).length,
+      nextEvent: events[0] || null,
+      license: (req as FastifyRequest & TenantReq).license,
+      adminPasswordFile: false
+    };
+    let today: Awaited<ReturnType<typeof buildTodayPayload>> | null = null;
+    try { today = await buildTodayPayload(settings); } catch { /* computation error */ }
+    const announcements = sortAnnouncements(all).map((a) => ({
+      ...a,
+      status: isAnnouncementActive(a, nowDate, tz) ? 'active' : 'inactive'
+    }));
+    reply.send({ status, today, announcements });
   });
 
   // Media upload (direct to Blob if configured, else local fs).

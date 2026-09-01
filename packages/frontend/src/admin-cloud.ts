@@ -27,6 +27,7 @@ bootAdmin({
     headingFont: true,
     fridayKhutbah: true,
     tokenRotate: true,
-    kioskStreams: true
+    kioskStreams: true,
+    syncIntervalMs: 30000
   }
 });

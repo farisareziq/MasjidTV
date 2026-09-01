@@ -1,6 +1,6 @@
 {
   "name": "@masjidtv/kiosk",
-  "version": "1.1.0",
+  "version": "1.1.1",
   "private": true,
   "description": "MasjidTV kiosk mini-PC app (Electron): embedded server + fullscreen kiosk display",
   "main": "dist/index.js",

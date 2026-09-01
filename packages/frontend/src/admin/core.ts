@@ -797,13 +797,10 @@ function buildPatch(section: string): Record<string, unknown> {
 async function syncAdminData() {
   if (!state.token) return;
   if (F.login() && state.role === 'superuser') return;
+  if (typeof document !== 'undefined' && document.hidden) return;
   const editing = ['INPUT', 'SELECT', 'TEXTAREA'].includes(document.activeElement?.tagName);
   try {
-    const [status, today, announcements] = await Promise.all([
-      api<AdminStatus>('/api/admin/status'),
-      api<import('@masjidtv/shared').TodayPayload>('/api/today'),
-      api<Array<Announcement & { status?: string }>>('/api/admin/announcements')
-    ]);
+    const { status, today, announcements } = await api<{ status: AdminStatus; today: import('@masjidtv/shared').TodayPayload; announcements: Array<Announcement & { status?: string }> }>('/api/admin/sync');
     state.status = status;
     state.today = today;
     state.announcements = announcements;
@@ -1467,7 +1464,7 @@ export function bootAdmin(config: AdminVariantConfig): void {
     }
   });
 
-  setInterval(syncAdminData, 10000);
+  setInterval(syncAdminData, F.syncIntervalMs());
 
   if (state.token) {
     loadApp().then(() => resetIdleTimer()).catch(() => showLogin());

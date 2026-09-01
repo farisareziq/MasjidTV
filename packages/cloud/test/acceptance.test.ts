@@ -20,7 +20,14 @@ describe('Acceptance Testing / cloud user journeys', () => {
   // deployment sebenar pada host yang sama.
   const pinFile = path.join(tmpDir, 'MASJIDTV_SUPERUSER_PIN.txt');
 
+  // Simpan nilai asli untuk dipulihkan di afterAll — env yang bocor ke
+  // thread lain (cth. TURSO_URL, JWT_SECRET) mengganggu suite server.
+  const _savedEnv: Record<string, string | undefined> = {};
+
   beforeAll(async () => {
+    for (const k of ['TURSO_URL', 'JWT_SECRET', 'MASJIDTV_SUPERUSER_PIN_FILE']) {
+      _savedEnv[k] = process.env[k];
+    }
     process.env.TURSO_URL = `file:${path.join(tmpDir, 'cloud.db')}`;
     process.env.JWT_SECRET = 'acceptance-secret';
     process.env.MASJIDTV_SUPERUSER_PIN_FILE = pinFile;
@@ -32,7 +39,10 @@ describe('Acceptance Testing / cloud user journeys', () => {
 
   afterAll(async () => {
     await app.close();
-    delete process.env.MASJIDTV_SUPERUSER_PIN_FILE;
+    for (const [k, v] of Object.entries(_savedEnv)) {
+      if (v === undefined) delete process.env[k];
+      else process.env[k] = v;
+    }
     for (let i = 0; i < 5; i++) {
       try {
         fs.rmSync(tmpDir, { recursive: true, force: true });

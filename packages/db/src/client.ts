@@ -175,22 +175,15 @@ export async function createCloudClient(url: string, authToken?: string): Promis
 }
 
 // Apply the base schema (CREATE TABLE IF NOT EXISTS) for a given client.
+// On Vercel, tables persist in Turso after first deploy — set
+// MASJIDTV_SKIP_SCHEMA=1 to skip the batch CREATE TABLE round-trip on every
+// cold start. Leave unset for first deploy / local dev / VPS.
 export async function applySchema(client: AppClient): Promise<void> {
   if (client.kind === 'local') {
     client.raw.exec(LOCAL_SCHEMA_SQL);
   } else {
+    if (process.env.MASJIDTV_SKIP_SCHEMA === '1') return;
     await client.raw.batch(CLOUD_SCHEMA_SQL.filter((s) => !s.startsWith('--')));
-    // Migrasi hw_report untuk DB sedia ada (CREATE TABLE baharu sudah
-    // mengandunginya). ALTER hanya perlu pada DB lama; ralat "duplicate
-    // column" bermakna lajur sedia ada — selamat diabaikan. LibsqlError
-    // boleh lontar sync ATAU async — tangkap kedua-duanya.
-    try {
-      await Promise.resolve(client.raw.execute(`ALTER TABLE tv_devices ADD COLUMN hw_report TEXT NOT NULL DEFAULT ''`))
-        .catch((err: unknown) => { throw err; });
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : String(err);
-      if (!/duplicate column/i.test(msg)) throw err;
-    }
   }
 }
 

@@ -154,10 +154,11 @@ fs.writeFileSync(path.join(funcDir, '.vc-config.json'), JSON.stringify({
   runtime: 'nodejs20.x',
   handler: 'index.cjs',
   maxDuration: 30,
-  // 256MB cuts GB-hours ~4x vs 1024 — plenty for this Fastify handler now that
-  // static assets no longer run through the function (Hobby plan is billed on
-  // memory-seconds, so lowering memory is the cheapest win).
-  memory: 256
+  // 128MB halves GB-seconds vs 256 — sufficient for this lightweight handler
+  // (no in-memory media buffering, assets on CDN, body limit 1MB, bcrypt
+  // lazy-loaded). Vercel serverless handles one request per instance, so
+  // peak memory is a single request, not concurrency.
+  memory: 128
 }, null, 2));
 
 // config: default routing (function auto-served at /api/index). Path
@@ -169,10 +170,15 @@ fs.writeFileSync(path.join(funcDir, '.vc-config.json'), JSON.stringify({
 // mengabaikan 204 (EventSource WebView lama tak patuh spec stop-on-204). Melayan
 // di edge menjadikan banjir ini PERCUMA (sifar invokasi fungsi). Laluan ini
 // diletak dahulu supaya ia menang sebelum rewrite /api/(.*) → fungsi.
+//
+// /api/health: jawab 200 TERUS di edge — uptime monitor (UptimeRobot dsb.)
+// memanggil ini setiap 1-5 minit; melayan di edge menjadikan setiap ping
+// PERCUMA (sifar invokasi fungsi).
 fs.writeFileSync(path.join(outRoot, 'config.json'), JSON.stringify({
   version: 3,
   routes: [
-    { src: '^/api/events/?$', status: 204, headers: { 'Cache-Control': 'no-store', 'X-Accel-Buffering': 'no' } }
+    { src: '^/api/events/?$', status: 204, headers: { 'Cache-Control': 'no-store', 'X-Accel-Buffering': 'no' } },
+    { src: '^/api/health/?$', status: 200, headers: { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' } }
   ]
 }, null, 2));
 

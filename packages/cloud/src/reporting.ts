@@ -47,7 +47,7 @@ function parseDsn(dsn: string): DsnParts | null {
     if (!publicKey || !projectId) return null;
     return {
       endpoint: `${u.origin}/api/${projectId}/envelope/`,
-      authHeader: `Sentry sentry_version=7, sentry_key=${publicKey}, sentry_client=masjidtv-min/1.1.0`
+      authHeader: `Sentry sentry_version=7, sentry_key=${publicKey}, sentry_client=masjidtv-min/1.1.1`
     };
   } catch {
     return null;

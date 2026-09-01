@@ -133,6 +133,9 @@ export interface AdminVariantConfig {
     // label status kiosk pada #ffmpegStatus, dan ayat nota overview yang
     // sesuai untuk URL Vercel awam (bukan teks LAN/ffmpeg mesin ini).
     kioskStreams?: boolean;
+    // Selang poll sync admin (ms). Lalai 10000. Varian awan menaikkannya
+    // (30000) untuk kurangkan invokasi fungsi Vercel.
+    syncIntervalMs?: number;
   };
 }
 
@@ -156,7 +159,8 @@ export const F = {
   headingFont: (): boolean => !!cfg.features.headingFont,
   fridayKhutbah: (): boolean => !!cfg.features.fridayKhutbah,
   tokenRotate: (): boolean => !!cfg.features.tokenRotate,
-  kioskStreams: (): boolean => !!cfg.features.kioskStreams
+  kioskStreams: (): boolean => !!cfg.features.kioskStreams,
+  syncIntervalMs: (): number => (typeof cfg.features.syncIntervalMs === 'number' && cfg.features.syncIntervalMs > 0) ? cfg.features.syncIntervalMs : 10000
 };
 
 // Cangkuk ciri varian — didaftarkan oleh modul ciri (cloud.ts) sebelum

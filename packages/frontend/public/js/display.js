@@ -1211,11 +1211,7 @@
   }
   async function refresh() {
     try {
-      const [settings, today, slides] = await Promise.all([
-        api("/api/settings"),
-        api("/api/today"),
-        api("/api/slides")
-      ]);
+      const { settings, today, slides } = await api("/api/sync");
       state.settings = settings;
       state.today = today;
       state.slidesData = slides;
@@ -1242,11 +1238,7 @@
   }
   async function sync() {
     try {
-      const [settings, today, slides] = await Promise.all([
-        api("/api/settings"),
-        api("/api/today"),
-        api("/api/slides")
-      ]);
+      const { settings, today, slides } = await api("/api/sync");
       const settingsChanged = JSON.stringify(settings) !== dataCache.settings;
       const todayChanged = JSON.stringify(stableToday(today)) !== dataCache.today;
       const slidesChanged = JSON.stringify(slides) !== dataCache.slides;

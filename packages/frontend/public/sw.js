@@ -2,7 +2,7 @@
 // HTML /display TIDAK dikendalikan SW: kawalan navigasi oleh SW sebelum ini
 // menyebabkan pelbagai kegagalan (redirect ditelan, CSP menyekat fetch,
 // cache lapuk). Halaman sentiasa dimuatkan terus dari rangkaian.
-const CACHE = 'masjidtv-v6';
+const CACHE = 'masjidtv-v7';
 
 self.addEventListener('install', (e) => self.skipWaiting());
 
@@ -26,7 +26,7 @@ self.addEventListener('activate', (e) => {
 self.addEventListener('fetch', (e) => {
   const url = new URL(e.request.url);
   if (e.request.method !== 'GET' || url.origin !== self.location.origin) return;
-  if (['/api/settings', '/api/today', '/api/slides'].includes(url.pathname)) {
+  if (['/api/sync', '/api/settings', '/api/today', '/api/slides'].includes(url.pathname)) {
     e.respondWith(
       fetch(e.request)
         .then((res) => {

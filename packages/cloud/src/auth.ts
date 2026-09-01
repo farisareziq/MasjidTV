@@ -1,8 +1,15 @@
-// Cloud auth: JWT + bcrypt + rate limiting (port of reference cloud/auth.js).
+// Cloud auth: JWT + rate limiting (port of reference cloud/auth.js).
 
-import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import { loginAttempts, eq, type CloudDatabase } from '@masjidtv/db';
+
+// bcryptjs lazy-loaded — only needed during login (rare on the display poll
+// path). Deferring module init shaves cold-start time for the hot path.
+let _bcrypt: typeof import('bcryptjs') | null = null;
+async function bcrypt() {
+  if (!_bcrypt) _bcrypt = await import('bcryptjs');
+  return _bcrypt;
+}
 
 // Predikat produksi MESTI sepadan dengan app.ts — di Vercel, NODE_ENV
 // sentiasa 'production', tetapi jangan benarkan rahsia dev jika hanya
@@ -46,12 +53,14 @@ export function verifyToken(token: string): TokenPayload | null {
   }
 }
 
-export function hashPassword(pw: string): Promise<string> {
-  return bcrypt.hash(String(pw), 10);
+export async function hashPassword(pw: string): Promise<string> {
+  const b = await bcrypt();
+  return b.hash(String(pw), 10);
 }
 
-export function comparePassword(pw: string, hash: string): Promise<boolean> {
-  return bcrypt.compare(String(pw), hash);
+export async function comparePassword(pw: string, hash: string): Promise<boolean> {
+  const b = await bcrypt();
+  return b.compare(String(pw), hash);
 }
 
 function now(): number {

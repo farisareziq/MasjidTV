@@ -20,7 +20,7 @@ import { applyPairing, PAIR_PAGE_HTML_SRC } from './pair.js';
 import { ensureFfmpeg } from './ensure-ffmpeg.js';
 
 const SESSION_TTL_MS = 12 * 60 * 60 * 1000;
-const VERSION = '1.1.0';
+const VERSION = '1.1.1';
 
 const CSP_DISPLAY = [
   "default-src 'self'",
@@ -281,6 +281,39 @@ export async function buildApp(opts: AppOptions): Promise<FastifyInstance> {
       dateKeyInZone(new Date(), tz())
     );
     reply.send({ announcements: resolved, builtin: resolved.length ? [] : builtinContent });
+  });
+
+  // Sync gabungan paparan — settings + today + slides dalam SATU respons.
+  // Paparan (display-core) kini mengundi endpoint ini sahaja; tanpa laluan
+  // ini paparan lokal/kiosk mendapat 404 pada setiap kitaran sync dan
+  // waktu solat tidak pernah dikemas kini. Bentuk payload seragam dengan
+  // /api/sync cloud (proxy mod cloud-sync memulangkan bentuk yang sama).
+  app.get('/api/sync', { preHandler: requireDisplayKey }, async (_req, reply) => {
+    if (await handleCloudSync(reply, opts.dataDir, '/api/sync', true)) return;
+    const s = settings();
+    const now = new Date();
+    const pub = buildPublicSettings(s, { includeEventsSync: true });
+    pub.events = buildEventsPayload((pub.events as Settings['events']) || [], now, tz());
+    pub.streams = ((pub.streams as Stream[]) || []).map(publicStream);
+
+    let today: Awaited<ReturnType<typeof buildTodayPayload>> | null = null;
+    try {
+      today = await buildTodayPayload(s);
+    } catch (err) {
+      // Jangan gagalkan keseluruhan sync — settings/slaid kekal dihantar
+      // (pariti dengan laluan cloud /api/sync).
+      console.error('[api] /api/sync today:', err instanceof Error ? err.message : err);
+    }
+
+    const todayKey = dateKeyInZone(now, tz());
+    const active = announcements.listActive(now, tz());
+    const resolved = resolveDoaAnnouncements(resolveQuranAnnouncements(active, todayKey), todayKey);
+
+    reply.send({
+      settings: pub,
+      today,
+      slides: { announcements: resolved, builtin: resolved.length ? [] : builtinContent }
+    });
   });
 
   // --- Admin auth -----------------------------------------------------------
