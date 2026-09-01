@@ -311,6 +311,33 @@ describe('Unit Testing / prayer.overrides (suntingan manual)', () => {
 });
 
 describe('Unit Testing / jakim cache helpers', () => {
+  it('parses the NEW e-Solat date format (English abbreviated months)', async () => {
+    // e-Solat menukar format tarikh (~Sep 2026): "01-Sep-2026" (singkatan
+    // Inggeris) bukan "01-September-2026" (Melayu penuh). Tanpa peta bulan
+    // yang diperluas, SEMUA entri gagal dihurai → fallback tempatan senyap.
+    const { parseEntry } = await import('../src/jakim.js');
+    const raw = {
+      hijri: '1448-03-19', date: '01-Sep-2026', day: 'Tuesday',
+      imsak: '05:50:00', fajr: '06:00:00', syuruk: '07:07:00', dhuha: '07:32:00',
+      dhuhr: '13:16:00', asr: '16:24:00', maghrib: '19:21:00', isha: '20:30:00'
+    };
+    const entry = parseEntry(raw);
+    expect(entry).not.toBeNull();
+    expect(entry!.dateKey).toBe('2026-09-01');
+    expect(entry!.hijri).toEqual({ year: 1448, month: 3, day: 19 });
+    expect(entry!.times).toEqual({
+      imsak: '05:50', fajr: '06:00', syuruk: '07:07', dhuha: '07:32',
+      dhuhr: '13:16', asr: '16:24', maghrib: '19:21', isha: '20:30'
+    });
+    // Semua 12 singkatan Inggeris + semua nama Melayu mesti dihurai.
+    const ENG = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    const MELAYU = ['Januari', 'Februari', 'Mac', 'April', 'Mei', 'Jun', 'Julai', 'Ogos', 'September', 'Oktober', 'November', 'Disember'];
+    for (let i = 0; i < 12; i++) {
+      expect(parseEntry({ date: `15-${ENG[i]}-2026` })?.dateKey).toBe(`2026-${String(i + 1).padStart(2, '0')}-15`);
+      expect(parseEntry({ date: `15-${MELAYU[i]}-2026` })?.dateKey).toBe(`2026-${String(i + 1).padStart(2, '0')}-15`);
+    }
+  });
+
   it('round-trips a JakimEntry through the row conversion', async () => {
     const { jakimEntryToRow, jakimRowToEntry } = await import('../src/jakim.js');
     const entry = {

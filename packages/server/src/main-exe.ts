@@ -148,7 +148,7 @@ async function main(): Promise<void> {
       if (cfg.repo) {
         new Updater({
           repo: cfg.repo,
-          currentVersion: '1.1.2',
+          currentVersion: '1.1.3',
           installDir: path.dirname(process.execPath),
           binaryName: cfg.binaryName || 'masjidtv.exe'
         }).start();

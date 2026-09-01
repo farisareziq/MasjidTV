@@ -12,8 +12,15 @@ export const HIJRI_MONTHS = [
 ];
 
 const GREG_MONTHS: Record<string, number> = {
+  // Nama bulan Melayu (format lama e-Solat).
   januari: 1, februari: 2, mac: 3, april: 4, mei: 5, jun: 6,
-  julai: 7, ogos: 8, september: 9, oktober: 10, november: 11, disember: 12
+  julai: 7, ogos: 8, september: 9, oktober: 10, november: 11, disember: 12,
+  // Singkatan Inggeris (format BAHARU e-Solat sejak ~Sep 2026, cth
+  // "01-Sep-2026") — tanpa ini SEMUA entri gagal dihurai dan paparan
+  // menyahuruf secara senyap kepada pengiraan tempatan.
+  jan: 1, feb: 2, mar: 3, apr: 4, may: 5, jul: 7, aug: 8, sep: 9, oct: 10, nov: 11, dec: 12,
+  // Nama penuh Inggeris (defensif — jika e-Solat kembali memanjangkan).
+  january: 1, february: 2, march: 3, june: 6, july: 7, august: 8, december: 12
 };
 
 export interface JakimEntry {
@@ -219,7 +226,7 @@ function parseHijri(str: string): HijriDate | null {
   return { year, month, day };
 }
 
-function parseEntry(raw: Record<string, unknown>): JakimEntry | null {
+export function parseEntry(raw: Record<string, unknown>): JakimEntry | null {
   const dateKey = parseDate(String(raw.date ?? ''));
   if (!dateKey) return null;
   const hijri = parseHijri(String(raw.hijri ?? ''));

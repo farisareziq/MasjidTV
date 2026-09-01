@@ -1,6 +1,6 @@
 {
   "name": "@masjidtv/server",
-  "version": "1.1.2",
+  "version": "1.1.3",
   "type": "module",
   "description": "MasjidTV local Fastify server (offline-first, full parity with TVMasjid)",
   "main": "./dist/index.js",

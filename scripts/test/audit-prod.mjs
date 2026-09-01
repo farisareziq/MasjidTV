@@ -4,7 +4,8 @@ const base = (process.argv[2] || process.env.PREFLIGHT_URL || 'https://masjidtv.
 let pass = 0, fail = 0;
 const check = (name, cond, detail = '') => {
   console.log((cond ? 'PASS' : 'FAIL') + ' ' + name + (detail ? ' — ' + detail : ''));
-  cond ? pass++ : fail++;
+  if (cond) pass++;
+  else fail++;
 };
 
 // 1. Health & identity
