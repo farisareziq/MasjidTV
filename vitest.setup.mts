@@ -13,6 +13,11 @@ const root = __dirname; // vitest.setup.mts duduk di akar repo (global/)
 const tsc = path.join(root, 'node_modules', 'typescript', 'bin', 'tsc');
 
 export default function setup(): void {
+  // Ujian: matikan sync latar belakang JAKIM (60 zon → e-solat.gov.my) —
+  // suite server membina app sebenar; tanpa ini timer 20sa boleh tercetus
+  // selepas stub fetch dipulihkan dan menghantar trafik sebenar dari CI.
+  process.env.MASJIDTV_DISABLE_JAKIM_SYNC = '1';
+
   for (const pkg of ['shared', 'db']) {
     const dist = path.join(root, 'packages', pkg, 'dist');
     if (!fs.existsSync(dist)) {

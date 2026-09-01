@@ -136,6 +136,11 @@ export interface AdminVariantConfig {
     // Selang poll sync admin (ms). Lalai 10000. Varian awan menaikkannya
     // (30000) untuk kurangkan invokasi fungsi Vercel.
     syncIntervalMs?: number;
+    // Kad cache waktu solat JAKIM (minggu + suntingan manual + butang sync).
+    jakimCache?: boolean;
+    // Butang "sync semua 60 zon" (latar belakang) — hanya server lokal yang
+    // ada proses panjang; serverless awan hanya mampu sync zon tenant.
+    jakimSyncAll?: boolean;
   };
 }
 
@@ -160,6 +165,8 @@ export const F = {
   fridayKhutbah: (): boolean => !!cfg.features.fridayKhutbah,
   tokenRotate: (): boolean => !!cfg.features.tokenRotate,
   kioskStreams: (): boolean => !!cfg.features.kioskStreams,
+  jakimCache: (): boolean => !!cfg.features.jakimCache,
+  jakimSyncAll: (): boolean => !!cfg.features.jakimSyncAll,
   syncIntervalMs: (): number => (typeof cfg.features.syncIntervalMs === 'number' && cfg.features.syncIntervalMs > 0) ? cfg.features.syncIntervalMs : 10000
 };
 

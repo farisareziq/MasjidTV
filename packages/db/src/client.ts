@@ -203,6 +203,21 @@ CREATE TABLE IF NOT EXISTS login_attempts (
   count INTEGER NOT NULL DEFAULT 0,
   locked_until INTEGER NOT NULL DEFAULT 0
 );
+CREATE TABLE IF NOT EXISTS jakim_times (
+  zone TEXT NOT NULL,
+  date_key TEXT NOT NULL,
+  hijri TEXT NOT NULL DEFAULT '',
+  imsak TEXT,
+  fajr TEXT,
+  syuruk TEXT,
+  dhuha TEXT,
+  dhuhr TEXT,
+  asr TEXT,
+  maghrib TEXT,
+  isha TEXT,
+  synced_at INTEGER NOT NULL DEFAULT 0,
+  PRIMARY KEY (zone, date_key)
+);
 `;
 
 const CLOUD_SCHEMA_SQL = [
@@ -278,5 +293,21 @@ const CLOUD_SCHEMA_SQL = [
     UNIQUE(tenant_id, device_id)
   )`,
   // Index auth peranti (x-device-token pada setiap permintaan paparan TV).
-  `CREATE UNIQUE INDEX IF NOT EXISTS idx_tv_devices_token ON tv_devices (token)`
+  `CREATE UNIQUE INDEX IF NOT EXISTS idx_tv_devices_token ON tv_devices (token)`,
+  // Cache waktu solat JAKIM (global — data awam per zon, dikongsi semua tenant).
+  `CREATE TABLE IF NOT EXISTS jakim_times (
+    zone TEXT NOT NULL,
+    date_key TEXT NOT NULL,
+    hijri TEXT NOT NULL DEFAULT '',
+    imsak TEXT,
+    fajr TEXT,
+    syuruk TEXT,
+    dhuha TEXT,
+    dhuhr TEXT,
+    asr TEXT,
+    maghrib TEXT,
+    isha TEXT,
+    synced_at INTEGER NOT NULL DEFAULT 0,
+    PRIMARY KEY (zone, date_key)
+  )`
 ];

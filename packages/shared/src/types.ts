@@ -42,6 +42,13 @@ export interface PrayerSettings {
   jemaahDurationMinutes: number;
   afterIqamah: 'jemaah' | 'black';
   iqamah: Record<PrayerKey, string>;
+  /**
+   * Suntingan manual waktu solat per tarikh (kunci YYYY-MM-DD). Nilai HH:MM
+   * MENANG ke atas sumber JAKIM/kiraan tempatan — untuk pembetulan manual
+   * bila waktu rasmi tidak tepat. Kunci masa = kunci payload paparan
+   * (imsak/fajr/sunrise/dhuhr/asr/maghrib/isha).
+   */
+  overrides?: Record<string, Partial<Record<'imsak' | (typeof PRAYER_KEYS)[number], string>>>;
 }
 
 export type Language = 'ms' | 'en';

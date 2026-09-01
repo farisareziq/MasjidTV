@@ -8,7 +8,7 @@
 import Fastify, { type FastifyInstance } from 'fastify';
 import fs from 'node:fs';
 import path from 'node:path';
-import { UPLOAD_TYPES } from '@masjidtv/shared';
+import { UPLOAD_TYPES, setJakimCacheAdapter } from '@masjidtv/shared';
 import { createCloudClient, applySchema } from '@masjidtv/db';
 import { CloudStore } from './store.js';
 import { bumpRev, registerSse } from './sse.js';
@@ -37,6 +37,13 @@ export async function createCloudApp(opts?: { staticDir?: string }): Promise<Fas
   );
   await applySchema(db);
   const store = new CloudStore(db.db);
+  // Cache luar talia JAKIM (jadual global jakim_times di Turso): carian DB
+  // dahulu → rangkaian sebagai fallback; hasil rangkaian disimpan balik.
+  // Paparan kekal berkhidmat bila e-solat.gov.my perlahan/tidak boleh capai.
+  setJakimCacheAdapter({
+    get: (zone, dateKey) => store.getJakimEntry(zone, dateKey),
+    put: (zone, entries) => store.putJakimEntries(zone, entries)
+  });
   // seedSuperuser does a DB round-trip on every cold start. After the first
   // deploy, the superuser row persists in Turso — set MASJIDTV_SKIP_SEED=1
   // in Vercel env vars to skip this check and shave ~1 DB round-trip per cold
@@ -64,6 +71,7 @@ export async function createCloudApp(opts?: { staticDir?: string }): Promise<Fas
   purgeTimer.unref?.();
 
   app.addHook('onClose', async () => {
+    setJakimCacheAdapter(null);
     await db.close();
   });
 

@@ -205,6 +205,20 @@ export async function getDay(dateKey: string, settings: Settings): Promise<Praye
       zone: null
     };
   }
+  // Suntingan manual admin (prayer.overrides) — MENANG ke atas JAKIM mahupun
+  // kiraan tempatan. Kunci = kunci payload paparan (imsak/fajr/sunrise/...).
+  // Dikenakan di peringkat ini supaya suntingan berfungsi sama ada sumber
+  // 'jakim' atau 'local', dan serta-merta selepas disimpan (settings dibaca
+  // semula setiap panggilan — tiada cache untuk dibatalkan).
+  const overrides = settings.prayer.overrides?.[dateKey];
+  if (overrides) {
+    const validKeys = new Set<string>(['imsak', ...PRAYER_KEYS]);
+    for (const [key, hhmm] of Object.entries(overrides)) {
+      if (!validKeys.has(key) || typeof hhmm !== 'string' || !/^([01]\d|2[0-3]):[0-5]\d$/.test(hhmm)) continue;
+      const dt = zonedDateTime(dateKey, hhmm, tz);
+      if (!Number.isNaN(dt.getTime())) day.times[key] = dt;
+    }
+  }
   // Pastikan hijri sentiasa ada: guna JAKIM jika ada, selain itu fallback
   // tabular (dengan pelarasan pentadbir) supaya paparan tidak rosak.
   if (!day.hijri) {

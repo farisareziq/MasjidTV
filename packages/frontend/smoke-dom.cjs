@@ -41,6 +41,14 @@ function domStub() {
   };
   const Audio = class { constructor() { this.paused = true; this.ended = false; this.muted = false; this.readyState = 0; } play() { return Promise.resolve(); } load() {} addEventListener() {} removeEventListener() {} };
   const fetchMock = async (url) => {
+    // Paparan kini mengundi endpoint gabungan /api/sync (settings + today +
+    // slides dalam satu respons). Laluan lama dikekalkan sebagai fallback
+    // stub untuk sebarang panggilan tinggalan.
+    if (url.includes('/api/sync')) return { ok: true, status: 200, json: async () => ({
+      settings: { mosque: { name: 'Masjid Uji', tagline: '', address: '', logo: '' }, prayer: { timezone: 'Asia/Kuala_Lumpur', method: 'KARACHI', source: 'jakim', zone: 'WLY01', iqamah: {} }, display: { language: 'ms', theme: 'dark', clockFormat: '24h', showSeconds: true, slideshowInterval: 12, showTicker: true, tickerSpeed: 'normal', safeMargin: 2, mediaFit: 'stretch', colors: {}, testMode: {} }, audio: { enabled: false }, weather: {}, streams: [], events: [], roster: {} },
+      today: { now: new Date().toISOString(), today: '2026-08-16', timeZone: 'Asia/Kuala_Lumpur', source: 'local', hijri: null, zone: null, prayers: { fajr: { time: '05:58', ms: Date.now() + 3600000 }, dhuhr: { time: '13:15', ms: Date.now() + 8 * 3600000 }, asr: { time: '16:30', ms: Date.now() + 11 * 3600000 }, maghrib: { time: '19:25', ms: Date.now() + 14 * 3600000 }, isha: { time: '20:40', ms: Date.now() + 15 * 3600000 } }, iqamah: {}, next: null },
+      slides: { announcements: [], builtin: [] }
+    }) };
     if (url.includes('/api/settings')) return { ok: true, status: 200, json: async () => ({ mosque: { name: 'Masjid Uji', tagline: '', address: '', logo: '' }, prayer: { timezone: 'Asia/Kuala_Lumpur', method: 'KARACHI', source: 'jakim', zone: 'WLY01', iqamah: {} }, display: { language: 'ms', theme: 'dark', clockFormat: '24h', showSeconds: true, slideshowInterval: 12, showTicker: true, tickerSpeed: 'normal', safeMargin: 2, mediaFit: 'stretch', colors: {}, testMode: {} }, audio: { enabled: false }, weather: {}, streams: [], events: [], roster: {} }) };
     if (url.includes('/api/today')) return { ok: true, status: 200, json: async () => ({ now: new Date().toISOString(), today: '2026-08-16', timeZone: 'Asia/Kuala_Lumpur', source: 'local', hijri: null, zone: null, prayers: { fajr: { time: '05:58', ms: Date.now() + 3600000 }, dhuhr: { time: '13:15', ms: Date.now() + 8 * 3600000 }, asr: { time: '16:30', ms: Date.now() + 11 * 3600000 }, maghrib: { time: '19:25', ms: Date.now() + 14 * 3600000 }, isha: { time: '20:40', ms: Date.now() + 15 * 3600000 } }, iqamah: {}, next: null }) };
     if (url.includes('/api/slides')) return { ok: true, status: 200, json: async () => ({ announcements: [], builtin: [] }) };

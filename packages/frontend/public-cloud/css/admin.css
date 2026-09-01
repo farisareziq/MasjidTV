@@ -570,6 +570,73 @@ label {
   margin-bottom: 18px;
 }
 
+/* Kad cache waktu solat JAKIM — minggu + suntingan manual per hari. */
+.jakim-bar {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  flex-wrap: wrap;
+  margin-bottom: 12px;
+}
+
+.table-wrap {
+  overflow-x: auto;
+}
+
+.jakim-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13.5px;
+}
+
+.jakim-table th,
+.jakim-table td {
+  padding: 7px 8px;
+  border-bottom: 1px solid var(--line);
+  text-align: left;
+  white-space: nowrap;
+}
+
+.jakim-table th {
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--muted, #8fa4bd);
+}
+
+.jakim-table tr.edited td {
+  background: rgba(224, 188, 106, 0.08);
+}
+
+.jakim-table .jakim-date {
+  font-weight: 600;
+}
+
+.jakim-table .jakim-hijri {
+  color: var(--muted, #8fa4bd);
+  font-size: 12.5px;
+}
+
+.jakim-table .jakim-actions {
+  display: flex;
+  gap: 6px;
+}
+
+.jakim-table input[type="time"] {
+  width: 104px;
+  padding: 4px 6px;
+}
+
+.badge-edited {
+  display: inline-block;
+  margin-left: 6px;
+  padding: 1px 7px;
+  border-radius: 999px;
+  font-size: 11px;
+  background: rgba(224, 188, 106, 0.18);
+  color: #b08a3e;
+}
+
 .form-card[hidden] {
   display: none;
 }

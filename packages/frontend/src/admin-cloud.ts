@@ -13,6 +13,8 @@
 // - tokenRotate: tukar kata laluan mengembalikan token baharu;
 // - kioskStreams: relay kamera/cermin melalui kiosk berpasangan (bukan ffmpeg
 //   pada hos awan) — nota & label status yang jujur pada kad stream.
+// - jakimCache: kad cache waktu solat luar talia + suntingan manual (zon
+//   tenant sahaja — serverless tiada proses panjang untuk semua 60 zon).
 import './admin/cloud';
 import { bootAdmin } from './admin/core';
 
@@ -28,6 +30,7 @@ bootAdmin({
     fridayKhutbah: true,
     tokenRotate: true,
     kioskStreams: true,
+    jakimCache: true,
     syncIntervalMs: 30000
   }
 });

@@ -44,6 +44,133 @@ const WEEK_CACHE = new Map<string, { dateKey: string; entries: JakimEntry[] }>()
 const WEEK_INFLIGHT = new Map<string, Promise<JakimEntry[]>>();
 let syncRunning = false;
 
+// ---------------------------------------------------------------------------
+// Cache luar talia (DB) — cermin data JAKIM dalam SQLite/Turso.
+//
+// Adapter disuntik oleh hos (server lokal / cloud) melalui setJakimCacheAdapter.
+// Susunan carian getEntryForDate: DB (L1) → cache mingguan memori (L2) →
+// rangkaian (L3, hasil disimpan balik ke DB). DB diletakkan PERTAMA supaya
+// suntingan/tulisanan segar sentiasa menang dan proses berjalan sepenuhnya
+// LUAR TALIAN bila e-solat.gov.my tidak dapat dihubungi.
+// ---------------------------------------------------------------------------
+
+export interface JakimCacheAdapter {
+  /** Baca satu hari untuk satu zon. Pulangkan null jika tiada baris cache. */
+  get(zone: string, dateKey: string): Promise<JakimEntry | null> | JakimEntry | null;
+  /** Upsert sekumpulan hari untuk satu zon (ON CONFLICT overwrite). */
+  put(zone: string, entries: JakimEntry[]): Promise<void> | void;
+}
+
+let cacheAdapter: JakimCacheAdapter | null = null;
+
+/** Suntik adapter cache DB (dipanggil sekali oleh hos semasa boot). */
+export function setJakimCacheAdapter(adapter: JakimCacheAdapter | null): void {
+  cacheAdapter = adapter;
+}
+
+/** Adapter semasa (ujian/diagnostik). */
+export function getJakimCacheAdapter(): JakimCacheAdapter | null {
+  return cacheAdapter;
+}
+
+async function cachePut(zone: string, entries: JakimEntry[]): Promise<void> {
+  if (!cacheAdapter || !entries.length) return;
+  try {
+    await cacheAdapter.put(zone, entries);
+  } catch {
+    /* kegagalan tulis cache tidak boleh menggagalkan paparan */
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Penukaran baris DB (jakim_times) ↔ JakimEntry — dikongsi oleh store lokal
+// (better-sqlite3) dan cloud (libsql). Baris ialah objek biasa snake_case.
+// ---------------------------------------------------------------------------
+
+export interface JakimTimeRow {
+  zone: string;
+  date_key: string;
+  hijri: string;
+  imsak: string | null;
+  fajr: string | null;
+  syuruk: string | null;
+  dhuha: string | null;
+  dhuhr: string | null;
+  asr: string | null;
+  maghrib: string | null;
+  isha: string | null;
+}
+
+const HHMM5 = (s: unknown): string | null =>
+  (typeof s === 'string' && /^\d{2}:\d{2}$/.test(s)) ? s : null;
+
+/** Baris jakim_times → JakimEntry (null jika date_key tidak sah). */
+export function jakimRowToEntry(row: JakimTimeRow): JakimEntry | null {
+  const dateKey = String(row.date_key || '');
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(dateKey)) return null;
+  let hijri: HijriDate | null = null;
+  try {
+    const h = JSON.parse(row.hijri || 'null') as HijriDate | null;
+    if (h && typeof h.year === 'number' && typeof h.month === 'number' && typeof h.day === 'number') hijri = h;
+  } catch {
+    /* hijri rosak → null (fallback tabular di prayers.ts) */
+  }
+  return {
+    dateKey,
+    hijri,
+    day: '',
+    times: {
+      imsak: HHMM5(row.imsak),
+      fajr: HHMM5(row.fajr),
+      syuruk: HHMM5(row.syuruk),
+      dhuha: HHMM5(row.dhuha),
+      dhuhr: HHMM5(row.dhuhr),
+      asr: HHMM5(row.asr),
+      maghrib: HHMM5(row.maghrib),
+      isha: HHMM5(row.isha)
+    }
+  };
+}
+
+/** JakimEntry → parameter baris untuk upsert jakim_times. */
+export function jakimEntryToRow(zone: string, entry: JakimEntry): JakimTimeRow {
+  return {
+    zone,
+    date_key: entry.dateKey,
+    hijri: entry.hijri ? JSON.stringify(entry.hijri) : '',
+    imsak: entry.times.imsak,
+    fajr: entry.times.fajr,
+    syuruk: entry.times.syuruk,
+    dhuha: entry.times.dhuha,
+    dhuhr: entry.times.dhuhr,
+    asr: entry.times.asr,
+    maghrib: entry.times.maghrib,
+    isha: entry.times.isha
+  };
+}
+
+/**
+ * Rancangan sync tahunan satu zon: julat tarikh yang perlu ditarik bagi tahun
+// semasa (JAKIM hanya menerbitkan data tahun semasa). Digunakan oleh servis
+ * sync lokal (semua zon) dan laluan admin cloud (zon tenant).
+ */
+export interface JakimZoneSyncPlan {
+  from: string;
+  to: string;
+  /** true = zon sudah lengkap hingga 31 Dis — tiada yang perlu ditarik. */
+  complete: boolean;
+}
+
+export function planZoneYearSync(maxDate: string | null, force: boolean, todayKey: string): JakimZoneSyncPlan {
+  const year = Number(todayKey.slice(0, 4));
+  const yearStart = `${year}-01-01`;
+  const yearEnd = `${year}-12-31`;
+  let from = yearStart;
+  if (!force && maxDate && maxDate >= yearStart) from = addDays(maxDate, 1);
+  if (from > yearEnd) return { from: yearEnd, to: yearEnd, complete: true };
+  return { from, to: yearEnd, complete: false };
+}
+
 async function apiFetch(
   zone: string,
   period: string,
@@ -126,6 +253,9 @@ async function getWeekEntries(zone: string): Promise<JakimEntry[]> {
     .then((json) => {
       const entries = (json.prayerTime || []).map((e) => parseEntry(e as Record<string, unknown>)).filter((e): e is JakimEntry => e !== null);
       WEEK_CACHE.set(zone, { dateKey: parts, entries });
+      // Simpan minggu penuh ke cache DB — selepas ini hari-hari dalam minggu
+      // berkhidmat sepenuhnya luar talian (L1 kena sebelum rangkaian).
+      void cachePut(zone, entries);
       return entries;
     })
     .finally(() => {
@@ -136,17 +266,28 @@ async function getWeekEntries(zone: string): Promise<JakimEntry[]> {
 }
 
 export async function getEntryForDate(zone: string, dateKey: string): Promise<JakimEntry | null> {
+  // L1: cache DB (luar talia) — baris sedia ada dipulangkan tanpa rangkaian.
+  if (cacheAdapter) {
+    try {
+      const hit = await cacheAdapter.get(zone, dateKey);
+      if (hit) return hit;
+    } catch {
+      /* kegagalan baca cache → jatuh ke L2/L3 */
+    }
+  }
+  // L2: cache mingguan memori.
   const entries = await getWeekEntries(zone);
   const found = entries.find((e) => e.dateKey === dateKey) ?? null;
   if (found) return found;
-  // period=week hanya memulangkan minggu semasa (Ahad–Sabtu). Pada Sabtu,
+  // L3: period=week hanya memulangkan minggu semasa (Ahad–Sabtu). Pada Sabtu,
   // "esok" (Ahad) tiada dalam cache — dapatkan hari tunggal melalui permintaan
   // duration supaya fallback tidak merosot kepada pengiraan tempatan secara
   // senyap (mismatch minit vs JAKIM).
   try {
     const json = await apiFetch(zone, 'duration', { start: dateKey, end: dateKey });
-    const day = (json.prayerTime || []).map((e) => parseEntry(e as Record<string, unknown>)).find((e): e is JakimEntry => e !== null && e.dateKey === dateKey);
-    return day || null;
+    const day = (json.prayerTime || []).map((e) => parseEntry(e as Record<string, unknown>)).find((e): e is JakimEntry => e !== null && e.dateKey === dateKey) || null;
+    if (day) void cachePut(zone, [day]);
+    return day;
   } catch {
     return null;
   }
@@ -161,14 +302,21 @@ export function addDays(dateKey: string, days: number): string {
   return `${y}-${m}-${dd}`;
 }
 
-async function fetchRange(zone: string, startKey: string, endKey: string): Promise<JakimEntry[]> {
+/**
+ * Tarik julat tarikh dari JAKIM (chunk 140 hari setiap permintaan) dan simpan
+ * setiap chunk ke cache DB. Digunakan oleh sync acara Islam, sync tahunan
+ * pelayan lokal (semua zon), dan butang "Sync" admin.
+ */
+export async function fetchJakimRange(zone: string, startKey: string, endKey: string): Promise<JakimEntry[]> {
   const all: JakimEntry[] = [];
   let cursor = startKey;
   while (cursor <= endKey) {
     const chunkEnd = addDays(cursor, 139);
     const end = chunkEnd < endKey ? chunkEnd : endKey;
     const json = await apiFetch(zone, 'duration', { start: cursor, end });
-    all.push(...(json.prayerTime || []).map((e) => parseEntry(e as Record<string, unknown>)).filter((e): e is JakimEntry => e !== null));
+    const chunk = (json.prayerTime || []).map((e) => parseEntry(e as Record<string, unknown>)).filter((e): e is JakimEntry => e !== null);
+    all.push(...chunk);
+    await cachePut(zone, chunk);
     if (end === endKey) break;
     cursor = addDays(end, 1);
   }
@@ -255,7 +403,7 @@ export async function syncEventsFor(
     const startKey = addDays(localParts, -15);
     // JAKIM hanya menerbitkan data sehingga akhir tahun semasa.
     const endKey = `${localParts.slice(0, 4)}-12-31`;
-    const entries = await fetchRange(zone, startKey, endKey);
+    const entries = await fetchJakimRange(zone, startKey, endKey);
 
     const byHijri = new Map<string, string>();
     for (const e of entries) {

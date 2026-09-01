@@ -5,16 +5,17 @@ import fs from 'node:fs';
 import path from 'node:path';
 import Fastify, { type FastifyInstance, type FastifyRequest, type FastifyReply } from 'fastify';
 import {
-  METHODS, getZonesGrouped, buildEventsPayload, syncEventsFor, dateKeyInZone,
+  METHODS, getZonesGrouped, getZone, buildEventsPayload, syncEventsFor, dateKeyInZone,
   resolveQuranAnnouncements, resolveDoaAnnouncements, content as builtinContent,
   UPLOAD_TYPES,
   publicSettings as buildPublicSettings, publicStream, buildTodayPayload,
-  isAnnouncementActive,
-  type Settings, type Stream
+  isAnnouncementActive, setJakimCacheAdapter, addDays, hijriText,
+  type Settings, type Stream, type JakimEntry
 } from '@masjidtv/shared';
 import { Store } from './store.js';
 import { AnnouncementService } from './announcements.js';
 import { StreamManager } from './streams.js';
+import { JakimSyncService } from './jakim-sync.js';
 import { cloudSyncEnabled, handleCloudSync, cloudPageRedirect, startCloudSseBridge, addLocalSseRoute, setOnCloudSettings } from './cloudsync.js';
 import { applyPairing, PAIR_PAGE_HTML_SRC } from './pair.js';
 import { ensureFfmpeg } from './ensure-ffmpeg.js';
@@ -68,6 +69,18 @@ export async function buildApp(opts: AppOptions): Promise<FastifyInstance> {
     () => store.getSettings().streams,
     () => store.getSettings().media.ffmpegPath
   );
+  // Cache luar talia JAKIM: carian DB dahulu (L1) → memori → rangkaian; hasil
+  // rangkaian disimpan balik ke DB. Waktu solat terus berkhidmat bila
+  // e-solat.gov.my tidak dapat dihubungi.
+  setJakimCacheAdapter({
+    get: (zone, dateKey) => store.getJakimEntry(zone, dateKey),
+    put: (zone, entries) => store.putJakimEntries(zone, entries)
+  });
+  // Sync latar belakang: tahun penuh × 60 zon (incremental harian).
+  const jakimSync = new JakimSyncService(store, {
+    isCloudPaired: () => cloudSyncEnabled(opts.dataDir)
+  });
+  jakimSync.start();
 
   // Had badan global kecil: auth berjalan SELEPAS badan dihurai, jadi had
   // besar global membenarkan sesiapa sahaja di LAN memaksa buffer 150MB
@@ -89,6 +102,8 @@ export async function buildApp(opts: AppOptions): Promise<FastifyInstance> {
     // Hentikan relay ffmpeg supaya tiada proses encoder yatim selepas tutup.
     streams.stopAll();
     store.close();
+    // Lepaskan adapter cache (ujian boleh buka app berturut dalam satu proses).
+    setJakimCacheAdapter(null);
   });
 
   // Accept raw media bodies for the upload endpoint (magic-byte validated).
@@ -399,6 +414,92 @@ export async function buildApp(opts: AppOptions): Promise<FastifyInstance> {
     reply.send(result);
   });
 
+  // --- Cache waktu solat JAKIM (luar talia + suntingan manual) ---------------
+  //
+  // GET  /api/admin/jakim-times  → minggu (7 hari lalai) untuk zon semasa:
+  //        hari cache + suntingan manual digabung + status sync + liputan.
+  // POST /api/admin/jakim-sync   → tarik data JAKIM ({zone} | {all:true}).
+  //        Zon tunggal: di-await (≤3 permintaan, ~2-10sa). Semua zon:
+  //        latar belakang (60 zon × ~3 permintaan — terlalu lama untuk 1 req).
+
+  app.get('/api/admin/jakim-times', { preHandler: requireAuth }, async (req, reply) => {
+    const q = (req.query || {}) as { zone?: string; from?: string; to?: string };
+    const s = settings();
+    const zone = (typeof q.zone === 'string' && getZone(q.zone)) ? q.zone : s.prayer.zone;
+    const today = dateKeyInZone(new Date(), tz());
+    const from = typeof q.from === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(q.from) ? q.from : today;
+    const maxTo = addDays(from, 30); // had 31 hari — elak muat beribu baris
+    let to = typeof q.to === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(q.to) ? q.to : addDays(from, 6);
+    if (to > maxTo) to = maxTo;
+    if (to < from) to = from;
+
+    const entries = new Map(store.getJakimRange(zone, from, to).map((e) => [e.dateKey, e]));
+    const overrides = s.prayer.overrides || {};
+    const days: unknown[] = [];
+    for (let cursor = from; cursor <= to; cursor = addDays(cursor, 1)) {
+      const entry = entries.get(cursor) as (JakimEntry & { times: Record<string, string | null> }) | undefined;
+      const dayOverride = overrides[cursor];
+      const overridden = !!dayOverride && Object.keys(dayOverride).length > 0;
+      // times = cache MENTAH (tanpa suntingan) — diff suntingan di klien.
+      // effective = nilai sebenar paparan (cache + suntingan digabung);
+      // wujud walaupun tanpa cache jika ada suntingan (boleh disunting/dibuang).
+      const times: Record<string, string | null> | null = entry ? { ...entry.times } : null;
+      let effective: Record<string, string | null> | null = times ? { ...times } : null;
+      if (dayOverride) {
+        if (!effective) effective = {};
+        if (dayOverride.imsak) effective.imsak = dayOverride.imsak;
+        if (dayOverride.fajr) effective.fajr = dayOverride.fajr;
+        if (dayOverride.sunrise) effective.syuruk = dayOverride.sunrise;
+        if (dayOverride.dhuhr) effective.dhuhr = dayOverride.dhuhr;
+        if (dayOverride.asr) effective.asr = dayOverride.asr;
+        if (dayOverride.maghrib) effective.maghrib = dayOverride.maghrib;
+        if (dayOverride.isha) effective.isha = dayOverride.isha;
+      }
+      days.push({
+        dateKey: cursor,
+        hijri: entry?.hijri ? hijriText(entry.hijri) : null,
+        times,
+        effective,
+        overrides: dayOverride || null,
+        overridden
+      });
+    }
+
+    const year = Number(today.slice(0, 4));
+    const coverageRows = store.getJakimCoverage();
+    reply.send({
+      zone,
+      from,
+      to,
+      days,
+      sync: jakimSync.getStatus(),
+      coverage: {
+        totalZones: 60,
+        zonesCached: coverageRows.length,
+        zonesFullYear: coverageRows.filter((r) => r.maxDate && r.maxDate >= `${year}-12-31`).length
+      }
+    });
+  });
+
+  app.post('/api/admin/jakim-sync', { preHandler: requireAuth }, async (req, reply) => {
+    const body = (req.body || {}) as { zone?: string; all?: boolean; force?: boolean };
+    if (body.all === true) {
+      if (jakimSync.getStatus().running) {
+        return reply.send({ started: false, sync: jakimSync.getStatus() });
+      }
+      // Latar belakang — 60 zon mengambil masa beberapa minit.
+      jakimSync.runAll(body.force === true).catch((err) => {
+        console.error('[jakim] sync semua zon gagal:', err instanceof Error ? err.message : err);
+      });
+      return reply.send({ started: true, sync: jakimSync.getStatus() });
+    }
+    const zone = (typeof body.zone === 'string' && getZone(body.zone))
+      ? body.zone
+      : settings().prayer.zone;
+    const sync = await jakimSync.runAll(body.force === true, zone);
+    reply.send({ started: false, done: true, sync });
+  });
+
   app.get('/api/admin/settings', { preHandler: requireAuth }, async (_req, reply) => {
     reply.send(settings());
   });
@@ -417,6 +518,11 @@ export async function buildApp(opts: AppOptions): Promise<FastifyInstance> {
           store.updateSettings(patch as Record<string, unknown>);
           return Promise.resolve();
         }, false).catch(() => {});
+      }
+      if (before !== after) {
+        // Zon baharu — panaskan cache JAKIM untuk zon itu serta-merta (latar
+        // belakang; tidak menyekat respons).
+        jakimSync.runAll(false, after).catch(() => {});
       }
       reply.send(updated);
     } catch (err) {

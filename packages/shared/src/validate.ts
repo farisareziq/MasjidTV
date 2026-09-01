@@ -2,6 +2,7 @@
 
 import crypto from 'node:crypto';
 import { METHODS } from './prayers.js';
+import { PRAYER_KEYS } from './types.js';
 import type { Settings, StreamType, Weekday } from './types.js';
 
 const WEEKDAYS: Weekday[] = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
@@ -243,6 +244,34 @@ export function applyPatch(current: Settings, patch: AnyPatch): Settings {
         else if (/^([01]\d|2[0-3]):[0-5]\d$/.test(v)) pr.iqamah[key as PrayerKeyIndex] = v;
       }
     }
+    // Suntingan manual waktu solat per tarikh. Semantik patch: GABUNG per
+    // kunci masa — kunci dengan nilai null membuang suntingan kunci itu;
+    // tarikh bernilai null membuang SELURUH suntingan hari itu; tarikh tiada
+    // dalam patch tidak disentuh. Panel suntingan menghantar HANYA kunci
+    // yang berubah (diff vs cache) tanpa memadam suntingan kunci lain.
+    if (p.overrides && typeof p.overrides === 'object') {
+      const VALID_KEYS = new Set(['imsak', ...PRAYER_KEYS]);
+      const merged: NonNullable<Settings['prayer']['overrides']> = { ...(pr.overrides || {}) };
+      const src = p.overrides as Record<string, unknown>;
+      for (const [dk, times] of Object.entries(src)) {
+        if (!/^\d{4}-\d{2}-\d{2}$/.test(dk)) continue;
+        if (times === null) { delete merged[dk]; continue; }
+        if (!times || typeof times !== 'object') continue;
+        const day: Record<string, string> = { ...(merged[dk] || {}) };
+        for (const [tk, tv] of Object.entries(times as Record<string, unknown>)) {
+          if (!VALID_KEYS.has(tk)) continue;
+          if (tv === null || tv === '') { delete day[tk]; continue; }
+          if (typeof tv === 'string' && /^([01]\d|2[0-3]):[0-5]\d$/.test(tv)) day[tk] = tv;
+        }
+        if (Object.keys(day).length) merged[dk] = day;
+        else delete merged[dk];
+      }
+      // Had atas: simpan suntingan terkini sahaja (elak peta membesar tanpa
+      // had jika admin menyunting tarikh baharu setiap hari bertahun-tahun).
+      const keys = Object.keys(merged).sort();
+      while (keys.length > 400) delete merged[keys.shift() as string];
+      pr.overrides = merged;
+    }
   }
 
   if (patch.display && typeof patch.display === 'object') {
@@ -386,7 +415,8 @@ export const DEFAULT_SETTINGS: Settings = {
     showImsak: true, imsakOffset: 10, showSunrise: true,
     azanLeadMinutes: 5, iqamahOffsetMinutes: 10, jemaahDurationMinutes: 15,
     afterIqamah: 'jemaah',
-    iqamah: { fajr: '', dhuhr: '', asr: '', maghrib: '', isha: '' }
+    iqamah: { fajr: '', dhuhr: '', asr: '', maghrib: '', isha: '' },
+    overrides: {}
   },
   display: {
     language: 'ms', theme: 'dark', headingFont: 'sans', slideshowInterval: 12,

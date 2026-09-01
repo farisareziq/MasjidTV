@@ -380,6 +380,9 @@ function populateSettings(s: Partial<Settings> & Record<string, any>) {
   // (tiada ffmpeg pada hos awan); lokal kekal ayat "ffmpeg pada mesin ini".
   if (F.kioskStreams()) $('streamsSub').textContent = t('streamsSubCloud');
   renderFfmpegStatus();
+  // Kad cache JAKIM: muat minggu zon semasa (throttle 30sa + guard suntingan
+  // dalam loadJakimWeek — borang suntingan tidak ditimpa).
+  if (F.jakimCache()) void loadJakimWeek();
   settingsDirty = false; // isian programatik bukan suntingan pengguna
 }
 
@@ -690,6 +693,213 @@ function collectRoster(): Record<string, { imam: string; bilal: string }> {
     roster[day] = { imam: imam.value, bilal: bilal.value };
   });
   return roster;
+}
+
+// ------------------------------------------------- cache waktu solat (JAKIM)
+//
+// Kad "cache luar talia & suntingan manual": minggu semasa zon terpilih,
+// dibaca daripada GET /api/admin/jakim-times (cache DB + suntingan digabung
+// di pelayan). Suntingan disimpan melalui PUT /api/admin/settings biasa
+// (patch prayer.overrides per-tarikh) — menunggang validasi + SSE + saluran
+// tetapan sedia ada; paparan nampak perubahan dalam kitaran poll seterusnya.
+
+interface JakimDay {
+  dateKey: string;
+  hijri: string | null;
+  /** Cache MENTAH (tanpa suntingan) — asas diff untuk simpan. */
+  times: Record<string, string | null> | null;
+  /** Nilai sebenar paparan (cache + suntingan digabung). */
+  effective: Record<string, string | null> | null;
+  overrides: Record<string, string> | null;
+  overridden: boolean;
+}
+
+interface JakimTimesResponse {
+  zone: string;
+  days: JakimDay[];
+  coverage: { totalZones: number; zonesCached: number; zonesFullYear: number };
+  sync?: { running: boolean; zonesDone: number; zonesTotal: number };
+}
+
+// Kunci lajur jadual → kunci suntingan (payload). Syuruk dipapar tetapi
+// disimpan sebagai 'sunrise' (nama kunci payload paparan).
+const JAKIM_COLS: [string, string][] = [
+  ['imsak', 'imsak'],
+  ['fajr', 'fajr'],
+  ['syuruk', 'sunrise'],
+  ['dhuhr', 'dhuhr'],
+  ['asr', 'asr'],
+  ['maghrib', 'maghrib'],
+  ['isha', 'isha']
+];
+
+let jakimEditingDate: string | null = null;
+let jakimLastFetch = { zone: '', at: 0 };
+let jakimSyncPolls = 0;
+
+function jakimFmtDate(dateKey: string): string {
+  const d = new Date(`${dateKey}T00:00:00`);
+  return d.toLocaleDateString(undefined, { weekday: 'short', day: 'numeric', month: 'short' });
+}
+
+async function loadJakimWeek(force = false): Promise<void> {
+  if (!F.jakimCache()) return;
+  if (jakimEditingDate && !force) return; // jangan timpa borang suntingan
+  const zone = String($('stZone').value || '');
+  if (!zone || !state.token) return;
+  const now = Date.now();
+  if (!force && jakimLastFetch.zone === zone && now - jakimLastFetch.at < 30_000) return;
+  jakimLastFetch = { zone, at: now };
+  try {
+    const data = await api<JakimTimesResponse>(`/api/admin/jakim-times?zone=${encodeURIComponent(zone)}`);
+    renderJakimTable(data);
+  } catch {
+    /* kekal data lama — ralat dipaparkan pada percubaan seterusnya */
+  }
+}
+
+function renderJakimTable(data: JakimTimesResponse): void {
+  const cov = $('jakimCoverage');
+  if (cov) {
+    cov.textContent = t('jakimCoverage', { n: data.coverage.zonesCached, total: data.coverage.totalZones })
+      + (data.sync?.running ? ` — ${t('jakimSyncRunning')} ${data.sync.zonesDone}/${data.sync.zonesTotal}` : '');
+  }
+  const body = $('jakimBody');
+  if (!body) return;
+  body.innerHTML = data.days.map((day) => {
+    const editing = jakimEditingDate === day.dateKey;
+    const cells = JAKIM_COLS.map(([label, key]) => {
+      const v = day.effective ? (day.effective[label] ?? '') : '';
+      if (editing) {
+        // data-raw = nilai cache mentah — asas diff semasa simpan (kunci yang
+        // nilainya kembali menyamai cache dibuang suntingannya).
+        const raw = day.times ? (day.times[label] ?? '') : '';
+        return `<td><input type="time" class="jakim-input" data-jkey="${key}" data-raw="${raw}" value="${v}"></td>`;
+      }
+      return `<td>${v || '—'}</td>`;
+    }).join('');
+    const badge = day.overridden ? ` <span class="badge-edited">${t('jakimOverridden')}</span>` : '';
+    let actions: string;
+    if (editing) {
+      actions = `<button class="btn sm" data-jact="save" data-date="${day.dateKey}">${t('jakimSave')}</button>`
+        + `<button class="btn sm ghost" data-jact="cancel" data-date="${day.dateKey}">${t('jakimCancel')}</button>`;
+    } else if (day.times || day.overridden) {
+      // Boleh disunting bila ada cache ATAU suntingan sedia ada (suntingan
+      // pada hari tanpa cache masih boleh dilihat/dibuang).
+      actions = `<button class="btn sm" data-jact="edit" data-date="${day.dateKey}">${t('jakimEdit')}</button>`
+        + (day.overridden ? `<button class="btn sm ghost" data-jact="reset" data-date="${day.dateKey}">${t('jakimReset')}</button>` : '');
+    } else {
+      actions = `<span class="sub">${t('jakimNoCache')}</span>`;
+    }
+    return `<tr class="${day.overridden ? 'edited' : ''}">
+      <td class="jakim-date">${jakimFmtDate(day.dateKey)}${badge}</td>
+      <td class="jakim-hijri">${day.hijri || ''}</td>
+      ${cells}
+      <td class="jakim-actions">${actions}</td>
+    </tr>`;
+  }).join('');
+}
+
+async function saveJakimOverride(dateKey: string): Promise<void> {
+  // Diff vs cache mentah: hanya kunci yang BERBEZA menjadi suntingan; kunci
+  // yang dikosongkan/dikembalikan kepada nilai cache dibuang suntingannya
+  // (null). Ini memastikan suntingan tidak "mengunci" waktu yang admin tidak
+  // sentuh apabila cache JAKIM dikemas kini kemudian.
+  const times: Record<string, string | null> = {};
+  let changed = 0;
+  const inputs = Array.from(document.querySelectorAll<HTMLInputElement>('#jakimBody input[data-jkey]'));
+  for (const input of inputs) {
+    const raw = input.dataset.raw || '';
+    const v = input.value;
+    if (v && v !== raw) { times[input.dataset.jkey!] = v; changed++; }
+    else times[input.dataset.jkey!] = null; // buang / jangan sunting kunci ini
+  }
+  jakimEditingDate = null;
+  try {
+    const updated = await api<Settings>('/api/admin/settings', {
+      method: 'PUT',
+      body: { prayer: { overrides: { [dateKey]: changed ? times : null } } }
+    });
+    state.settings = updated;
+    populateSettings(updated);
+    toast(t('jakimSaved'));
+    void loadJakimWeek(true);
+  } catch (err) {
+    toast((err as Error).message, 'err');
+    void loadJakimWeek(true);
+  }
+}
+
+async function resetJakimOverride(dateKey: string): Promise<void> {
+  try {
+    const updated = await api<Settings>('/api/admin/settings', {
+      method: 'PUT',
+      body: { prayer: { overrides: { [dateKey]: null } } }
+    });
+    state.settings = updated;
+    populateSettings(updated);
+    toast(t('jakimResetDone'));
+    void loadJakimWeek(true);
+  } catch (err) {
+    toast((err as Error).message, 'err');
+  }
+}
+
+async function jakimSync(zone: string, all = false): Promise<void> {
+  const btn = all ? $('jakimSyncAllBtn') : $('jakimSyncZoneBtn');
+  const btnEl = btn as unknown as HTMLButtonElement | undefined;
+  if (btnEl) btnEl.disabled = true;
+  try {
+    const res = await api<{ started?: boolean; done?: boolean; complete?: boolean; synced?: number }>('/api/admin/jakim-sync', {
+      method: 'POST',
+      body: all ? { all: true } : { zone }
+    });
+    if (all && res.started) {
+      toast(t('jakimSyncRunning'));
+      // Poll liputan setiap 5sa × 12 (~1 min) semasa sync latar belakang.
+      jakimSyncPolls = 12;
+      const poll = setInterval(() => {
+        void loadJakimWeek(true);
+        if (--jakimSyncPolls <= 0) clearInterval(poll);
+      }, 5000);
+    } else {
+      toast(t('settingsSaved'));
+    }
+    void loadJakimWeek(true);
+  } catch (err) {
+    toast((err as Error).message, 'err');
+  } finally {
+    if (btnEl) btnEl.disabled = false;
+  }
+}
+
+function wireJakimPanel(): void {
+  if (!F.jakimCache()) return;
+  const card = $('jakimCacheCard');
+  if (card) card.hidden = false;
+  const allBtn = $('jakimSyncAllBtn');
+  if (allBtn) allBtn.hidden = !F.jakimSyncAll();
+  $('jakimBody').addEventListener('click', (e) => {
+    const btn = (e.target as HTMLElement).closest('button[data-jact]') as HTMLElement | null;
+    if (!btn) return;
+    const date = btn.dataset.date!;
+    const act = btn.dataset.jact!;
+    if (act === 'edit') {
+      jakimEditingDate = date;
+      void loadJakimWeek(true);
+    } else if (act === 'cancel') {
+      jakimEditingDate = null;
+      void loadJakimWeek(true);
+    } else if (act === 'save') {
+      void saveJakimOverride(date);
+    } else if (act === 'reset') {
+      void resetJakimOverride(date);
+    }
+  });
+  $('jakimSyncZoneBtn').addEventListener('click', () => { void jakimSync(String($('stZone').value || '')); });
+  if (allBtn) allBtn.addEventListener('click', () => { void jakimSync(String($('stZone').value || ''), true); });
+  // Pertukaran zon → muat semula jadual untuk zon baharu.
+  $('stZone').addEventListener('change', () => { void loadJakimWeek(true); });
 }
 
 // ------------------------------------------------------------- save sections
@@ -1465,6 +1675,9 @@ export function bootAdmin(config: AdminVariantConfig): void {
   });
 
   setInterval(syncAdminData, F.syncIntervalMs());
+
+  // Kad cache waktu solat JAKIM (ciri varian) — pendengar sekali sahaja.
+  wireJakimPanel();
 
   if (state.token) {
     loadApp().then(() => resetIdleTimer()).catch(() => showLogin());

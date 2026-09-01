@@ -48,6 +48,8 @@
     fridayKhutbah: () => !!cfg.features.fridayKhutbah,
     tokenRotate: () => !!cfg.features.tokenRotate,
     kioskStreams: () => !!cfg.features.kioskStreams,
+    jakimCache: () => !!cfg.features.jakimCache,
+    jakimSyncAll: () => !!cfg.features.jakimSyncAll,
     syncIntervalMs: () => typeof cfg.features.syncIntervalMs === "number" && cfg.features.syncIntervalMs > 0 ? cfg.features.syncIntervalMs : 1e4
   };
   var featureHooks = {};
@@ -279,7 +281,23 @@
       asr: "Asr",
       maghrib: "Maghrib",
       isha: "Isha",
+      imsak: "Imsak",
+      hijriShort: "Hijri",
       savePrayer: "Save prayer settings",
+      jakimCacheTitle: "Offline prayer times cache & manual edit",
+      jakimCacheSub: "Prayer times are cached offline in the database \u2014 the display keeps working even without internet. If an official time is inaccurate, edit that day manually: your edit overrides the official time on the screen immediately.",
+      jakimSyncZone: "Sync this zone",
+      jakimSyncAll: "Sync all 60 zones (background)",
+      jakimSyncRunning: "Syncing\u2026",
+      jakimCoverage: "{n} of {total} zones cached offline",
+      jakimEdit: "Edit",
+      jakimSave: "Save",
+      jakimCancel: "Cancel",
+      jakimReset: "Reset",
+      jakimOverridden: "edited",
+      jakimNoCache: "Not cached \u2014 sync this zone (display uses local calculation)",
+      jakimSaved: "Manual prayer time saved",
+      jakimResetDone: "Manual edit removed \u2014 official time restored",
       audioSub: "The screen plays the adhan at the start of each prayer and the iqamah call at the configured iqamah time. Upload your own audio files or paste a URL.",
       audioEnabled: "Audio enabled",
       adhanAudio: "Azan audio",
@@ -649,7 +667,23 @@
       asr: "Asar",
       maghrib: "Maghrib",
       isha: "Isyak",
+      imsak: "Imsak",
+      hijriShort: "Hijri",
       savePrayer: "Simpan tetapan solat",
+      jakimCacheTitle: "Cache waktu solat luar talia & suntingan manual",
+      jakimCacheSub: "Waktu solat disimpan luar talia dalam pangkalan data \u2014 paparan terus berjalan walaupun tiada internet. Jika waktu rasmi tidak tepat, sunting hari itu secara manual: suntingan anda mengatasi waktu rasmi pada skrin serta-merta.",
+      jakimSyncZone: "Sync zon ini",
+      jakimSyncAll: "Sync semua 60 zon (latar belakang)",
+      jakimSyncRunning: "Menyinkron\u2026",
+      jakimCoverage: "{n} daripada {total} zon dicache luar talia",
+      jakimEdit: "Sunting",
+      jakimSave: "Simpan",
+      jakimCancel: "Batal",
+      jakimReset: "Set semula",
+      jakimOverridden: "disunting",
+      jakimNoCache: "Tiada cache \u2014 sync zon ini (paparan guna kiraan tempatan)",
+      jakimSaved: "Waktu solat manual disimpan",
+      jakimResetDone: "Suntingan dibuang \u2014 waktu rasmi dipulihkan",
       audioSub: "Skrin memainkan azan pada permulaan setiap solat dan panggilan iqamah pada masa iqamah yang ditetapkan. Muat naik fail audio sendiri atau tampal URL.",
       audioEnabled: "Audio diaktifkan",
       adhanAudio: "Audio azan",
@@ -1372,6 +1406,7 @@
     renderStreams();
     if (F.kioskStreams()) $("streamsSub").textContent = t("streamsSubCloud");
     renderFfmpegStatus();
+    if (F.jakimCache()) void loadJakimWeek();
     settingsDirty = false;
   }
   function setLogoPreview(url) {
@@ -1633,6 +1668,170 @@
       roster[day] = { imam: imam.value, bilal: bilal.value };
     });
     return roster;
+  }
+  var JAKIM_COLS = [
+    ["imsak", "imsak"],
+    ["fajr", "fajr"],
+    ["syuruk", "sunrise"],
+    ["dhuhr", "dhuhr"],
+    ["asr", "asr"],
+    ["maghrib", "maghrib"],
+    ["isha", "isha"]
+  ];
+  var jakimEditingDate = null;
+  var jakimLastFetch = { zone: "", at: 0 };
+  var jakimSyncPolls = 0;
+  function jakimFmtDate(dateKey) {
+    const d = /* @__PURE__ */ new Date(`${dateKey}T00:00:00`);
+    return d.toLocaleDateString(void 0, { weekday: "short", day: "numeric", month: "short" });
+  }
+  async function loadJakimWeek(force = false) {
+    if (!F.jakimCache()) return;
+    if (jakimEditingDate && !force) return;
+    const zone = String($("stZone").value || "");
+    if (!zone || !state.token) return;
+    const now = Date.now();
+    if (!force && jakimLastFetch.zone === zone && now - jakimLastFetch.at < 3e4) return;
+    jakimLastFetch = { zone, at: now };
+    try {
+      const data = await api(`/api/admin/jakim-times?zone=${encodeURIComponent(zone)}`);
+      renderJakimTable(data);
+    } catch {
+    }
+  }
+  function renderJakimTable(data) {
+    const cov = $("jakimCoverage");
+    if (cov) {
+      cov.textContent = t("jakimCoverage", { n: data.coverage.zonesCached, total: data.coverage.totalZones }) + (data.sync?.running ? ` \u2014 ${t("jakimSyncRunning")} ${data.sync.zonesDone}/${data.sync.zonesTotal}` : "");
+    }
+    const body = $("jakimBody");
+    if (!body) return;
+    body.innerHTML = data.days.map((day) => {
+      const editing = jakimEditingDate === day.dateKey;
+      const cells = JAKIM_COLS.map(([label, key]) => {
+        const v = day.effective ? day.effective[label] ?? "" : "";
+        if (editing) {
+          const raw = day.times ? day.times[label] ?? "" : "";
+          return `<td><input type="time" class="jakim-input" data-jkey="${key}" data-raw="${raw}" value="${v}"></td>`;
+        }
+        return `<td>${v || "\u2014"}</td>`;
+      }).join("");
+      const badge = day.overridden ? ` <span class="badge-edited">${t("jakimOverridden")}</span>` : "";
+      let actions;
+      if (editing) {
+        actions = `<button class="btn sm" data-jact="save" data-date="${day.dateKey}">${t("jakimSave")}</button><button class="btn sm ghost" data-jact="cancel" data-date="${day.dateKey}">${t("jakimCancel")}</button>`;
+      } else if (day.times || day.overridden) {
+        actions = `<button class="btn sm" data-jact="edit" data-date="${day.dateKey}">${t("jakimEdit")}</button>` + (day.overridden ? `<button class="btn sm ghost" data-jact="reset" data-date="${day.dateKey}">${t("jakimReset")}</button>` : "");
+      } else {
+        actions = `<span class="sub">${t("jakimNoCache")}</span>`;
+      }
+      return `<tr class="${day.overridden ? "edited" : ""}">
+      <td class="jakim-date">${jakimFmtDate(day.dateKey)}${badge}</td>
+      <td class="jakim-hijri">${day.hijri || ""}</td>
+      ${cells}
+      <td class="jakim-actions">${actions}</td>
+    </tr>`;
+    }).join("");
+  }
+  async function saveJakimOverride(dateKey) {
+    const times = {};
+    let changed = 0;
+    const inputs = Array.from(document.querySelectorAll("#jakimBody input[data-jkey]"));
+    for (const input of inputs) {
+      const raw = input.dataset.raw || "";
+      const v = input.value;
+      if (v && v !== raw) {
+        times[input.dataset.jkey] = v;
+        changed++;
+      } else times[input.dataset.jkey] = null;
+    }
+    jakimEditingDate = null;
+    try {
+      const updated = await api("/api/admin/settings", {
+        method: "PUT",
+        body: { prayer: { overrides: { [dateKey]: changed ? times : null } } }
+      });
+      state.settings = updated;
+      populateSettings(updated);
+      toast(t("jakimSaved"));
+      void loadJakimWeek(true);
+    } catch (err) {
+      toast(err.message, "err");
+      void loadJakimWeek(true);
+    }
+  }
+  async function resetJakimOverride(dateKey) {
+    try {
+      const updated = await api("/api/admin/settings", {
+        method: "PUT",
+        body: { prayer: { overrides: { [dateKey]: null } } }
+      });
+      state.settings = updated;
+      populateSettings(updated);
+      toast(t("jakimResetDone"));
+      void loadJakimWeek(true);
+    } catch (err) {
+      toast(err.message, "err");
+    }
+  }
+  async function jakimSync(zone, all = false) {
+    const btn = all ? $("jakimSyncAllBtn") : $("jakimSyncZoneBtn");
+    const btnEl = btn;
+    if (btnEl) btnEl.disabled = true;
+    try {
+      const res = await api("/api/admin/jakim-sync", {
+        method: "POST",
+        body: all ? { all: true } : { zone }
+      });
+      if (all && res.started) {
+        toast(t("jakimSyncRunning"));
+        jakimSyncPolls = 12;
+        const poll = setInterval(() => {
+          void loadJakimWeek(true);
+          if (--jakimSyncPolls <= 0) clearInterval(poll);
+        }, 5e3);
+      } else {
+        toast(t("settingsSaved"));
+      }
+      void loadJakimWeek(true);
+    } catch (err) {
+      toast(err.message, "err");
+    } finally {
+      if (btnEl) btnEl.disabled = false;
+    }
+  }
+  function wireJakimPanel() {
+    if (!F.jakimCache()) return;
+    const card = $("jakimCacheCard");
+    if (card) card.hidden = false;
+    const allBtn = $("jakimSyncAllBtn");
+    if (allBtn) allBtn.hidden = !F.jakimSyncAll();
+    $("jakimBody").addEventListener("click", (e) => {
+      const btn = e.target.closest("button[data-jact]");
+      if (!btn) return;
+      const date = btn.dataset.date;
+      const act = btn.dataset.jact;
+      if (act === "edit") {
+        jakimEditingDate = date;
+        void loadJakimWeek(true);
+      } else if (act === "cancel") {
+        jakimEditingDate = null;
+        void loadJakimWeek(true);
+      } else if (act === "save") {
+        void saveJakimOverride(date);
+      } else if (act === "reset") {
+        void resetJakimOverride(date);
+      }
+    });
+    $("jakimSyncZoneBtn").addEventListener("click", () => {
+      void jakimSync(String($("stZone").value || ""));
+    });
+    if (allBtn) allBtn.addEventListener("click", () => {
+      void jakimSync(String($("stZone").value || ""), true);
+    });
+    $("stZone").addEventListener("change", () => {
+      void loadJakimWeek(true);
+    });
   }
   function buildPatch(section) {
     switch (section) {
@@ -2331,6 +2530,7 @@
       }
     });
     setInterval(syncAdminData, F.syncIntervalMs());
+    wireJakimPanel();
     if (state.token) {
       loadApp().then(() => resetIdleTimer()).catch(() => showLogin());
     } else {
@@ -2348,6 +2548,9 @@
 
   // packages/frontend/src/admin.ts
   bootAdmin({
-    features: {}
+    features: {
+      jakimCache: true,
+      jakimSyncAll: true
+    }
   });
 })();

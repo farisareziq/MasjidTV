@@ -241,4 +241,100 @@ describe('Functional Testing / feature requirements', () => {
       expect(body.nextEvent).not.toBeNull();
     });
   });
+
+  describe('FR7 — offline prayer times cache & manual edit', () => {
+    it('GET /api/admin/jakim-times returns the week with overrides merged', async () => {
+      const today = new Intl.DateTimeFormat('en-CA', {
+        timeZone: 'Asia/Kuala_Lumpur', year: 'numeric', month: '2-digit', day: '2-digit'
+      }).format(new Date());
+      // Simpan suntingan manual untuk hari semasa (fajr 05:51).
+      await srv.app.inject({
+        method: 'PUT',
+        url: '/api/admin/settings',
+        headers: { authorization: `Bearer ${token}` },
+        payload: { prayer: { overrides: { [today]: { fajr: '05:51' } } } }
+      });
+      const res = await srv.app.inject({
+        method: 'GET',
+        url: '/api/admin/jakim-times',
+        headers: { authorization: `Bearer ${token}` }
+      });
+      expect(res.statusCode).toBe(200);
+      const body = res.json();
+      expect(body.zone).toBe('WLY01');
+      expect(body.days).toHaveLength(7);
+      // Minggu stub JAKIM telah dicache oleh /api/today lebih awal — hari
+      // semasa wujud dengan nilai stub + suntingan digabung.
+      const todayRow = body.days.find((d: { dateKey: string }) => d.dateKey === today);
+      expect(todayRow).toBeTruthy();
+      expect(todayRow.effective.fajr).toBe('05:51'); // suntingan menang (stub: 05:55)
+      expect(todayRow.times.fajr).toBe('05:55'); // cache mentah kekal
+      expect(todayRow.effective.maghrib).toBe('19:27'); // nilai cache asal
+      expect(todayRow.overridden).toBe(true);
+      expect(body.coverage.totalZones).toBe(60);
+    });
+
+    it('a manual override is reflected on /api/today immediately', async () => {
+      const today = new Intl.DateTimeFormat('en-CA', {
+        timeZone: 'Asia/Kuala_Lumpur', year: 'numeric', month: '2-digit', day: '2-digit'
+      }).format(new Date());
+      await srv.app.inject({
+        method: 'PUT',
+        url: '/api/admin/settings',
+        headers: { authorization: `Bearer ${token}` },
+        payload: { prayer: { overrides: { [today]: { maghrib: '19:35' } } } }
+      });
+      const res = await srv.app.inject({
+        method: 'GET',
+        url: '/api/today',
+        headers: { 'x-display-key': srv.displayKey }
+      });
+      expect(res.json().prayers.maghrib.time).toBe('19:35');
+      // Buang suntingan → nilai rasmi dipulihkan.
+      await srv.app.inject({
+        method: 'PUT',
+        url: '/api/admin/settings',
+        headers: { authorization: `Bearer ${token}` },
+        payload: { prayer: { overrides: { [today]: null } } }
+      });
+      const restored = await srv.app.inject({
+        method: 'GET',
+        url: '/api/today',
+        headers: { 'x-display-key': srv.displayKey }
+      });
+      expect(restored.json().prayers.maghrib.time).toBe('19:27');
+    });
+
+    it('GET /api/admin/jakim-times rejects an invalid zone and requires auth', async () => {
+      const bad = await srv.app.inject({
+        method: 'GET',
+        url: '/api/admin/jakim-times?zone=ZZZ99',
+        headers: { authorization: `Bearer ${token}` }
+      });
+      expect(bad.statusCode).toBe(200); // fallback kepada zon tetapan (WLY01)
+      expect(bad.json().zone).toBe('WLY01');
+      const noAuth = await srv.app.inject({ method: 'GET', url: '/api/admin/jakim-times' });
+      expect(noAuth.statusCode).toBe(401);
+    });
+
+    it('POST /api/admin/jakim-sync syncs a single zone and stores it offline', async () => {
+      const res = await srv.app.inject({
+        method: 'POST',
+        url: '/api/admin/jakim-sync',
+        headers: { authorization: `Bearer ${token}` },
+        payload: { zone: 'SGR01' }
+      });
+      expect(res.statusCode).toBe(200);
+      expect(res.json().done).toBe(true);
+      // Seminggu stub kini tersimpan untuk SGR01 — jadual menunjukkannya.
+      const table = await srv.app.inject({
+        method: 'GET',
+        url: '/api/admin/jakim-times?zone=SGR01',
+        headers: { authorization: `Bearer ${token}` }
+      });
+      const days = table.json().days;
+      expect(days.filter((d: { times: unknown }) => d.times).length).toBe(7);
+      expect(days[0].times.fajr).toBe('05:55');
+    });
+  });
 });

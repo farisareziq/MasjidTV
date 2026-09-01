@@ -4,7 +4,7 @@
 import crypto from 'node:crypto';
 import bcrypt from 'bcryptjs';
 import { createLocalClient, applySchema, settings, announcements, eq, type LocalClient } from '@masjidtv/db';
-import { DEFAULT_SETTINGS, applyPatch, type Settings, type Announcement } from '@masjidtv/shared';
+import { DEFAULT_SETTINGS, applyPatch, jakimRowToEntry, jakimEntryToRow, type Settings, type Announcement, type JakimEntry } from '@masjidtv/shared';
 import fs from 'node:fs';
 import path from 'node:path';
 
@@ -201,6 +201,57 @@ export class Store {
   deleteAnnouncement(id: string): boolean {
     const result = this.client.db.delete(announcements).where(eq(announcements.id, id)).run();
     return result.changes > 0;
+  }
+
+  // --- cache jakim_times (waktu solat luar talia) ----------------------------
+
+  private static readonly UPSERT_JAKIM_SQL = `INSERT INTO jakim_times
+    (zone, date_key, hijri, imsak, fajr, syuruk, dhuha, dhuhr, asr, maghrib, isha, synced_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    ON CONFLICT (zone, date_key) DO UPDATE SET
+      hijri=excluded.hijri, imsak=excluded.imsak, fajr=excluded.fajr, syuruk=excluded.syuruk,
+      dhuha=excluded.dhuha, dhuhr=excluded.dhuhr, asr=excluded.asr, maghrib=excluded.maghrib,
+      isha=excluded.isha, synced_at=excluded.synced_at`;
+
+  getJakimEntry(zone: string, dateKey: string): JakimEntry | null {
+    const row = this.client.raw
+      .prepare('SELECT * FROM jakim_times WHERE zone = ? AND date_key = ?')
+      .get(zone, dateKey) as ReturnType<typeof jakimEntryToRow> | undefined;
+    return row ? jakimRowToEntry(row) : null;
+  }
+
+  putJakimEntries(zone: string, entries: JakimEntry[]): void {
+    if (!entries.length) return;
+    const stmt = this.client.raw.prepare(Store.UPSERT_JAKIM_SQL);
+    this.client.raw.transaction(() => {
+      const now = Date.now();
+      for (const e of entries) {
+        const r = jakimEntryToRow(zone, e);
+        stmt.run(r.zone, r.date_key, r.hijri, r.imsak, r.fajr, r.syuruk, r.dhuha, r.dhuhr, r.asr, r.maghrib, r.isha, now);
+      }
+    })();
+  }
+
+  getJakimRange(zone: string, from: string, to: string): JakimEntry[] {
+    const rows = this.client.raw
+      .prepare('SELECT * FROM jakim_times WHERE zone = ? AND date_key >= ? AND date_key <= ? ORDER BY date_key')
+      .all(zone, from, to) as ReturnType<typeof jakimEntryToRow>[];
+    return rows.map(jakimRowToEntry).filter((e): e is JakimEntry => e !== null);
+  }
+
+  getJakimMaxDate(zone: string): string | null {
+    const row = this.client.raw
+      .prepare('SELECT MAX(date_key) AS mx FROM jakim_times WHERE zone = ?')
+      .get(zone) as { mx: string | null } | undefined;
+    return row?.mx ?? null;
+  }
+
+  /** Ringkasan liputan cache per zon (untuk panel admin). */
+  getJakimCoverage(): { zone: string; count: number; maxDate: string | null }[] {
+    const rows = this.client.raw
+      .prepare('SELECT zone, COUNT(*) AS n, MAX(date_key) AS mx FROM jakim_times GROUP BY zone ORDER BY zone')
+      .all() as { zone: string; n: number; mx: string | null }[];
+    return rows.map((r) => ({ zone: r.zone, count: Number(r.n), maxDate: r.mx ?? null }));
   }
 
   close(): void {

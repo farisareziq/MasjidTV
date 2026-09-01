@@ -10,7 +10,7 @@ import {
   tenants, users, superusers, cloudAnnouncements, cloudMedia,
   pairingSessions, tvDevices, loginAttempts, eq, and, lt, sql, type CloudDatabase
 } from '@masjidtv/db';
-import { DEFAULT_SETTINGS, applyPatch, type Settings, type Announcement } from '@masjidtv/shared';
+import { DEFAULT_SETTINGS, applyPatch, jakimRowToEntry, jakimEntryToRow, type Settings, type Announcement, type JakimEntry, type JakimTimeRow } from '@masjidtv/shared';
 import { hashPassword } from './auth.js';
 
 function now(): number {
@@ -417,6 +417,58 @@ export class CloudStore {
   async deleteDeviceByToken(tenantId: string, token: string): Promise<void> {
     this._bustDevice(token);
     await this.db.delete(tvDevices).where(and(eq(tvDevices.tenantId, tenantId), eq(tvDevices.token, token))).run();
+  }
+
+  // --- cache jakim_times (GLOBAL — data awam JAKIM, dikongsi semua tenant) ---
+  // Suntingan manual TIDAK di sini: ia dalam settings tenant (prayer.overrides).
+
+  async getJakimEntry(zone: string, dateKey: string): Promise<JakimEntry | null> {
+    const rows = await this.db.all(
+      sql`SELECT * FROM jakim_times WHERE zone = ${zone} AND date_key = ${dateKey}`
+    );
+    const row = (rows as unknown as JakimTimeRow[])[0];
+    return row ? jakimRowToEntry(row) : null;
+  }
+
+  async putJakimEntries(zone: string, entries: JakimEntry[]): Promise<void> {
+    if (!entries.length) return;
+    const stamp = now();
+    // Multi-row INSERT + ON CONFLICT — satu round-trip Turso per 60 baris
+    // (elak siling 999 parameter SQLite).
+    for (let i = 0; i < entries.length; i += 60) {
+      const chunk = entries.slice(i, i + 60).map((e) => jakimEntryToRow(zone, e));
+      const values = sql.join(
+        chunk.map((r) => sql`(${r.zone}, ${r.date_key}, ${r.hijri}, ${r.imsak}, ${r.fajr}, ${r.syuruk}, ${r.dhuha}, ${r.dhuhr}, ${r.asr}, ${r.maghrib}, ${r.isha}, ${stamp})`),
+        sql`, `
+      );
+      await this.db.run(sql`INSERT INTO jakim_times
+        (zone, date_key, hijri, imsak, fajr, syuruk, dhuha, dhuhr, asr, maghrib, isha, synced_at)
+        VALUES ${values}
+        ON CONFLICT (zone, date_key) DO UPDATE SET
+          hijri=excluded.hijri, imsak=excluded.imsak, fajr=excluded.fajr, syuruk=excluded.syuruk,
+          dhuha=excluded.dhuha, dhuhr=excluded.dhuhr, asr=excluded.asr, maghrib=excluded.maghrib,
+          isha=excluded.isha, synced_at=excluded.synced_at`);
+    }
+  }
+
+  async getJakimRange(zone: string, from: string, to: string): Promise<JakimEntry[]> {
+    const rows = await this.db.all(
+      sql`SELECT * FROM jakim_times WHERE zone = ${zone} AND date_key >= ${from} AND date_key <= ${to} ORDER BY date_key`
+    );
+    return (rows as unknown as JakimTimeRow[]).map(jakimRowToEntry).filter((e): e is JakimEntry => e !== null);
+  }
+
+  async getJakimMaxDate(zone: string): Promise<string | null> {
+    const rows = await this.db.all(sql`SELECT MAX(date_key) AS mx FROM jakim_times WHERE zone = ${zone}`);
+    return (rows as unknown as { mx: string | null }[])[0]?.mx ?? null;
+  }
+
+  async getJakimCoverage(): Promise<{ zone: string; count: number; maxDate: string | null }[]> {
+    const rows = await this.db.all(
+      sql`SELECT zone, COUNT(*) AS n, MAX(date_key) AS mx FROM jakim_times GROUP BY zone ORDER BY zone`
+    );
+    return (rows as unknown as { zone: string; n: number; mx: string | null }[])
+      .map((r) => ({ zone: r.zone, count: Number(r.n), maxDate: r.mx ?? null }));
   }
 
   async deleteTenant(id: string): Promise<void> {

@@ -1,4 +1,4 @@
-import { sqliteTable, text, integer } from 'drizzle-orm/sqlite-core';
+import { sqliteTable, text, integer, primaryKey } from 'drizzle-orm/sqlite-core';
 
 // ---------------------------------------------------------------------------
 // Local (single-tenant) tables — offline-first mini PC server.
@@ -24,6 +24,28 @@ export const loginAttempts = sqliteTable('login_attempts', {
   count: integer('count').notNull().default(0),
   lockedUntil: integer('locked_until').notNull().default(0)
 });
+
+// Cermin data waktu solat JAKIM (e-Solat) — cache luar talia untuk SEMUA zon.
+// Dipenuhi oleh fetch rangkaian (minggu semasa) + sync tahunan (semua zon).
+// Suntingan manual admin TIDAK disimpan di sini — ia dalam settings
+// (prayer.overrides) supaya tersebar merentas peranti melalui saluran tetapan
+// sedia ada. Hijri = JSON {year,month,day} atau ''.
+export const jakimTimes = sqliteTable('jakim_times', {
+  zone: text('zone').notNull(),
+  dateKey: text('date_key').notNull(),
+  hijri: text('hijri').notNull().default(''),
+  imsak: text('imsak'),
+  fajr: text('fajr'),
+  syuruk: text('syuruk'),
+  dhuha: text('dhuha'),
+  dhuhr: text('dhuhr'),
+  asr: text('asr'),
+  maghrib: text('maghrib'),
+  isha: text('isha'),
+  syncedAt: integer('synced_at').notNull().default(0)
+}, (t) => ({
+  pk: primaryKey({ columns: [t.zone, t.dateKey] })
+}));
 
 // ---------------------------------------------------------------------------
 // Cloud (multi-tenant) tables — used only by the cloud app.

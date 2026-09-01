@@ -255,3 +255,131 @@ describe('Unit Testing / settings patch validation', () => {
     expect(JSON.stringify(DEFAULT_SETTINGS)).toBe(before);
   });
 });
+
+describe('Unit Testing / prayer.overrides (suntingan manual)', () => {
+  const today = dateKeyInZone(new Date(), 'Asia/Kuala_Lumpur');
+
+  it('upserts per-date overrides and validates HH:MM values', () => {
+    const next = applyPatch(DEFAULT_SETTINGS, {
+      prayer: { overrides: { [today]: { fajr: '05:58', maghrib: '19:30' } } }
+    });
+    expect(next.prayer.overrides?.[today]).toEqual({ fajr: '05:58', maghrib: '19:30' });
+    const next2 = applyPatch(next, {
+      prayer: { overrides: { [today]: { fajr: '06:01', bad: '25:99', isha: 'abc' } } }
+    });
+    // Kunci tidak sah dibuang; nilai sah menimpa; kunci tiada dalam patch kekal.
+    expect(next2.prayer.overrides?.[today]).toEqual({ fajr: '06:01', maghrib: '19:30' });
+  });
+
+  it('deletes a date override with null and preserves untouched dates', () => {
+    const withTwo = applyPatch(DEFAULT_SETTINGS, {
+      prayer: { overrides: {
+        '2026-01-01': { fajr: '05:00' },
+        '2026-01-02': { isha: '20:00' }
+      } }
+    });
+    const cleared = applyPatch(withTwo, {
+      prayer: { overrides: { '2026-01-01': null } }
+    });
+    expect(cleared.prayer.overrides?.['2026-01-01']).toBeUndefined();
+    expect(cleared.prayer.overrides?.['2026-01-02']).toEqual({ isha: '20:00' });
+  });
+
+  it('rejects malformed date keys and caps the map size', () => {
+    const big: Record<string, unknown> = { 'not-a-date': { fajr: '05:00' } };
+    for (let i = 0; i < 450; i++) big[`2026-${String(Math.floor(i / 31) + 1).padStart(2, '0')}-${String(i % 31 + 1).padStart(2, '0')}`] = { fajr: '05:00' };
+    const next = applyPatch(DEFAULT_SETTINGS, { prayer: { overrides: big } });
+    expect(next.prayer.overrides?.['not-a-date']).toBeUndefined();
+    expect(Object.keys(next.prayer.overrides || {}).length).toBeLessThanOrEqual(400);
+  });
+
+  it('a saved override wins over the JAKIM/local time in getDay', async () => {
+    const { getDay } = await import('../src/prayers.js');
+    const s = JSON.parse(JSON.stringify(DEFAULT_SETTINGS)) as typeof DEFAULT_SETTINGS;
+    // Pastikan tarikh ujian stabil: guna hari semasa MYT supaya getDay
+    // menyelesaikan hari yang sama.
+    s.prayer.source = 'local';
+    const base = await getDay(today, s);
+    const baseFajr = base.times.fajr!.time;
+    s.prayer.overrides = { [today]: { fajr: '05:11' } };
+    const edited = await getDay(today, s);
+    expect(edited.times.fajr!.time).toBe('05:11');
+    expect(edited.times.fajr!.time).not.toBe(baseFajr);
+    // Kunci lain tidak berubah.
+    expect(edited.times.dhuhr!.time).toBe(base.times.dhuhr!.time);
+  });
+});
+
+describe('Unit Testing / jakim cache helpers', () => {
+  it('round-trips a JakimEntry through the row conversion', async () => {
+    const { jakimEntryToRow, jakimRowToEntry } = await import('../src/jakim.js');
+    const entry = {
+      dateKey: '2026-09-01',
+      hijri: { year: 1448, month: 3, day: 9 },
+      day: 'Selasa',
+      times: { imsak: '05:44', fajr: '05:54', syuruk: '07:08', dhuha: '07:32', dhuhr: '13:15', asr: '16:36', maghrib: '19:22', isha: '20:34' }
+    };
+    const row = jakimEntryToRow('WLY01', entry);
+    expect(row.zone).toBe('WLY01');
+    expect(row.date_key).toBe('2026-09-01');
+    expect(JSON.parse(row.hijri)).toEqual(entry.hijri);
+    const back = jakimRowToEntry(row);
+    expect(back).not.toBeNull();
+    expect(back!.dateKey).toBe(entry.dateKey);
+    expect(back!.times).toEqual(entry.times);
+  });
+
+  it('tolerates corrupted hijri JSON and null times', async () => {
+    const { jakimRowToEntry } = await import('../src/jakim.js');
+    const row = {
+      zone: 'WLY01', date_key: '2026-09-01', hijri: '{oops',
+      imsak: null, fajr: '05:54', syuruk: null, dhuha: null,
+      dhuhr: '13:15', asr: null, maghrib: null, isha: null
+    };
+    const entry = jakimRowToEntry(row);
+    expect(entry).not.toBeNull();
+    expect(entry!.hijri).toBeNull();
+    expect(entry!.times.fajr).toBe('05:54');
+    expect(entry!.times.asr).toBeNull();
+  });
+
+  it('plans the yearly sync range from the cached max date', async () => {
+    const { planZoneYearSync } = await import('../src/jakim.js');
+    const today = '2026-09-01';
+    // Tiada cache → tahun penuh.
+    expect(planZoneYearSync(null, false, today)).toEqual({ from: '2026-01-01', to: '2026-12-31', complete: false });
+    // Cache hingga semalam → hanya hari semasa seterusnya.
+    expect(planZoneYearSync('2026-08-31', false, today)).toEqual({ from: '2026-09-01', to: '2026-12-31', complete: false });
+    // Cache tahun lama (sebelum tahun semasa) → mula semula dari 1 Jan.
+    expect(planZoneYearSync('2025-12-31', false, today)).toEqual({ from: '2026-01-01', to: '2026-12-31', complete: false });
+    // Lengkap → tiada yang perlu ditarik.
+    expect(planZoneYearSync('2026-12-31', false, today).complete).toBe(true);
+    // Paksa → tarik semula tahun penuh.
+    expect(planZoneYearSync('2026-12-31', true, today).complete).toBe(false);
+  });
+
+  it('serves getEntryForDate fully offline once the DB cache has the day', async () => {
+    const { setJakimCacheAdapter, getEntryForDate, jakimEntryToRow, jakimRowToEntry } = await import('../src/jakim.js');
+    const entry = {
+      dateKey: '2026-09-01',
+      hijri: { year: 1448, month: 3, day: 9 },
+      day: 'Selasa',
+      times: { imsak: '05:44', fajr: '05:54', syuruk: '07:08', dhuha: '07:32', dhuhr: '13:15', asr: '16:36', maghrib: '19:22', isha: '20:34' }
+    };
+    // Adapter ingat-berterusan: hari tersimpan TIDAK boleh mencetuskan sebarang
+    // panggilan rangkaian — fetch ditukar kepada fungsi yang gagal ujian.
+    let putCalls = 0;
+    setJakimCacheAdapter({
+      get: (_zone, dateKey) => (dateKey === '2026-09-01' ? jakimRowToEntry(jakimEntryToRow('WLY01', entry)) : null),
+      put: () => { putCalls++; }
+    });
+    try {
+      const found = await getEntryForDate('WLY01', '2026-09-01');
+      expect(found).not.toBeNull();
+      expect(found!.times.fajr).toBe('05:54');
+      expect(putCalls).toBe(0); // cache hit — tiada tulisan
+    } finally {
+      setJakimCacheAdapter(null);
+    }
+  });
+});

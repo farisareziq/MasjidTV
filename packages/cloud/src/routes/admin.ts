@@ -7,7 +7,9 @@ import {
   buildEventsPayload, syncEventsFor, buildTodayPayload,
   UPLOAD_TYPES,
   sanitizeAnnouncementCreate, applyAnnouncementPatch,
-  sortAnnouncements, isAnnouncementActive
+  sortAnnouncements, isAnnouncementActive,
+  dateKeyInZone, addDays, fetchJakimRange, planZoneYearSync, hijriText, getZone,
+  type JakimEntry
 } from '@masjidtv/shared';
 import { signToken, comparePassword } from '../auth.js';
 import { verifyLicense, licenseStatus } from '../license.js';
@@ -157,6 +159,93 @@ export function registerAdminRoutes(app: FastifyInstance, ctx: RouteContext): vo
       await store.updateAnnouncement(tenant.id, a.id, a);
     }
     reply.send({ ok: true });
+  });
+
+  // --- Cache waktu solat JAKIM (luar talia + suntingan manual) ----------------
+  //
+  // Jadual jakim_times GLOBAL (dikongsi semua tenant — data awam per zon).
+  // Suntingan manual dibaca daripada settings tenant (prayer.overrides) dan
+  // digabung dalam respons supaya panel memaparkan nilai sebenar paparan.
+
+  app.get('/api/admin/jakim-times', async (req, reply) => {
+    const tenant = await requireAdmin(store, req, reply);
+    if (!tenant) return;
+    const s = tenant.settings;
+    const tz = s.prayer.timezone || 'Asia/Kuala_Lumpur';
+    const q = (req.query || {}) as { zone?: string; from?: string; to?: string };
+    const zone = (typeof q.zone === 'string' && getZone(q.zone)) ? q.zone : s.prayer.zone;
+    const today = dateKeyInZone(new Date(), tz);
+    const from = typeof q.from === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(q.from) ? q.from : today;
+    const maxTo = addDays(from, 30);
+    let to = typeof q.to === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(q.to) ? q.to : addDays(from, 6);
+    if (to > maxTo) to = maxTo;
+    if (to < from) to = from;
+
+    const entries = new Map((await store.getJakimRange(zone, from, to)).map((e) => [e.dateKey, e]));
+    const overrides = s.prayer.overrides || {};
+    const days: unknown[] = [];
+    for (let cursor = from; cursor <= to; cursor = addDays(cursor, 1)) {
+      const entry = entries.get(cursor) as (JakimEntry & { times: Record<string, string | null> }) | undefined;
+      const dayOverride = overrides[cursor];
+      const overridden = !!dayOverride && Object.keys(dayOverride).length > 0;
+      const times: Record<string, string | null> | null = entry ? { ...entry.times } : null;
+      let effective: Record<string, string | null> | null = times ? { ...times } : null;
+      if (dayOverride) {
+        if (!effective) effective = {};
+        if (dayOverride.imsak) effective.imsak = dayOverride.imsak;
+        if (dayOverride.fajr) effective.fajr = dayOverride.fajr;
+        if (dayOverride.sunrise) effective.syuruk = dayOverride.sunrise;
+        if (dayOverride.dhuhr) effective.dhuhr = dayOverride.dhuhr;
+        if (dayOverride.asr) effective.asr = dayOverride.asr;
+        if (dayOverride.maghrib) effective.maghrib = dayOverride.maghrib;
+        if (dayOverride.isha) effective.isha = dayOverride.isha;
+      }
+      days.push({
+        dateKey: cursor,
+        hijri: entry?.hijri ? hijriText(entry.hijri) : null,
+        times,
+        effective,
+        overrides: dayOverride || null,
+        overridden
+      });
+    }
+
+    const year = Number(today.slice(0, 4));
+    const coverageRows = await store.getJakimCoverage();
+    reply.send({
+      zone,
+      from,
+      to,
+      days,
+      coverage: {
+        totalZones: 60,
+        zonesCached: coverageRows.length,
+        zonesFullYear: coverageRows.filter((r) => r.maxDate && r.maxDate >= `${year}-12-31`).length
+      }
+    });
+  });
+
+  // Sync zon tenant (≤3 permintaan JAKIM — sama ikatan seperti /api/admin/events/sync
+  // yang menarik julat setahun). Tidak ada sync semua-zon di serverless.
+  app.post('/api/admin/jakim-sync', async (req, reply) => {
+    const tenant = await requireAdmin(store, req, reply);
+    if (!tenant) return;
+    const body = (req.body || {}) as { zone?: string; force?: boolean };
+    const zone = (typeof body.zone === 'string' && getZone(body.zone))
+      ? body.zone
+      : tenant.settings.prayer.zone;
+    const tz = tenant.settings.prayer.timezone || 'Asia/Kuala_Lumpur';
+    const today = dateKeyInZone(new Date(), tz);
+    const plan = planZoneYearSync(await store.getJakimMaxDate(zone), body.force === true, today);
+    if (plan.complete) {
+      return reply.send({ done: true, complete: true, synced: 0 });
+    }
+    try {
+      const entries = await fetchJakimRange(zone, plan.from, plan.to);
+      reply.send({ done: true, complete: true, synced: entries.length });
+    } catch (err) {
+      jsonError(reply, 502, `Sync JAKIM gagal: ${err instanceof Error ? err.message : String(err)}`);
+    }
   });
 
   // Combined admin sync — returns status + today + announcements in ONE

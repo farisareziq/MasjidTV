@@ -322,6 +322,35 @@
           <button class="btn primary" data-save="prayer" data-i18n="savePrayer">Save prayer settings</button>
         </div>
 
+        <div class="card" id="jakimCacheCard" hidden>
+          <h3 data-i18n="jakimCacheTitle">Offline prayer times cache &amp; manual edit</h3>
+          <p class="sub" data-i18n="jakimCacheSub">Prayer times are cached offline in the database. If an official time is inaccurate, edit that day manually — your edit overrides the official time on the display immediately.</p>
+          <div class="jakim-bar">
+            <span id="jakimCoverage" class="sub"></span>
+            <button class="btn" id="jakimSyncZoneBtn" data-i18n="jakimSyncZone">Sync this zone</button>
+            <button class="btn" id="jakimSyncAllBtn" data-i18n="jakimSyncAll" hidden>Sync all 60 zones (background)</button>
+          </div>
+          <div class="table-wrap">
+            <table class="jakim-table">
+              <thead>
+                <tr>
+                  <th data-i18n="date">Date</th>
+                  <th data-i18n="hijriShort">Hijri</th>
+                  <th data-i18n="imsak">Imsak</th>
+                  <th data-i18n="fajr">Fajr</th>
+                  <th data-i18n="sunrise">Syuruk</th>
+                  <th data-i18n="dhuhr">Dhuhr</th>
+                  <th data-i18n="asr">Asr</th>
+                  <th data-i18n="maghrib">Maghrib</th>
+                  <th data-i18n="isha">Isha</th>
+                  <th></th>
+                </tr>
+              </thead>
+              <tbody id="jakimBody"></tbody>
+            </table>
+          </div>
+        </div>
+
         <div class="card">
           <h3 data-i18n="audioTitle">Audio — Azan &amp; Iqamah</h3>
           <p class="sub" data-i18n="audioSub">The screen plays the adhan at the start of each prayer and the iqamah call at the configured iqamah time. Upload your own audio files or paste a URL.</p>
