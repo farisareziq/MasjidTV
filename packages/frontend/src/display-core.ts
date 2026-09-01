@@ -680,7 +680,9 @@ function tickPrayerMode(): void {
       arabic.textContent = 'إِقَامَة';
       arabic.classList.add('big');
       ovName.textContent = name;
-      sub.textContent = time ? `${((t('names') as unknown) as Record<string, string>)[ev.key]} — ${fmtPrayerTime(time)}` : '';
+      // prayerLabel (bukan names mentah) — pada hari Jumaat sub mesti
+      // menunjukkan "Jumaat" (konsisten dengan ovName), bukan "Zohor".
+      sub.textContent = time ? `${name} — ${fmtPrayerTime(time)}` : '';
       count.textContent = formatDuration(st.remaining);
       break;
     case 'jemaah':

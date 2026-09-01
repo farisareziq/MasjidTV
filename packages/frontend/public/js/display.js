@@ -584,7 +584,7 @@
         arabic.textContent = "\u0625\u0650\u0642\u064E\u0627\u0645\u064E\u0629";
         arabic.classList.add("big");
         ovName.textContent = name;
-        sub.textContent = time ? `${t("names")[ev.key]} \u2014 ${fmtPrayerTime(time)}` : "";
+        sub.textContent = time ? `${name} \u2014 ${fmtPrayerTime(time)}` : "";
         count.textContent = formatDuration(st.remaining);
         break;
       case "jemaah":
