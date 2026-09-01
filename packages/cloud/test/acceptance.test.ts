@@ -209,4 +209,58 @@ describe('Acceptance Testing / cloud user journeys', () => {
     const delMissing = await app.inject({ method: 'DELETE', url: '/api/admin/media/tiada-id', headers });
     expect(delMissing.statusCode).toBe(404);
   });
+
+  // --- Cache device-token: pembatalan segera (regresi v1.1.1) -----------------
+  //
+  // dry-run-kiosk menangkap: padam peranti melalui ID admin tidak membatalkan
+  // cache device-token 30sa → TV yang dinyahpaut kekal sah sehingga TTL.
+  // Unpair mesti segera berkuat kuasa.
+
+  it('DEV1 — padam peranti (by ID) membatalkan token serta-merta, bukan selepas TTL cache', async () => {
+    const login = await app.inject({
+      method: 'POST', url: '/api/auth/login',
+      payload: { username: 'ustaz', password: 'rahsia123' }
+    });
+    const token = login.json().token;
+    const headers = { authorization: `Bearer ${token}` };
+
+    // Cipta peranti (pairing claim penuh tidak diperlukan — tulis terus
+    // melalui laluan padam/uji tidak wujud; guna aliran pair sebenar ringkas:
+    // pair/start + claim oleh admin).
+    const start = await app.inject({
+      method: 'POST', url: '/api/pair/start',
+      payload: { deviceId: 'test-device-cache-bust' }
+    });
+    expect(start.statusCode).toBe(200);
+    const code = start.json().code;
+    const claim = await app.inject({
+      method: 'POST', url: '/api/admin/pair',
+      headers, payload: { code, name: 'TV Cache Test' }
+    });
+    expect(claim.statusCode).toBe(200);
+    const deviceToken = claim.json().token;
+
+    // Isi cache: satu panggilan baca sahaja mencache token selama 30sa.
+    const before = await app.inject({
+      method: 'GET', url: '/api/settings',
+      headers: { 'x-device-token': deviceToken }
+    });
+    expect(before.statusCode).toBe(200);
+
+    // Padam melalui ID (laluan unpair admin sebenar).
+    const list = await app.inject({ method: 'GET', url: '/api/admin/devices', headers });
+    const device = list.json().devices.find((d: { deviceId?: string }) => d.deviceId === 'test-device-cache-bust' || d.id === 'test-device-cache-bust');
+    expect(device).toBeTruthy();
+    const del = await app.inject({
+      method: 'DELETE', url: `/api/admin/devices/${device.id}`, headers
+    });
+    expect(del.statusCode).toBe(200);
+
+    // Token mesti ditolak SERTA-MERTA (cache dibatalkan oleh deleteDevice).
+    const after = await app.inject({
+      method: 'GET', url: '/api/settings',
+      headers: { 'x-device-token': deviceToken }
+    });
+    expect(after.statusCode).toBe(401);
+  });
 });

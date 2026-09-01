@@ -407,7 +407,14 @@ export class CloudStore {
   }
 
   async deleteDevice(tenantId: string, id: string): Promise<void> {
+    // Baca baris dahulu supaya cache device-token dapat dibatalkan — tanpa
+    // ini token peranti yang dipadam kekal sah sehingga TTL 30sa (unpair
+    // admin tidak segera berkuat kuasa; ditangkap oleh dry-run-kiosk).
+    const rows = await this.db.select().from(tvDevices)
+      .where(and(eq(tvDevices.tenantId, tenantId), eq(tvDevices.id, id))).all();
+    const token = rows[0]?.token;
     await this.db.delete(tvDevices).where(and(eq(tvDevices.tenantId, tenantId), eq(tvDevices.id, id))).run();
+    if (token) this._bustDevice(token);
   }
 
   async renameDevice(tenantId: string, id: string, name: string): Promise<void> {
