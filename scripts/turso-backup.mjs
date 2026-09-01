@@ -22,6 +22,10 @@ if (!url) {
 }
 
 const client = await createCloudClient(url, token);
+// jakim_times DIKECUALIKAN secara sengaja: cache awam JAKIM (60 zon × setahun,
+// ~22k baris/tahun) yang dibina semula automatik daripada e-solat.gov.my —
+// bukan data tenant/pengguna. Restore (turso-restore.mjs) tidak menyentuh
+// jadual yang tiada dalam backup. Jangan tambah melainkan keputusan berubah.
 const tables = ['tenants', 'users', 'superusers', 'cloud_announcements', 'cloud_media', 'pairing_sessions', 'tv_devices'];
 const backup = { exportedAt: new Date().toISOString(), tables: {} };
 const errors = [];

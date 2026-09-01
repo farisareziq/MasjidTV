@@ -46,6 +46,8 @@ jobs:
       # Integrity gate ketat: SEMUA 7 jadual cloud mesti hadir dan bukan
       # undefined. Backup kosong separa ( Jadual hilang = DB rosak /
       # kebenaran hilang / skema drift) — jangan terima sebagai "success".
+      # (jakim_times DIKECUALIKAN — cache awam JAKIM yang dibina semula
+      # automatik; bukan data tenant. Lihat turso-backup.mjs.)
       - name: Verify backup integrity (all cloud tables present)
         run: |
           node -e "
