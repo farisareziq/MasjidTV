@@ -257,6 +257,18 @@ export async function createCloudApp(opts?: { staticDir?: string }): Promise<Fas
   app.setNotFoundHandler((_req, reply) => jsonError(reply, 404, 'Tidak dijumpai'));
   app.setErrorHandler((err, _req, reply) => {
     const msg = err instanceof Error ? err.message : String(err);
+    const code = (err as { code?: unknown }).code;
+    const statusCode = (err as { statusCode?: unknown }).statusCode;
+    // Ralat framework Fastify (415 media-type tidak disokong, 400 JSON
+    // rosak, 413 badan terlalu besar) membawa statusCode sendiri — hormati
+    // supaya input pelanggan yang salah tidak dilaporkan sebagai 500 (boleh
+    // mencetuskan alert ralat palsu + mengelirukan pentest/monitoring).
+    // Mesej FST_ERR bersifat generik — selalu di dedahkan.
+    if (typeof code === 'string' && code.startsWith('FST_ERR')) {
+      const sc = typeof statusCode === 'number' ? statusCode : 400;
+      console.error(`[cloud] ralat ${sc} (${code}):`, msg);
+      return reply.status(sc).send({ error: msg, code });
+    }
     console.error('[cloud] ralat:', msg);
     reply.status(500).send({ error: 'Ralat dalaman' });
   });
